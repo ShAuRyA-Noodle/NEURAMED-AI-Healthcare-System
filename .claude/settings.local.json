@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls \"c:/Users/Dell/Desktop/Project01/frontend/.env\"*)",
+      "Bash(ls \"c:/Users/Dell/Desktop/Project01/neural-care-hub-main/.env\"*)"
+    ]
+  }
+}
