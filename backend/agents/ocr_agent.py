@@ -4,9 +4,9 @@ import os
 import time
 import logging
 from PIL import Image
-from backend.utils.llm import call_llm
-from backend.db.schemas import ReportAnalysisResult
-from backend.db.models import Report, DiagnosisSession
+from utils.llm import call_llm
+from db.schemas import ReportAnalysisResult
+from db.models import Report, DiagnosisSession
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)

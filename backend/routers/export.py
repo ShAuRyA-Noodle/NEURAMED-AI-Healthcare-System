@@ -6,9 +6,9 @@ from typing import Optional
 from datetime import datetime, timedelta
 from io import BytesIO
 
-from backend.db.database import get_db
-from backend.db.models import DiagnosisSession
-from backend.utils.pdf_export import generate_session_pdf
+from db.database import get_db
+from db.models import DiagnosisSession
+from utils.pdf_export import generate_session_pdf
 
 router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
 

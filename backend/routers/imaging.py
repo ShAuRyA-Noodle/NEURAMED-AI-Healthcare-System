@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
-from backend.ws_manager import broadcast_to_clients
+from ws_manager import broadcast_to_clients
 from datetime import datetime
 from typing import Optional, List
-from backend.db.database import get_db
-from backend.agents import imaging_agent
-from backend.db.models import ScanResult
-from backend.db.schemas import ScanAnalysisResult, ScanResultResponse
+from db.database import get_db
+from agents import imaging_agent
+from db.models import ScanResult
+from db.schemas import ScanAnalysisResult, ScanResultResponse
 
 router = APIRouter(prefix="/api/imaging", tags=["Imaging"])
 
@@ -22,7 +22,7 @@ async def analyze_image(
         contents = await file.read()
         res = imaging_agent.analyze(image_bytes=contents, scan_type=scan_type, patient_id=patient_id, session_id=session_id, db=db)
         
-        from backend.db.models import Patient
+        from db.models import Patient
         patient = db.query(Patient).filter(Patient.id == patient_id).first() if patient_id else None
         p_code = patient.patient_code if patient else f"PT-{patient_id}"
 
