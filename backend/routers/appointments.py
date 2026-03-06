@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import Optional, List
+from datetime import datetime, timedelta
 from pydantic import BaseModel
 from backend.db.database import get_db
 from backend.agents import appointment_agent
@@ -12,6 +14,10 @@ router = APIRouter(prefix="/api/appointments", tags=["Appointments"])
 
 class StatusUpdate(BaseModel):
     status: str
+
+
+class NotesUpdate(BaseModel):
+    notes: str
 
 
 @router.post("", response_model=AppointmentResponse)
@@ -33,30 +39,111 @@ def create_appointment(app_req: AppointmentCreate, db: Session = Depends(get_db)
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _format_appointment(a):
+    p_code = a.patient.patient_code if a.patient else f"PT-{a.patient_id}"
+    now = datetime.utcnow()
+    time_until = None
+    if a.appointment_datetime and a.appointment_datetime > now:
+        time_until = int((a.appointment_datetime - now).total_seconds() / 60)
+    return {
+        "id": a.id,
+        "patient_id": a.patient_id,
+        "patient_code": p_code,
+        "doctor_name": a.doctor_name,
+        "specialty": a.specialty,
+        "appointment_datetime": a.appointment_datetime.isoformat() if a.appointment_datetime else None,
+        "reason": a.reason,
+        "status": a.status,
+        "appointment_type": getattr(a, "appointment_type", "initial") or "initial",
+        "notes": getattr(a, "notes", None),
+        "duration_minutes": getattr(a, "duration_minutes", 30) or 30,
+        "location": getattr(a, "location", None),
+        "time_until_minutes": time_until,
+        "created_at": a.created_at.isoformat() if a.created_at else None,
+    }
+
+
+@router.get("/stats")
+def get_appointment_stats(db: Session = Depends(get_db)):
+    total = db.query(Appointment).count()
+    scheduled = db.query(Appointment).filter(Appointment.status == "scheduled").count()
+    completed = db.query(Appointment).filter(Appointment.status == "completed").count()
+    cancelled = db.query(Appointment).filter(Appointment.status == "cancelled").count()
+
+    now = datetime.utcnow()
+    today_start = datetime(now.year, now.month, now.day)
+    today_end = today_start + timedelta(days=1)
+    week_start = today_start - timedelta(days=now.weekday())
+
+    today_count = db.query(Appointment).filter(
+        Appointment.appointment_datetime >= today_start,
+        Appointment.appointment_datetime < today_end
+    ).count()
+
+    this_week_count = db.query(Appointment).filter(
+        Appointment.appointment_datetime >= week_start,
+        Appointment.appointment_datetime < today_end
+    ).count()
+
+    completion_rate = round(completed / total * 100, 1) if total > 0 else 0
+
+    return {
+        "total": total,
+        "scheduled": scheduled,
+        "completed": completed,
+        "cancelled": cancelled,
+        "today_count": today_count,
+        "this_week_count": this_week_count,
+        "completion_rate": completion_rate
+    }
+
+
+@router.get("/upcoming")
+def get_upcoming(db: Session = Depends(get_db)):
+    now = datetime.utcnow()
+    week_ahead = now + timedelta(days=7)
+    appointments = db.query(Appointment).filter(
+        Appointment.appointment_datetime >= now,
+        Appointment.appointment_datetime <= week_ahead,
+        Appointment.status == "scheduled"
+    ).order_by(Appointment.appointment_datetime.asc()).all()
+    return [_format_appointment(a) for a in appointments]
+
+
+@router.get("/today")
+def get_today_appointments(db: Session = Depends(get_db)):
+    now = datetime.utcnow()
+    today_start = datetime(now.year, now.month, now.day)
+    today_end = today_start + timedelta(days=1)
+    appointments = db.query(Appointment).filter(
+        Appointment.appointment_datetime >= today_start,
+        Appointment.appointment_datetime < today_end
+    ).order_by(Appointment.appointment_datetime.asc()).all()
+    return [_format_appointment(a) for a in appointments]
+
+
 @router.get("")
-def get_appointments(patient_id: Optional[int] = None, status: Optional[str] = None, db: Session = Depends(get_db)):
+def get_appointments(
+    patient_id: Optional[int] = None,
+    status: Optional[str] = None,
+    specialty: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
     query = db.query(Appointment)
     if patient_id:
         query = query.filter(Appointment.patient_id == patient_id)
     if status:
         query = query.filter(Appointment.status == status)
+    if specialty:
+        query = query.filter(Appointment.specialty.ilike(f"%{specialty}%"))
+    if date_from:
+        query = query.filter(Appointment.appointment_datetime >= date_from)
+    if date_to:
+        query = query.filter(Appointment.appointment_datetime <= date_to)
     appointments = query.order_by(Appointment.appointment_datetime.asc()).all()
-
-    result = []
-    for a in appointments:
-        p_code = a.patient.patient_code if a.patient else f"PT-{a.patient_id}"
-        result.append({
-            "id": a.id,
-            "patient_id": a.patient_id,
-            "patient_code": p_code,
-            "doctor_name": a.doctor_name,
-            "specialty": a.specialty,
-            "appointment_datetime": a.appointment_datetime.isoformat() if a.appointment_datetime else None,
-            "reason": a.reason,
-            "status": a.status,
-            "created_at": a.created_at.isoformat() if a.created_at else None,
-        })
-    return result
+    return [_format_appointment(a) for a in appointments]
 
 
 @router.patch("/{appointment_id}/status")
@@ -69,15 +156,15 @@ def update_status(appointment_id: int, body: StatusUpdate, db: Session = Depends
     if not app:
         raise HTTPException(status_code=404, detail="Appointment not found")
 
-    p_code = app.patient.patient_code if app.patient else f"PT-{app.patient_id}"
-    return {
-        "id": app.id,
-        "patient_id": app.patient_id,
-        "patient_code": p_code,
-        "doctor_name": app.doctor_name,
-        "specialty": app.specialty,
-        "appointment_datetime": app.appointment_datetime.isoformat() if app.appointment_datetime else None,
-        "reason": app.reason,
-        "status": app.status,
-        "created_at": app.created_at.isoformat() if app.created_at else None,
-    }
+    return _format_appointment(app)
+
+
+@router.patch("/{appointment_id}/notes")
+def add_notes(appointment_id: int, body: NotesUpdate, db: Session = Depends(get_db)):
+    app = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not app:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    app.notes = body.notes
+    db.commit()
+    db.refresh(app)
+    return _format_appointment(app)
