@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from backend.db.models import Appointment
+from db.models import Appointment
 from datetime import datetime
 
 def create_appointment(db: Session, patient_id: int, doctor_name: str, specialty: str, appointment_datetime: datetime, reason: str):

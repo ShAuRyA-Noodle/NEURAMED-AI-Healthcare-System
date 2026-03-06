@@ -18,9 +18,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from datetime import datetime
 
-from backend.db.database import engine, Base
-from backend.routers import voice, imaging, ocr, dashboard, patients, appointments, search, system
-from backend.seed import seed_db
+from db.database import engine, Base
+from routers import voice, imaging, ocr, dashboard, patients, appointments, search, system
+from seed import seed_db
 
 # Create all tables
 Base.metadata.create_all(bind=engine)
@@ -46,12 +46,12 @@ app.include_router(dashboard.router)
 app.include_router(patients.router)
 app.include_router(appointments.router)
 
-from backend.routers import export
+from routers import export
 app.include_router(export.router)
 app.include_router(search.router)
 app.include_router(system.router)
 
-from backend.ws_manager import manager, broadcast_to_clients
+from ws_manager import manager, broadcast_to_clients
 
 @app.websocket("/ws/live-feed")
 async def websocket_endpoint(websocket: WebSocket):

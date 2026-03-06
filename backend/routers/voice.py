@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from backend.ws_manager import broadcast_to_clients
+from ws_manager import broadcast_to_clients
 from datetime import datetime
 from pydantic import BaseModel
 from typing import Optional, List
-from backend.db.database import get_db
-from backend.agents import voice_agent
-from backend.db.models import DiagnosisSession
-from backend.db.schemas import DiagnosisResult, DiagnosisSessionResponse
+from db.database import get_db
+from agents import voice_agent
+from db.models import DiagnosisSession
+from db.schemas import DiagnosisResult, DiagnosisSessionResponse
 
 router = APIRouter(prefix="/api/voice", tags=["Voice"])
 
@@ -27,7 +27,7 @@ async def diagnose(request: DiagnoseRequest, db: Session = Depends(get_db)):
         )
         
         # Load patient
-        from backend.db.models import Patient
+        from db.models import Patient
         patient = db.query(Patient).filter(Patient.id == request.patient_id).first() if request.patient_id else None
         p_code = patient.patient_code if patient else f"PT-{request.patient_id}"
 
