@@ -14,16 +14,36 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-IMAGING_PROMPT = """You are a radiologist AI assistant.
-Given medical scan region statistics, return ONLY JSON:
+IMAGING_PROMPT = """You are a board-certified radiologist AI assistant.
+Analyze the following medical scan region statistics and provide a comprehensive radiological report.
+
+Return ONLY this exact JSON, no markdown:
 {
-  "findings": "Detailed radiological findings in 2-3 clinical sentences",
-  "impression": "Primary radiological impression",
-  "recommendations": ["Specific follow-up action 1", "Action 2"],
-  "anomaly_type": "nodule|mass|opacity|effusion|calcification|normal",
-  "follow_up": "Recommended next diagnostic step",
-  "urgency": "routine|urgent|emergent"
-}"""
+  "primary_finding": "Most significant finding in one clinical sentence",
+  "findings": "Detailed radiological findings paragraph (3-4 sentences, clinical language)",
+  "impression": "Radiological impression — what this likely means clinically",
+  "anomaly_type": "nodule|mass|opacity|effusion|calcification|consolidation|normal|artifact",
+  "acr_category": "ACR 1|ACR 2|ACR 3|ACR 4|ACR 5",
+  "acr_description": "What this ACR category means for the patient",
+  "measurements": "Estimated size/extent of primary finding if applicable",
+  "distribution": "Unilateral/bilateral, location description",
+  "recommendations": [
+    {"priority": "immediate|routine|optional", "action": "specific recommendation"}
+  ],
+  "follow_up_imaging": "Specific follow-up scan recommended and timeframe",
+  "clinical_correlation": "How findings should be correlated with patient symptoms",
+  "differential_diagnoses": ["diagnosis1", "diagnosis2", "diagnosis3"],
+  "urgency": "routine|urgent|emergent",
+  "confidence": 0.81,
+  "follow_up": "Recommended next diagnostic step"
+}
+
+Rules:
+- acr_category: ACR 1=Negative, ACR 2=Benign, ACR 3=Probably Benign, ACR 4=Suspicious, ACR 5=Highly Suggestive of Malignancy
+- If no anomalies detected, use ACR 1 or ACR 2
+- recommendations: include priority level for each
+- Be clinically specific, avoid vague language
+- confidence: 0.0-1.0 based on image quality and finding clarity"""
 
 
 def bytes_to_b64(img_bytes: bytes) -> str:
@@ -41,12 +61,25 @@ def analyze(image_bytes: bytes, scan_type: str, patient_id: int | None, session_
 
     original_b64 = bytes_to_b64(image_bytes)
 
-    # OpenCV pipeline
+    # Scan-type specific OpenCV pipeline
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    img_height, img_width = gray.shape[:2]
+
+    # Adjust CLAHE parameters by scan type
+    scan_lower = scan_type.lower() if scan_type else ""
+    if "ct" in scan_lower:
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+    elif "mri" in scan_lower:
+        clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(16, 16))
+    else:
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+
     enhanced = clahe.apply(gray)
     blurred = cv2.GaussianBlur(enhanced, (5, 5), 0)
     _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    # Estimate pixel size for measurements (assume standard FOV ~350mm for chest)
+    pixel_size_mm = 350.0 / max(img_width, 1)
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     annotated = img.copy()
@@ -76,6 +109,10 @@ def analyze(image_bytes: bytes, scan_type: str, patient_id: int | None, session_
         label = f"R{i + 1}: {confidence:.0%}"
         cv2.putText(annotated, label, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
 
+        # Estimate real-world size
+        size_w_mm = round(w * pixel_size_mm, 1)
+        size_h_mm = round(h * pixel_size_mm, 1)
+
         regions.append({
             "id": i + 1,
             "location": f"Region at ({x},{y})",
@@ -84,7 +121,8 @@ def analyze(image_bytes: bytes, scan_type: str, patient_id: int | None, session_
             "mean_intensity": round(mean_intensity, 1),
             "confidence": round(confidence, 3),
             "is_anomaly": is_anomaly,
-            "bounding_box": {"x": x, "y": y, "w": w, "h": h}
+            "bounding_box": {"x": x, "y": y, "w": w, "h": h},
+            "size_mm": f"~{size_w_mm}mm x {size_h_mm}mm"
         })
 
     # Encode annotated image
@@ -157,5 +195,15 @@ def analyze(image_bytes: bytes, scan_type: str, patient_id: int | None, session_
         session_id=session_id,
         impression=llm_result.get("impression", ""),
         recommendations=llm_result.get("recommendations", []),
-        follow_up=llm_result.get("follow_up", "")
+        follow_up=llm_result.get("follow_up", ""),
+        primary_finding=llm_result.get("primary_finding", ""),
+        acr_category=llm_result.get("acr_category", ""),
+        acr_description=llm_result.get("acr_description", ""),
+        measurements=llm_result.get("measurements", ""),
+        distribution=llm_result.get("distribution", ""),
+        differential_diagnoses=llm_result.get("differential_diagnoses", []),
+        clinical_correlation=llm_result.get("clinical_correlation", ""),
+        follow_up_imaging=llm_result.get("follow_up_imaging", ""),
+        anomaly_type=llm_result.get("anomaly_type", ""),
+        urgency=llm_result.get("urgency", "routine")
     )

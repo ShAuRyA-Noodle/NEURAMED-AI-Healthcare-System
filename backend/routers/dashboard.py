@@ -1,13 +1,18 @@
+import time as _time
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List
 from datetime import datetime, timedelta
 from backend.db.database import get_db
-from backend.db.models import DiagnosisSession, Patient, Report
+from backend.db.models import DiagnosisSession, Patient, Report, Appointment
 from backend.db.schemas import DashboardStats, ActivityFeedItem
+from backend.utils.llm import call_llm
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
+
+# Simple in-memory cache for AI insights
+_insights_cache: dict = {"data": None, "timestamp": 0}
 
 
 @router.get("/stats", response_model=DashboardStats)
@@ -155,3 +160,128 @@ def get_recent_sessions(limit: int = 10, db: Session = Depends(get_db)):
             "created_at": s.created_at.isoformat() if s.created_at else None
         })
     return res
+
+
+@router.get("/quick-stats")
+def get_quick_stats(db: Session = Depends(get_db)):
+    total_voice = db.query(DiagnosisSession).filter(DiagnosisSession.agent_type == "voice").count()
+    total_imaging = db.query(DiagnosisSession).filter(DiagnosisSession.agent_type == "imaging").count()
+    total_ocr = db.query(DiagnosisSession).filter(DiagnosisSession.agent_type == "ocr").count()
+
+    now = datetime.utcnow()
+    upcoming_appointments = db.query(Appointment).filter(
+        Appointment.appointment_datetime >= now,
+        Appointment.status == "scheduled"
+    ).count()
+
+    total_patients = db.query(Patient).count()
+
+    # Critical cases today
+    today_start = datetime(now.year, now.month, now.day)
+    critical_today = db.query(DiagnosisSession).filter(
+        DiagnosisSession.created_at >= today_start,
+        DiagnosisSession.urgency_level == "critical"
+    ).count()
+
+    # Average processing time today
+    avg_proc = db.query(func.avg(DiagnosisSession.processing_time_ms)).filter(
+        DiagnosisSession.created_at >= today_start
+    ).scalar() or 0
+
+    return {
+        "total_voice": total_voice,
+        "total_imaging": total_imaging,
+        "total_ocr": total_ocr,
+        "upcoming_appointments": upcoming_appointments,
+        "total_patients": total_patients,
+        "critical_today": critical_today,
+        "avg_processing_time_ms": round(avg_proc)
+    }
+
+
+@router.get("/ai-insights")
+def get_ai_insights(db: Session = Depends(get_db)):
+    global _insights_cache
+
+    # Check cache (5 minute TTL)
+    now = _time.time()
+    if _insights_cache["data"] and (now - _insights_cache["timestamp"]) < 300:
+        return _insights_cache["data"]
+
+    # Query last 50 sessions
+    sessions = db.query(DiagnosisSession).order_by(
+        DiagnosisSession.created_at.desc()
+    ).limit(50).all()
+
+    if not sessions:
+        result = {"insights": [
+            {"title": "No Data Yet", "description": "Run some diagnoses to generate AI insights.", "icon_emoji": "📊", "severity": "low"}
+        ]}
+        _insights_cache = {"data": result, "timestamp": now}
+        return result
+
+    # Build summary
+    conditions = []
+    urgencies = {"low": 0, "medium": 0, "high": 0, "critical": 0}
+    agents = {"voice": 0, "imaging": 0, "ocr": 0}
+    for s in sessions:
+        if s.conditions_detected:
+            conditions.extend(s.conditions_detected)
+        if s.urgency_level in urgencies:
+            urgencies[s.urgency_level] += 1
+        if s.agent_type in agents:
+            agents[s.agent_type] += 1
+
+    summary = f"Last 50 sessions: {agents}. Urgency distribution: {urgencies}. Top conditions: {conditions[:20]}"
+
+    insights_prompt = """Given these recent diagnoses data, provide 3 clinical insights about patterns you notice.
+Return JSON: {"insights": [{"title": "short title", "description": "1-2 sentence insight", "icon_emoji": "relevant emoji", "severity": "high|medium|low"}]}
+Be specific and data-driven. Reference actual numbers from the data."""
+
+    try:
+        llm_result = call_llm(insights_prompt, summary, fallback_type="insights")
+        result = {"insights": llm_result.get("insights", [])}
+    except Exception:
+        result = {"insights": [
+            {"title": "Insights Processing", "description": "AI insights are being generated. Try refreshing.", "icon_emoji": "⏳", "severity": "low"}
+        ]}
+
+    _insights_cache = {"data": result, "timestamp": now}
+    return result
+
+
+@router.get("/urgency-heatmap")
+def get_urgency_heatmap(db: Session = Depends(get_db)):
+    # Last 28 days grouped by day_of_week + urgency
+    now = datetime.utcnow()
+    start = now - timedelta(days=28)
+
+    sessions = db.query(DiagnosisSession).filter(
+        DiagnosisSession.created_at >= start
+    ).all()
+
+    # Build heatmap: 7 days x 4 urgency levels
+    days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    urgencies = ["low", "medium", "high", "critical"]
+
+    heatmap = {day: {u: 0 for u in urgencies} for day in days}
+
+    for s in sessions:
+        if s.created_at:
+            day_idx = s.created_at.weekday()  # 0=Monday
+            day_name = days[day_idx]
+            urg = (s.urgency_level or "low").lower()
+            if urg in urgencies:
+                heatmap[day_name][urg] += 1
+
+    # Convert to flat list for frontend
+    result = []
+    for day in days:
+        for urg in urgencies:
+            result.append({
+                "day": day,
+                "urgency": urg,
+                "count": heatmap[day][urg]
+            })
+
+    return {"heatmap": result, "days": days, "urgencies": urgencies}
