@@ -34,7 +34,7 @@ async def diagnose(request: DiagnoseRequest, db: Session = Depends(get_db)):
         await broadcast_to_clients({
             "patient_code": p_code,
             "agent_type": "voice",
-            "condition": res.conditions[0] if res.conditions else "Unknown",
+            "condition": res.conditions[0].name if res.conditions else "Unknown",
             "confidence": res.confidence,
             "urgency": res.urgency,
             "timestamp": datetime.utcnow().isoformat()

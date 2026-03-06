@@ -3,15 +3,39 @@ from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 
 # --- Pydantic Schemas ---
+
+# --- Voice Agent sub-models ---
+class ConditionDetail(BaseModel):
+    name: str
+    probability: float
+    icd_code: str = ""
+    description: str = ""
+    matching_symptoms: list[str] = []
+    red_flags: list[str] = []
+
+class RecommendedTest(BaseModel):
+    test: str
+    reason: str
+
 # --- Return schemas from Agents ---
 class DiagnosisResult(BaseModel):
-    conditions: List[str]
-    confidence: float
-    urgency: str
-    recommendations: List[str]
-    transcript: str
-    processing_time_ms: int
     session_id: int
+    conditions: list[ConditionDetail] = []
+    overall_confidence: float = 0.0
+    urgency: str = "medium"
+    urgency_reasoning: str = ""
+    immediate_actions: list[str] = []
+    recommended_tests: list[RecommendedTest] = []
+    medications_to_avoid: list[str] = []
+    lifestyle_advice: list[str] = []
+    follow_up: str = ""
+    differential_summary: str = ""
+    when_to_go_to_er: str = ""
+    transcript: str = ""
+    processing_time_ms: int = 0
+    # Backward compat — old simple fields
+    confidence: float = 0.0
+    recommendations: list[str] = []
     differential_diagnosis: str = ""
 
 class ScanAnalysisResult(BaseModel):
@@ -24,19 +48,45 @@ class ScanAnalysisResult(BaseModel):
     annotated_image_b64: str
     session_id: int
     impression: str = ""
-    recommendations: List[str] = []
+    recommendations: List[Any] = []
     follow_up: str = ""
+    # New fields
+    primary_finding: str = ""
+    acr_category: str = ""
+    acr_description: str = ""
+    measurements: str = ""
+    distribution: str = ""
+    differential_diagnoses: list[str] = []
+    clinical_correlation: str = ""
+    follow_up_imaging: str = ""
+    anomaly_type: str = ""
+    urgency: str = "routine"
 
 class ReportAnalysisResult(BaseModel):
     sections: Dict[str, str]
     key_findings: List[str]
     abnormal_flags: List[str]
-    medications: List[str]
+    medications: List[Any] = []
     summary: str
     extracted_text: str
     session_id: int
     conditions: List[str] = []
     urgency: str = "low"
+    # New fields
+    report_type: str = ""
+    patient_info: Dict[str, Any] = {}
+    abnormal_values: list[Dict[str, Any]] = []
+    normal_values: list[Dict[str, Any]] = []
+    diagnoses: list[str] = []
+    procedures: list[str] = []
+    allergies: list[str] = []
+    critical_alerts: list[str] = []
+    overall_health_score: str = ""
+    patient_action_items: list[str] = []
+    follow_up_instructions: list[str] = []
+    doctor_info: str = ""
+    facility: str = ""
+    report_date: str = ""
 
 # --- API Response Models ---
 
@@ -97,7 +147,7 @@ class ReportBase(BaseModel):
     sections: Dict[str, str]
     key_findings: List[str]
     abnormal_flags: List[str]
-    medications: List[str]
+    medications: List[Any]
     summary: str
 
 class ReportCreate(ReportBase):
@@ -116,6 +166,10 @@ class AppointmentBase(BaseModel):
     appointment_datetime: datetime
     reason: str
     status: Optional[str] = "scheduled"
+    appointment_type: Optional[str] = "initial"
+    notes: Optional[str] = None
+    duration_minutes: Optional[int] = 30
+    location: Optional[str] = None
 
 class AppointmentCreate(AppointmentBase):
     patient_id: int

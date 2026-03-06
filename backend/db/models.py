@@ -17,7 +17,7 @@ class Patient(Base):
 
 class DiagnosisSession(Base):
     __tablename__ = "diagnosis_sessions"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     patient_id = Column(Integer, ForeignKey("patients.id"))
     agent_type = Column(String) # 'voice', 'imaging', 'ocr'
@@ -27,8 +27,9 @@ class DiagnosisSession(Base):
     urgency_level = Column(String)
     conditions_detected = Column(JSON)
     processing_time_ms = Column(Integer)
+    is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+
     patient = relationship("Patient", back_populates="sessions")
     scan_results = relationship("ScanResult", back_populates="session")
     reports = relationship("Report", back_populates="session")
@@ -66,7 +67,7 @@ class Report(Base):
 
 class Appointment(Base):
     __tablename__ = "appointments"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     patient_id = Column(Integer, ForeignKey("patients.id"))
     doctor_name = Column(String)
@@ -74,6 +75,11 @@ class Appointment(Base):
     appointment_datetime = Column(DateTime)
     reason = Column(String)
     status = Column(String, default="scheduled")
+    appointment_type = Column(String, default="initial")  # initial|follow_up|emergency|teleconsult
+    notes = Column(String, nullable=True)
+    reminder_sent = Column(Boolean, default=False)
+    duration_minutes = Column(Integer, default=30)
+    location = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+
     patient = relationship("Patient", back_populates="appointments")

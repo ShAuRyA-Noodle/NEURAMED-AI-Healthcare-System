@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from datetime import datetime
 
 from backend.db.database import engine, Base
-from backend.routers import voice, imaging, ocr, dashboard, patients, appointments
+from backend.routers import voice, imaging, ocr, dashboard, patients, appointments, search, system
 from backend.seed import seed_db
 
 # Create all tables
@@ -48,6 +48,8 @@ app.include_router(appointments.router)
 
 from backend.routers import export
 app.include_router(export.router)
+app.include_router(search.router)
+app.include_router(system.router)
 
 from backend.ws_manager import manager, broadcast_to_clients
 
