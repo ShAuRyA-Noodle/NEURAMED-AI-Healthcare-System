@@ -1,7 +1,7 @@
 import random
 from datetime import datetime, timedelta
-from backend.db.database import SessionLocal
-from backend.db.models import Patient, DiagnosisSession, Appointment
+from db.database import SessionLocal
+from db.models import Patient, DiagnosisSession, Appointment
 
 def seed_db():
     db = SessionLocal()

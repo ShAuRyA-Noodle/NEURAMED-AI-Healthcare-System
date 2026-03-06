@@ -1,9 +1,9 @@
 import time
 import os
 import logging
-from backend.utils.llm import call_llm
-from backend.db.schemas import DiagnosisResult, ConditionDetail, RecommendedTest
-from backend.db.models import DiagnosisSession, Patient
+from utils.llm import call_llm
+from db.schemas import DiagnosisResult, ConditionDetail, RecommendedTest
+from db.models import DiagnosisSession, Patient
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)

@@ -7,9 +7,9 @@ import os
 import uuid
 import time
 import logging
-from backend.utils.llm import call_llm
-from backend.db.schemas import ScanAnalysisResult
-from backend.db.models import ScanResult, DiagnosisSession
+from utils.llm import call_llm
+from db.schemas import ScanAnalysisResult
+from db.models import ScanResult, DiagnosisSession
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
