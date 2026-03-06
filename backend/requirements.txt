@@ -8,7 +8,7 @@ python-dotenv
 elevenlabs
 gTTS
 SpeechRecognition
-pyaudio
+
 pytesseract
 pdf2image
 Pillow
