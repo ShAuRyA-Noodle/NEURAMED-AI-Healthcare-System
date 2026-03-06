@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 
@@ -200,3 +200,36 @@ class ActivityFeedItem(BaseModel):
     confidence: float
     urgency: str
     timestamp: datetime
+
+# --- Auth Schemas ---
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    full_name: str
+    password: str
+    role: str
+    invite_code: Optional[str] = None
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserOut(BaseModel):
+    id: int
+    email: str
+    full_name: str
+    role: str
+    patient_code: Optional[str] = None
+    avatar_emoji: str = "👤"
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserOut
+
+class TokenData(BaseModel):
+    user_id: Optional[int] = None
+    role: Optional[str] = None
