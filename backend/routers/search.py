@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, cast, String
-from backend.db.database import get_db
-from backend.db.models import Patient, DiagnosisSession, Appointment
+from db.database import get_db
+from db.models import Patient, DiagnosisSession, Appointment
 
 router = APIRouter(prefix="/api", tags=["Search"])
 

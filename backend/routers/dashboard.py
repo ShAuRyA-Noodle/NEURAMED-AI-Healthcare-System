@@ -4,10 +4,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List
 from datetime import datetime, timedelta
-from backend.db.database import get_db
-from backend.db.models import DiagnosisSession, Patient, Report, Appointment
-from backend.db.schemas import DashboardStats, ActivityFeedItem
-from backend.utils.llm import call_llm
+from db.database import get_db
+from db.models import DiagnosisSession, Patient, Report, Appointment
+from db.schemas import DashboardStats, ActivityFeedItem
+from utils.llm import call_llm
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 
