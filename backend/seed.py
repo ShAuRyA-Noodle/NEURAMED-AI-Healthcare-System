@@ -1,14 +1,50 @@
 import random
 from datetime import datetime, timedelta
 from db.database import SessionLocal
-from db.models import Patient, DiagnosisSession, Appointment
+from db.models import Patient, DiagnosisSession, Appointment, User
+from utils.auth import get_password_hash
+
+
+def seed_users(db):
+    """Seed demo doctor and patient accounts."""
+    if db.query(User).filter(User.email == "demo@doctor.com").first():
+        return  # Already seeded
+
+    print("Seeding demo users...")
+
+    # Demo doctor
+    doctor = User(
+        email="demo@doctor.com",
+        full_name="Dr. Demo Singh",
+        hashed_password=get_password_hash("demo1234"),
+        role="doctor",
+        avatar_emoji="👨‍⚕️",
+    )
+    db.add(doctor)
+
+    # Demo patient — link to PT-0001
+    patient = User(
+        email="demo@patient.com",
+        full_name="Demo Patient",
+        hashed_password=get_password_hash("demo1234"),
+        role="patient",
+        patient_code="PT-0001",
+        avatar_emoji="🧑‍🦽",
+    )
+    db.add(patient)
+    db.commit()
+    print("Demo users seeded: demo@doctor.com / demo@patient.com (password: demo1234)")
+
 
 def seed_db():
     db = SessionLocal()
 
+    # Always seed users (idempotent)
+    seed_users(db)
+
     if db.query(Patient).count() > 0:
         db.close()
-        return # Skip if already seeded
+        return  # Skip if already seeded
 
     print("Seeding database...")
 

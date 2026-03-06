@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, MicOff, Stethoscope, ChevronDown, ChevronUp, AlertTriangle, Clock, FileText, RotateCcw, Download, Activity, Shield, Pill, Heart, FlaskConical, Languages, Loader2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useVoiceDiagnosis } from '@/hooks/useVoiceDiagnosis';
 import { useToast } from '@/hooks/useToast';
 import { ConfidenceMeter } from '@/components/shared/ConfidenceMeter';
@@ -57,6 +58,7 @@ const VoicePage = () => {
   const { mutateAsync: diagnose, isPending } = useVoiceDiagnosis();
   const [result, setResult] = useState<DiagnosisResult | null>(null);
   const { addToast } = useToast();
+  const { user } = useAuth();
 
   const [tab, setTab] = useState<'record' | 'type'>('type');
   const [transcript, setTranscript] = useState('');
@@ -195,7 +197,7 @@ const VoicePage = () => {
     if (finalText && finalText.length >= 10) {
       setTimeout(async () => {
         try {
-          const res = await diagnose({ transcript: finalText, patient_id: 1 });
+          const res = await diagnose({ transcript: finalText, patient_id: user?.patient_code ? parseInt(user.patient_code.replace('PT-', '')) : 1 });
           setResult(res);
         } catch {
           addToast('error', 'Voice diagnosis failed');
@@ -209,7 +211,7 @@ const VoicePage = () => {
   const handleTypeAnalysis = async () => {
     if (transcript.length < 10 || isPending) return;
     try {
-      const res = await diagnose({ transcript, patient_id: 1 });
+      const res = await diagnose({ transcript, patient_id: user?.patient_code ? parseInt(user.patient_code.replace('PT-', '')) : 1 });
       setResult(res);
     } catch {
       addToast('error', 'Text diagnosis failed');

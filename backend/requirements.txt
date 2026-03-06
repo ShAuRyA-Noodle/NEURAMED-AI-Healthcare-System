@@ -1,13 +1,14 @@
 fastapi
 uvicorn
 sqlalchemy
-pydantic
+pydantic[email]
 python-multipart
 groq
 python-dotenv
 elevenlabs
 gTTS
 SpeechRecognition
+python-jose[cryptography]
 
 pytesseract
 pdf2image

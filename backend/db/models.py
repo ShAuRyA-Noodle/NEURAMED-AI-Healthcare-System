@@ -65,6 +65,19 @@ class Report(Base):
     
     session = relationship("DiagnosisSession", back_populates="reports")
 
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    full_name = Column(String, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    role = Column(String, default="patient")  # "doctor" or "patient"
+    patient_code = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    avatar_emoji = Column(String, default="👤")
+
 class Appointment(Base):
     __tablename__ = "appointments"
 

@@ -7,6 +7,7 @@ import {
 } from 'recharts';
 import { TrendingUp, Activity, Target, FileText, AlertTriangle, Clock, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
+import { useAuth } from '../context/AuthContext';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { useRecentSessions } from '@/hooks/useRecentSessions';
 import { useLiveWebSocket } from '@/hooks/useLiveWebSocket';
@@ -123,6 +124,7 @@ const QuickActionCard = ({ emoji, title, desc, stat, statLabel, cta, to, bgGrad 
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { user, isPatient } = useAuth();
   const { data: stats, isLoading } = useDashboardStats();
   const { data: recentSessions, isLoading: loadingSessions } = useRecentSessions();
   const { data: sysInfo } = useSystemInfo();
@@ -169,12 +171,19 @@ const Dashboard = () => {
       >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
-            <span style={{ fontSize: 48 }}>🏥</span>
-            <span className="font-number" style={{ fontSize: 32, fontWeight: 700, color: 'var(--cyan)' }}>NEURAMED</span>
+            <span style={{ fontSize: 48 }}>{isPatient ? '👋' : '🏥'}</span>
+            <span className="font-number" style={{ fontSize: 32, fontWeight: 700, color: 'var(--cyan)' }}>
+              {isPatient ? `Welcome, ${user?.full_name?.split(' ')[0]}` : 'NEURAMED'}
+            </span>
           </div>
           <div className="font-heading" style={{ fontSize: 16, color: 'var(--muted)', marginBottom: 16 }}>
-            Clinical AI Diagnostic Intelligence Platform
+            {isPatient ? 'Your AI health assistant is ready' : 'Clinical AI Diagnostic Intelligence Platform'}
           </div>
+          {isPatient && user?.patient_code && (
+            <span className="font-number" style={{ fontSize: 13, color: 'var(--cyan)', background: 'rgba(0,229,255,0.06)', border: '1px solid rgba(0,229,255,0.15)', padding: '4px 12px', borderRadius: 20, marginBottom: 12, display: 'inline-block' }}>
+              Your ID: {user.patient_code}
+            </span>
+          )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {['🎤 Voice Diagnosis', '🧠 Imaging AI', '📄 OCR Reports'].map(pill => (
               <span key={pill} className="font-body" style={{

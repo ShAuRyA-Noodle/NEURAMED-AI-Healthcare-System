@@ -100,3 +100,43 @@ h1, h2, h3, h4, h5, h6 {
   0%, 100% { transform: scale(1); opacity: 0.8; }
   50% { transform: scale(1.05); opacity: 0.4; }
 }
+
+/* ===== MOBILE RESPONSIVE ===== */
+:root {
+  --sidebar-width: 220px;
+}
+
+/* Sidebar mobile */
+@media (max-width: 768px) {
+  .sidebar-container {
+    transform: translateX(-100%);
+    z-index: 100;
+  }
+  .sidebar-container.open {
+    transform: translateX(0) !important;
+  }
+  .sidebar-overlay {
+    display: block !important;
+  }
+  .main-content {
+    margin-left: 0 !important;
+  }
+  .hamburger-btn {
+    display: flex !important;
+  }
+  .hide-mobile {
+    display: none !important;
+  }
+  .search-desktop {
+    display: none !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .hamburger-btn {
+    display: none !important;
+  }
+  .sidebar-overlay {
+    display: none !important;
+  }
+}

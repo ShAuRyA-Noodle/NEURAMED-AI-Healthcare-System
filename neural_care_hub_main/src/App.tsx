@@ -5,6 +5,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "./components/layout/AppLayout";
 import { CustomCursor } from "./components/cursor/CustomCursor";
 import { Toast } from "./components/shared/Toast";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import { useAuth } from "./context/AuthContext";
 import Dashboard from "./pages/DashboardPage";
 import VoiceAgent from "./pages/VoicePage";
 import ImagingAI from "./pages/ImagingPage";
@@ -14,6 +16,7 @@ import Appointments from "./pages/AppointmentsPage";
 import NotFound from "./pages/NotFound";
 import Sessions from "./pages/SessionsPage";
 import SessionDetail from "./pages/SessionDetailPage";
+import LoginPage from "./pages/LoginPage";
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
@@ -40,6 +43,7 @@ const App = () => {
 
 const AppRoutes = ({ showSplash }: { showSplash: boolean }) => {
   const location = useLocation();
+  const { isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
     const pageName = location.pathname.split('/')[1];
@@ -64,6 +68,26 @@ const AppRoutes = ({ showSplash }: { showSplash: boolean }) => {
     );
   }
 
+  // Login page — no layout, no protection
+  if (location.pathname === '/login') {
+    if (!isLoading && isAuthenticated) {
+      return (
+        <QueryClientProvider client={queryClient}>
+          <Routes>
+            <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </QueryClientProvider>
+      );
+    }
+    return (
+      <QueryClientProvider client={queryClient}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+        </Routes>
+      </QueryClientProvider>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <CustomCursor />
@@ -72,15 +96,15 @@ const AppRoutes = ({ showSplash }: { showSplash: boolean }) => {
         <AppLayout>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/voice" element={<VoiceAgent />} />
-            <Route path="/imaging" element={<ImagingAI />} />
-            <Route path="/ocr" element={<OCRReports />} />
-            <Route path="/patients" element={<Patients />} />
-            <Route path="/patients/:id" element={<Patients />} />
-            <Route path="/sessions" element={<Sessions />} />
-            <Route path="/sessions/:id" element={<SessionDetail />} />
-            <Route path="/appointments" element={<Appointments />} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/voice" element={<ProtectedRoute><VoiceAgent /></ProtectedRoute>} />
+            <Route path="/imaging" element={<ProtectedRoute><ImagingAI /></ProtectedRoute>} />
+            <Route path="/ocr" element={<ProtectedRoute><OCRReports /></ProtectedRoute>} />
+            <Route path="/patients" element={<ProtectedRoute requireRole="doctor"><Patients /></ProtectedRoute>} />
+            <Route path="/patients/:id" element={<ProtectedRoute requireRole="doctor"><Patients /></ProtectedRoute>} />
+            <Route path="/sessions" element={<ProtectedRoute requireRole="doctor"><Sessions /></ProtectedRoute>} />
+            <Route path="/sessions/:id" element={<ProtectedRoute requireRole="doctor"><SessionDetail /></ProtectedRoute>} />
+            <Route path="/appointments" element={<ProtectedRoute requireRole="doctor"><Appointments /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AppLayout>

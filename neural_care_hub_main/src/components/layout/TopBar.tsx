@@ -18,7 +18,6 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
     return () => clearInterval(timer);
   }, []);
 
-  // Close search on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
@@ -29,7 +28,6 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { setShowResults(false); setSearchQuery(''); }
@@ -38,7 +36,6 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
-  // Close results on route change
   useEffect(() => {
     setShowResults(false);
     setSearchQuery('');
@@ -58,11 +55,14 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
   return (
     <div style={{
       height: 56, background: 'var(--bg)', borderBottom: '1px solid var(--border)',
-      padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+      padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
     }}>
       {/* Left */}
       <div style={{ display: 'flex', alignItems: 'center' }}>
-        <button className="hamburger-btn" onClick={onMenuClick} style={{ display: 'none', background: 'transparent', border: 'none', color: 'var(--text)', marginRight: 16, padding: 0 }}>
+        <button className="hamburger-btn" onClick={onMenuClick} style={{
+          background: 'transparent', border: 'none', color: 'var(--text)', marginRight: 16, padding: 4, cursor: 'pointer',
+          display: 'none' /* shown via CSS media query */
+        }}>
           <Menu size={20} />
         </button>
         <div className="font-body" style={{ fontSize: 12 }}>
@@ -71,8 +71,8 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
         </div>
       </div>
 
-      {/* Center: Global Search */}
-      <div ref={searchRef} style={{ position: 'relative' }}>
+      {/* Center: Global Search (hidden on mobile) */}
+      <div ref={searchRef} className="search-desktop" style={{ position: 'relative' }}>
         <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', zIndex: 1 }} />
         <input
           value={searchQuery}
@@ -113,13 +113,12 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
               </div>
             ) : (
               <>
-                {/* Patients */}
                 {searchResults.patients.length > 0 && (
                   <div>
                     <div style={{ padding: '8px 14px', background: 'var(--elevated)' }}>
                       <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.1em' }}>PATIENTS</span>
                     </div>
-                    {searchResults.patients.map(p => (
+                    {searchResults.patients.map((p: any) => (
                       <div key={p.id} data-cursor="hover"
                         onClick={() => { navigate('/patients'); setShowResults(false); setSearchQuery(''); }}
                         style={{ padding: '10px 14px', cursor: 'pointer', transition: 'background 150ms', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
@@ -131,14 +130,12 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
                     ))}
                   </div>
                 )}
-
-                {/* Sessions */}
                 {searchResults.sessions.length > 0 && (
                   <div>
                     <div style={{ padding: '8px 14px', background: 'var(--elevated)' }}>
                       <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.1em' }}>SESSIONS</span>
                     </div>
-                    {searchResults.sessions.map(s => (
+                    {searchResults.sessions.map((s: any) => (
                       <div key={s.id} data-cursor="hover"
                         onClick={() => { navigate(`/sessions/${s.id}`); setShowResults(false); setSearchQuery(''); }}
                         style={{ padding: '10px 14px', cursor: 'pointer', transition: 'background 150ms', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
@@ -149,23 +146,16 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
                           <span className="font-body" style={{ fontSize: 12, color: 'var(--text)' }}>{s.patient_code}</span>
                           <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'rgba(0,229,255,0.08)', color: 'var(--cyan)', fontFamily: 'var(--font-body)', textTransform: 'capitalize' }}>{s.agent_type}</span>
                         </div>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          {(s.conditions_detected || []).slice(0, 1).map((c: string) => (
-                            <span key={c} className="font-body" style={{ fontSize: 10, color: 'var(--muted)' }}>{c}</span>
-                          ))}
-                        </div>
                       </div>
                     ))}
                   </div>
                 )}
-
-                {/* Appointments */}
                 {searchResults.appointments.length > 0 && (
                   <div>
                     <div style={{ padding: '8px 14px', background: 'var(--elevated)' }}>
                       <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.1em' }}>APPOINTMENTS</span>
                     </div>
-                    {searchResults.appointments.map(a => (
+                    {searchResults.appointments.map((a: any) => (
                       <div key={a.id} data-cursor="hover"
                         onClick={() => { navigate('/appointments'); setShowResults(false); setSearchQuery(''); }}
                         style={{ padding: '10px 14px', cursor: 'pointer', transition: 'background 150ms', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
@@ -188,14 +178,14 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
 
       {/* Right */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-        <span className="font-body" style={{ fontSize: 12, color: 'var(--muted)' }}>
+        <span className="font-body hide-mobile" style={{ fontSize: 12, color: 'var(--muted)' }}>
           {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </span>
         <div data-cursor="hover" style={{ position: 'relative', cursor: 'pointer' }}>
           <Bell size={18} style={{ color: 'var(--muted)' }} />
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--red)', position: 'absolute', top: -2, right: -2, border: '2px solid var(--bg)' }} />
         </div>
-        <div style={{
+        <div className="hide-mobile" style={{
           background: 'rgba(0,255,157,0.08)', border: '1px solid rgba(0,255,157,0.25)',
           color: 'var(--green)', fontFamily: 'var(--font-body)', fontSize: 10,
           padding: '4px 10px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 6
