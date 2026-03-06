@@ -4,10 +4,10 @@ from sqlalchemy import func
 from typing import Optional, List
 from datetime import datetime, timedelta
 from pydantic import BaseModel
-from backend.db.database import get_db
-from backend.agents import appointment_agent
-from backend.db.models import Appointment, Patient
-from backend.db.schemas import AppointmentCreate, AppointmentResponse
+from db.database import get_db
+from agents import appointment_agent
+from db.models import Appointment, Patient
+from db.schemas import AppointmentCreate, AppointmentResponse
 
 router = APIRouter(prefix="/api/appointments", tags=["Appointments"])
 

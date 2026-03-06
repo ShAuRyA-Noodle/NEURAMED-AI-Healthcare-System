@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
-from backend.ws_manager import broadcast_to_clients
+from ws_manager import broadcast_to_clients
 from datetime import datetime
 from typing import Optional, List
-from backend.db.database import get_db
-from backend.agents import ocr_agent
-from backend.db.models import Report
-from backend.db.schemas import ReportAnalysisResult, ReportResponse
+from db.database import get_db
+from agents import ocr_agent
+from db.models import Report
+from db.schemas import ReportAnalysisResult, ReportResponse
 
 router = APIRouter(prefix="/api/ocr", tags=["OCR"])
 
@@ -20,7 +20,7 @@ async def analyze_report(
         contents = await file.read()
         res = ocr_agent.analyze(file_bytes=contents, filename=file.filename, patient_id=patient_id, db=db)
         
-        from backend.db.models import Patient
+        from db.models import Patient
         patient = db.query(Patient).filter(Patient.id == patient_id).first() if patient_id else None
         p_code = patient.patient_code if patient else f"PT-{patient_id}"
 

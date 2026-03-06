@@ -4,8 +4,8 @@ import shutil
 from datetime import datetime
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from backend.db.database import get_db
-from backend.db.models import DiagnosisSession
+from db.database import get_db
+from db.models import DiagnosisSession
 
 router = APIRouter(prefix="/api/system", tags=["System"])
 
