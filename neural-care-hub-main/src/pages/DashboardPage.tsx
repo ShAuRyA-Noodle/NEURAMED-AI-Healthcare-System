@@ -3,14 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, PieChart, Pie, Cell,
+  PieChart, Pie, Cell,
 } from 'recharts';
-import { TrendingUp, Activity, Target, FileText } from 'lucide-react';
+import { TrendingUp, Activity, Target, FileText, AlertTriangle, Clock, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
-import { useActivityFeed } from '@/hooks/useActivityFeed';
 import { useRecentSessions } from '@/hooks/useRecentSessions';
 import { useLiveWebSocket } from '@/hooks/useLiveWebSocket';
+import { useSystemInfo } from '@/hooks/useSystemInfo';
+import { useQuickStats, useAIInsights, useUrgencyHeatmap } from '@/hooks/useQuickStats';
 import { SkeletonCard } from '@/components/shared/SkeletonCard';
 import { SparkLine } from '@/components/shared/SparkLine';
 import { CountUpNumber } from '@/components/shared/CountUpNumber';
@@ -18,10 +19,8 @@ import { AgentBadge } from '@/components/shared/AgentBadge';
 import { UrgencyBadge } from '@/components/shared/UrgencyBadge';
 import { ConfidenceMeter } from '@/components/shared/ConfidenceMeter';
 
-/* PIE COLORS */
 const PIE_COLORS = ['#00E5FF', '#00FF9D', '#FF9500', '#FF3B5C', '#8B5CF6', '#EC4899'];
 
-/* ── Custom Tooltip for AreaChart ── */
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload) return null;
   return (
@@ -41,266 +40,340 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+/* ── Uptime Counter ── */
+const UptimeCounter = ({ seconds }: { seconds: number }) => {
+  const [elapsed, setElapsed] = useState(seconds);
+  useEffect(() => { setElapsed(seconds); }, [seconds]);
+  useEffect(() => {
+    const t = setInterval(() => setElapsed(e => e + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const d = Math.floor(elapsed / 86400);
+  const h = Math.floor((elapsed % 86400) / 3600);
+  const m = Math.floor((elapsed % 3600) / 60);
+  const s = elapsed % 60;
+  return (
+    <span className="font-number" style={{ fontSize: 11, color: 'var(--cyan)' }}>
+      {d}d {String(h).padStart(2,'0')}:{String(m).padStart(2,'0')}:{String(s).padStart(2,'0')}
+    </span>
+  );
+};
+
+/* ── Stat Card (reusable) ── */
+const StatCard = ({ label, value, icon, sparkData, trendColor }: {
+  label: string; value: number; icon: React.ReactNode; sparkData?: number[]; trendColor?: string
+}) => (
+  <div style={{
+    background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
+    padding: 20, transition: 'all 300ms ease', cursor: 'default'
+  }}
+    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'var(--border-glow)'; }}
+    onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+  >
+    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+      <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</span>
+      {icon}
+    </div>
+    <div className="font-number" style={{ fontSize: 32, color: 'var(--text)', lineHeight: 1 }}>
+      <CountUpNumber value={value} />
+    </div>
+    {sparkData && (
+      <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+        <SparkLine data={sparkData} color={trendColor || 'var(--cyan)'} width={60} height={20} />
+      </div>
+    )}
+  </div>
+);
+
+/* ── Quick Action Card ── */
+const QuickActionCard = ({ emoji, title, desc, stat, statLabel, cta, to, bgGrad }: {
+  emoji: string; title: string; desc: string; stat: number; statLabel: string; cta: string; to: string; bgGrad: string
+}) => {
+  const navigate = useNavigate();
+  return (
+    <motion.div
+      whileHover={{ y: -8, boxShadow: '0 16px 48px rgba(0,229,255,0.08)' }}
+      style={{
+        background: bgGrad, border: '1px solid var(--border)', borderRadius: 16,
+        padding: 28, cursor: 'pointer', transition: 'border-color 300ms',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12
+      }}
+      onClick={() => navigate(to)}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-glow)'; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+    >
+      <motion.div style={{ fontSize: 56 }} whileHover={{ scale: 1.1, y: -4 }} transition={{ type: 'spring', stiffness: 400 }}>
+        {emoji}
+      </motion.div>
+      <span className="font-heading" style={{ fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
+      <span className="font-body" style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>{desc}</span>
+      <span className="font-number" style={{ fontSize: 13, color: 'var(--cyan)' }}>
+        <CountUpNumber value={stat} /> {statLabel}
+      </span>
+      <div style={{
+        marginTop: 8, padding: '8px 24px', borderRadius: 8,
+        background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.15)',
+        color: 'var(--cyan)', fontFamily: 'var(--font-heading)', fontSize: 13, fontWeight: 600
+      }}>
+        {cta}
+      </div>
+    </motion.div>
+  );
+};
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const { data: stats, isLoading } = useDashboardStats();
-  const { events, isConnected } = useLiveWebSocket();
   const { data: recentSessions, isLoading: loadingSessions } = useRecentSessions();
+  const { data: sysInfo } = useSystemInfo();
+  const { data: quickStats } = useQuickStats();
+  const { data: insightsData, refetch: refetchInsights, isFetching: insightsLoading } = useAIInsights();
+  const { data: heatmapData } = useUrgencyHeatmap();
+  const { isConnected } = useLiveWebSocket();
 
   const [activePie, setActivePie] = useState<number | null>(null);
+  const [chartRange, setChartRange] = useState<7 | 14 | 30>(30);
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   if (isLoading || !stats) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div className="responsive-grid-4">
-          {[1, 2, 3, 4].map(i => <SkeletonCard key={i} height={120} />)}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '7fr 5fr', gap: 16 }}>
-          <SkeletonCard height={280} />
-          <SkeletonCard height={280} />
-        </div>
+        <SkeletonCard height={200} />
+        <div className="responsive-grid-4">{[1,2,3,4].map(i => <SkeletonCard key={i} height={220} />)}</div>
+        <div className="responsive-grid-4">{[1,2,3,4,5].map(i => <SkeletonCard key={i} height={100} />)}</div>
       </div>
     );
   }
 
-  // Derive simple sparkline data from last 7 days voice volume
-  const last7daysVoice = stats.diagnoses_last_30_days.slice(-7).map((d: any) => d.voice);
+  const chartData = stats.diagnoses_last_30_days.slice(-chartRange);
+  const last7 = stats.diagnoses_last_30_days.slice(-7).map(d => d.voice + d.imaging + d.ocr);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* ROW 1: 4 Stat Cards */}
+
+      {/* ═══════ 1A. HERO SECTION ═══════ */}
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-        className="responsive-grid-4"
+        style={{
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16,
+          padding: '32px 40px', minHeight: 180,
+          backgroundImage: 'linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px)',
+          backgroundSize: '32px 32px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 24
+        }}
       >
-        {/* Card 1: Total Diagnoses */}
-        <div
-          data-hover="true"
-          style={{
-            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
-            padding: 24, position: 'relative', overflow: 'hidden', transition: 'all 300ms ease',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.borderColor = 'var(--border-glow)';
-            e.currentTarget.style.boxShadow = '0 12px 40px rgba(0,229,255,0.04)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.borderColor = 'var(--border)';
-            e.currentTarget.style.boxShadow = 'none';
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-            <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>TOTAL DIAGNOSES</span>
-            <TrendingUp size={16} style={{ color: 'var(--muted)' }} />
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
+            <span style={{ fontSize: 48 }}>🏥</span>
+            <span className="font-number" style={{ fontSize: 32, fontWeight: 700, color: 'var(--cyan)' }}>NEURAMED</span>
           </div>
-          <div style={{ fontSize: 42, color: 'var(--text)', lineHeight: 1 }}>
-            <CountUpNumber value={stats.total_diagnoses} />
+          <div className="font-heading" style={{ fontSize: 16, color: 'var(--muted)', marginBottom: 16 }}>
+            Clinical AI Diagnostic Intelligence Platform
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
-            <span className="font-body" style={{
-              fontSize: 11, padding: '2px 8px', borderRadius: 4,
-              color: 'var(--green)', background: 'rgba(0,255,157,0.08)',
-            }}>
-              +12.4%
-            </span>
-            <SparkLine data={last7daysVoice} color="var(--cyan)" width={50} height={20} />
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {['🎤 Voice Diagnosis', '🧠 Imaging AI', '📄 OCR Reports'].map(pill => (
+              <span key={pill} className="font-body" style={{
+                fontSize: 11, padding: '4px 12px', borderRadius: 20,
+                background: 'rgba(0,229,255,0.06)', border: '1px solid rgba(0,229,255,0.15)', color: 'var(--text)'
+              }}>{pill}</span>
+            ))}
           </div>
         </div>
 
-        {/* Card 2: Active Sessions */}
-        <div
-          data-hover="true"
-          style={{
-            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
-            padding: 24, position: 'relative', overflow: 'hidden', transition: 'all 300ms ease',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.borderColor = 'var(--border-glow)';
-            e.currentTarget.style.boxShadow = '0 12px 40px rgba(0,229,255,0.04)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.borderColor = 'var(--border)';
-            e.currentTarget.style.boxShadow = 'none';
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-            <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>ACTIVE SESSIONS TODAY</span>
-            <Activity size={16} style={{ color: 'var(--muted)' }} />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ fontSize: 42, color: 'var(--text)', lineHeight: 1 }}>
-              <CountUpNumber value={stats.active_sessions_today} />
-            </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green)', animation: 'pulse-dot 2s infinite' }} />
+            <span className="font-body" style={{ fontSize: 12, color: 'var(--green)' }}>⚡ SYSTEM ONLINE</span>
           </div>
-          <div style={{ marginTop: 16 }}>
-            <span className="font-body" style={{
-              fontSize: 11, padding: '2px 8px', borderRadius: 4,
-              color: 'var(--amber)', background: 'rgba(255,149,0,0.08)',
-            }}>
-              -2.1%
-            </span>
-          </div>
-        </div>
-
-        {/* Card 3: Avg Confidence */}
-        <div
-          data-hover="true"
-          style={{
-            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
-            padding: 24, position: 'relative', overflow: 'hidden', transition: 'all 300ms ease',
-            display: 'flex', flexDirection: 'column'
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.borderColor = 'var(--border-glow)';
-            e.currentTarget.style.boxShadow = '0 12px 40px rgba(0,229,255,0.04)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.borderColor = 'var(--border)';
-            e.currentTarget.style.boxShadow = 'none';
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-            <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>AVG CONFIDENCE</span>
-            <Target size={16} style={{ color: 'var(--muted)' }} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
-            <ConfidenceMeter value={stats.avg_confidence} size={100} />
-          </div>
-        </div>
-
-        {/* Card 4: Reports Today */}
-        <div
-          data-hover="true"
-          style={{
-            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
-            padding: 24, position: 'relative', overflow: 'hidden', transition: 'all 300ms ease',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.borderColor = 'var(--border-glow)';
-            e.currentTarget.style.boxShadow = '0 12px 40px rgba(0,229,255,0.04)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.borderColor = 'var(--border)';
-            e.currentTarget.style.boxShadow = 'none';
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-            <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>REPORTS TODAY</span>
-            <FileText size={16} style={{ color: 'var(--muted)' }} />
-          </div>
-          <div style={{ fontSize: 42, color: 'var(--text)', lineHeight: 1 }}>
-            <CountUpNumber value={stats.reports_today} />
-          </div>
-          <div style={{ marginTop: 16 }}>
-            <span className="font-body" style={{
-              fontSize: 11, padding: '2px 8px', borderRadius: 4,
-              color: 'var(--green)', background: 'rgba(0,255,157,0.08)',
-            }}>
-              +5.8%
-            </span>
-          </div>
+          <span className="font-body" style={{ fontSize: 12, color: 'var(--muted)' }}>
+            {format(now, 'MMM d, yyyy')} — {format(now, 'HH:mm:ss')}
+          </span>
+          <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>🤖 LLaMA 3 70B — ⚡ Groq Inference</span>
+          {sysInfo && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Clock size={12} style={{ color: 'var(--muted)' }} />
+              <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>Uptime:</span>
+              <UptimeCounter seconds={sysInfo.uptime_seconds} />
+            </div>
+          )}
         </div>
       </motion.div>
 
-      {/* ROW 2: Charts */}
+      {/* ═══════ 1B. QUICK ACTION CARDS ═══════ */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.05 }}
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16 }}
+      >
+        <QuickActionCard emoji="🎤" title="Voice Diagnosis" desc="Speak or type symptoms. Get AI differential diagnosis in seconds."
+          stat={quickStats?.total_voice ?? 0} statLabel="diagnoses run" cta="Start Diagnosis →" to="/voice"
+          bgGrad="linear-gradient(135deg, #020608 0%, rgba(0,229,255,0.04) 100%)" />
+        <QuickActionCard emoji="🧠" title="Imaging AI" desc="Upload CT, MRI, X-Ray. OpenCV + LLaMA detects anomalies automatically."
+          stat={quickStats?.total_imaging ?? 0} statLabel="scans analyzed" cta="Analyze Scan →" to="/imaging"
+          bgGrad="linear-gradient(135deg, #020608 0%, rgba(0,255,157,0.04) 100%)" />
+        <QuickActionCard emoji="📄" title="OCR Reports" desc="Upload any medical PDF. AI extracts findings, flags, medications instantly."
+          stat={quickStats?.total_ocr ?? 0} statLabel="reports processed" cta="Process Report →" to="/ocr"
+          bgGrad="linear-gradient(135deg, #020608 0%, rgba(255,149,0,0.04) 100%)" />
+        <QuickActionCard emoji="📅" title="Appointments" desc="Manage patient appointments. Track status and upcoming schedules."
+          stat={quickStats?.upcoming_appointments ?? 0} statLabel="upcoming" cta="View Schedule →" to="/appointments"
+          bgGrad="linear-gradient(135deg, #020608 0%, rgba(139,92,246,0.04) 100%)" />
+      </motion.div>
+
+      {/* ═══════ 1C. METRICS ROW ═══════ */}
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}
-        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 16 }}
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}
       >
-        {/* Area Chart */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <span className="font-heading" style={{ fontSize: 16, color: 'var(--text)', fontWeight: 600 }}>Diagnostic Activity</span>
-            <div style={{ display: 'flex', gap: 16 }}>
-              {[{ name: 'Voice', color: 'var(--cyan)' }, { name: 'Imaging', color: 'var(--green)' }, { name: 'OCR', color: 'var(--amber)' }].map(x => (
-                <div key={x.name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: x.color }} />
-                  <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>{x.name}</span>
-                </div>
-              ))}
-            </div>
+        <StatCard label="Total Diagnoses" value={stats.total_diagnoses} icon={<TrendingUp size={14} style={{ color: 'var(--muted)' }} />} sparkData={last7} trendColor="var(--cyan)" />
+        <StatCard label="Patients" value={quickStats?.total_patients ?? 0} icon={<Activity size={14} style={{ color: 'var(--muted)' }} />} />
+        <div style={{
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
+          padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>AVG CONFIDENCE</span>
+          <ConfidenceMeter value={stats.avg_confidence} size={80} />
+        </div>
+        <StatCard label="Critical Today" value={quickStats?.critical_today ?? 0} icon={<AlertTriangle size={14} style={{ color: 'var(--red)' }} />} trendColor="var(--red)" />
+        <StatCard label="Avg Speed (ms)" value={quickStats?.avg_processing_time_ms ?? 0} icon={<Target size={14} style={{ color: 'var(--muted)' }} />} trendColor="var(--amber)" />
+      </motion.div>
+
+      {/* ═══════ 1D. ACTIVITY CHART ═══════ */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15 }}
+        style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <span className="font-heading" style={{ fontSize: 16, color: 'var(--text)', fontWeight: 600 }}>Diagnostic Activity</span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {([7, 14, 30] as const).map(r => (
+              <button key={r} onClick={() => setChartRange(r)} className="font-body" style={{
+                fontSize: 11, padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                background: chartRange === r ? 'rgba(0,229,255,0.12)' : 'transparent',
+                color: chartRange === r ? 'var(--cyan)' : 'var(--muted)',
+              }}>{r}D</button>
+            ))}
           </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={stats.diagnoses_last_30_days}>
-              <defs>
-                <linearGradient id="gCyan" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00E5FF" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="#00E5FF" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="gGreen" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00FF9D" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="#00FF9D" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="gAmber" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#FF9500" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="#FF9500" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-              <XAxis dataKey="date" tick={{ fontFamily: 'DM Mono', fontSize: 10, fill: '#445566' }} tickLine={false} axisLine={false} tickFormatter={d => format(new Date(d), 'MMM d')} />
-              <YAxis tick={{ fontFamily: 'DM Mono', fontSize: 10, fill: '#445566' }} tickLine={false} axisLine={false} width={30} />
-              <Tooltip content={<CustomTooltip />} />
-              <Area type="monotone" name="Voice" dataKey="voice" stroke="#00E5FF" strokeWidth={2} fill="url(#gCyan)" animationDuration={1200} />
-              <Area type="monotone" name="Imaging" dataKey="imaging" stroke="#00FF9D" strokeWidth={2} fill="url(#gGreen)" animationDuration={1200} />
-              <Area type="monotone" name="OCR" dataKey="ocr" stroke="#FF9500" strokeWidth={2} fill="url(#gAmber)" animationDuration={1200} />
-            </AreaChart>
-          </ResponsiveContainer>
+        </div>
+        <ResponsiveContainer width="100%" height={240}>
+          <AreaChart data={chartData}>
+            <defs>
+              <linearGradient id="gCyan" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#00E5FF" stopOpacity={0.25}/><stop offset="95%" stopColor="#00E5FF" stopOpacity={0}/></linearGradient>
+              <linearGradient id="gGreen" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#00FF9D" stopOpacity={0.25}/><stop offset="95%" stopColor="#00FF9D" stopOpacity={0}/></linearGradient>
+              <linearGradient id="gAmber" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#FF9500" stopOpacity={0.25}/><stop offset="95%" stopColor="#FF9500" stopOpacity={0}/></linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+            <XAxis dataKey="date" tick={{ fontFamily: 'DM Mono', fontSize: 10, fill: '#445566' }} tickLine={false} axisLine={false} tickFormatter={d => format(new Date(d), 'MMM d')} />
+            <YAxis tick={{ fontFamily: 'DM Mono', fontSize: 10, fill: '#445566' }} tickLine={false} axisLine={false} width={30} />
+            <Tooltip content={<CustomTooltip />} />
+            <Area type="monotone" name="Voice" dataKey="voice" stroke="#00E5FF" strokeWidth={2} fill="url(#gCyan)" />
+            <Area type="monotone" name="Imaging" dataKey="imaging" stroke="#00FF9D" strokeWidth={2} fill="url(#gGreen)" />
+            <Area type="monotone" name="OCR" dataKey="ocr" stroke="#FF9500" strokeWidth={2} fill="url(#gAmber)" />
+          </AreaChart>
+        </ResponsiveContainer>
+      </motion.div>
+
+      {/* ═══════ 1E. SPLIT ROW: Recent Sessions + AI Insights ═══════ */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}
+        style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 16 }}
+      >
+        {/* Recent Sessions */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, overflowX: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <span className="font-heading" style={{ fontSize: 16, color: 'var(--text)', fontWeight: 600 }}>Recent Sessions</span>
+            <button onClick={() => navigate('/sessions')} className="font-body" style={{ fontSize: 12, color: 'var(--cyan)', background: 'none', border: 'none', cursor: 'pointer' }}>View All →</button>
+          </div>
+          {loadingSessions ? <SkeletonCard height={200} /> : (
+            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: 600 }}>
+              <thead>
+                <tr>
+                  {['PATIENT', 'AGENT', 'CONDITION', 'CONFIDENCE', 'URGENCY', 'TIME'].map(h => (
+                    <th key={h} className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.08em', padding: '0 12px 10px', textAlign: 'left', borderBottom: '1px solid var(--border)', fontWeight: 400 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {recentSessions?.slice(0, 8).map((s: any) => (
+                  <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/sessions/${s.id}`)}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <td className="font-number" style={{ fontSize: 12, color: 'var(--cyan)', padding: '10px 12px' }}>{s.patient_code}</td>
+                    <td style={{ padding: '10px 12px' }}><AgentBadge agent={s.agent_type} /></td>
+                    <td className="font-body" style={{ fontSize: 11, color: 'var(--text)', padding: '10px 12px' }}>{(s.conditions_detected || [])[0] || '—'}</td>
+                    <td className="font-number" style={{ fontSize: 12, color: s.confidence_score > 0.8 ? 'var(--green)' : 'var(--cyan)', padding: '10px 12px' }}>{Math.round(s.confidence_score * 100)}%</td>
+                    <td style={{ padding: '10px 12px' }}><UrgencyBadge urgency={s.urgency_level} /></td>
+                    <td className="font-body" style={{ fontSize: 11, color: 'var(--muted)', padding: '10px 12px' }}>{formatDistanceToNow(new Date(s.created_at), { addSuffix: true })}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
-        {/* Bar Chart */}
+        {/* AI Insights */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
-          <span className="font-heading" style={{ fontSize: 16, color: 'var(--text)', fontWeight: 600, display: 'block', marginBottom: 20 }}>Agent Performance</span>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart layout="vertical" data={stats.agent_performance}>
-              <XAxis type="number" domain={[0, 100]} tick={{ fontFamily: 'DM Mono', fontSize: 10, fill: 'var(--muted)' }} tickLine={false} axisLine={false} />
-              <YAxis type="category" dataKey="agent" width={70} tick={{ fontFamily: 'DM Mono', fontSize: 11, fill: 'var(--muted)' }} tickLine={false} axisLine={false} />
-              <Tooltip cursor={{ fill: 'rgba(255,255,255,0.02)' }} contentStyle={{ background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8 }} />
-              <Bar dataKey="accuracy" name="Accuracy" fill="#00E5FF" barSize={6} radius={[0, 3, 3, 0]} animationDuration={1000} />
-              <Bar dataKey="confidence" name="Confidence" fill="#00FF9D" barSize={6} radius={[0, 3, 3, 0]} animationDuration={1000} />
-            </BarChart>
-          </ResponsiveContainer>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <span className="font-heading" style={{ fontSize: 16, color: 'var(--text)', fontWeight: 600 }}>AI Insights</span>
+            <button onClick={() => refetchInsights()} className="font-body" style={{
+              fontSize: 11, color: 'var(--cyan)', background: 'none', border: '1px solid var(--border)', borderRadius: 6,
+              padding: '4px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4
+            }}>
+              <RefreshCw size={12} className={insightsLoading ? 'animate-spin' : ''} /> Refresh
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {insightsData?.insights?.map((insight, i) => {
+              const borderColors: Record<string, string> = { high: 'var(--red)', medium: 'var(--amber)', low: 'var(--cyan)' };
+              return (
+                <motion.div key={i}
+                  initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}
+                  style={{
+                    padding: '12px 16px', borderRadius: 8,
+                    borderLeft: `3px solid ${borderColors[insight.severity] || 'var(--cyan)'}`,
+                    background: 'rgba(255,255,255,0.02)'
+                  }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 16 }}>{insight.icon_emoji}</span>
+                    <span className="font-heading" style={{ fontSize: 14, color: 'var(--text)' }}>{insight.title}</span>
+                  </div>
+                  <span className="font-body" style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>{insight.description}</span>
+                </motion.div>
+              );
+            })}
+            {!insightsData?.insights?.length && (
+              <span className="font-body" style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: 24 }}>
+                Run diagnoses to generate AI insights
+              </span>
+            )}
+          </div>
         </div>
       </motion.div>
 
-      {/* ROW 3 */}
+      {/* ═══════ 1F. BOTTOM ROW ═══════ */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.25 }}
         style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}
       >
-        {/* Pie */}
+        {/* Condition Distribution Donut */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
           <span className="font-heading" style={{ fontSize: 16, color: 'var(--text)', fontWeight: 600, display: 'block', marginBottom: 16 }}>Top Conditions</span>
           <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
             <PieChart width={200} height={200}>
-              <Pie
-                data={stats.condition_distribution.slice(0, 6)} dataKey="count" nameKey="condition" cx={100} cy={100}
-                innerRadius={60} outerRadius={85}
-                onMouseEnter={(_, i) => setActivePie(i)}
-                onMouseLeave={() => setActivePie(null)}
-                animationDuration={800}
-              >
-                {stats.condition_distribution.slice(0, 6).map((_: any, i: number) => (
-                  <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                ))}
+              <Pie data={stats.condition_distribution.slice(0, 6)} dataKey="count" nameKey="condition" cx={100} cy={100}
+                innerRadius={60} outerRadius={85} onMouseEnter={(_, i) => setActivePie(i)} onMouseLeave={() => setActivePie(null)}>
+                {stats.condition_distribution.slice(0, 6).map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
               </Pie>
             </PieChart>
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', pointerEvents: 'none' }}>
               <div className="font-body" style={{ fontSize: 10, color: 'var(--muted)' }}>
-                {activePie !== null ? stats.condition_distribution[activePie].condition : 'Total'}
+                {activePie !== null ? stats.condition_distribution[activePie]?.condition : 'Total'}
               </div>
               <div className="font-number" style={{ fontSize: 22, color: 'var(--text)' }}>
-                {activePie !== null
-                  ? stats.condition_distribution[activePie].count
-                  : stats.condition_distribution.reduce((s: number, c: any) => s + c.count, 0)}
+                {activePie !== null ? stats.condition_distribution[activePie]?.count : stats.condition_distribution.reduce((s: number, c: any) => s + c.count, 0)}
               </div>
             </div>
           </div>
@@ -314,42 +387,36 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Live Feed */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <span className="font-heading" style={{ fontSize: 16, color: 'var(--text)', fontWeight: 600 }}>LIVE FEED</span>
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: isConnected ? 'var(--green)' : 'var(--red)', animation: isConnected ? 'pulse-dot 2s infinite' : 'none' }} />
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto', maxHeight: 220 }}>
-            <AnimatePresence initial={false}>
-              {events.slice(0, 8).map(event => (
-                <motion.div key={event.id}
-                  initial={{ opacity: 0, x: -12, height: 0 }}
-                  animate={{ opacity: 1, x: 0, height: 'auto' }}
-                  exit={{ opacity: 0, x: 12, height: 0 }}
-                  transition={{ duration: 0.3 }}
-                  style={{ borderBottom: '1px solid var(--border)', padding: '10px 0', display: 'flex', alignItems: 'center', gap: 12 }}
-                >
-                  <span className="font-body" style={{ fontSize: 10, color: 'var(--dim)', minWidth: 40 }}>
-                    {format(new Date(event.timestamp), 'HH:mm')}
-                  </span>
-                  <div style={{ flex: 1 }}>
-                    <span className="font-body" style={{ fontSize: 12, color: 'var(--text)', display: 'block' }}>{event.patient_code}</span>
-                    <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>{event.condition}</span>
-                  </div>
-                  <AgentBadge agent={event.agent_type} />
-                  <span className="font-number" style={{ fontSize: 12, color: event.confidence > 0.8 ? 'var(--green)' : 'var(--cyan)' }}>
-                    {Math.round(event.confidence * 100)}%
-                  </span>
-                </motion.div>
-              ))}
-              {events.length === 0 && (
-                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span className="font-body" style={{ color: 'var(--muted)', fontSize: 12 }}>Waiting for events...</span>
-                </div>
-              )}
-            </AnimatePresence>
-          </div>
+        {/* Urgency Heatmap */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
+          <span className="font-heading" style={{ fontSize: 16, color: 'var(--text)', fontWeight: 600, display: 'block', marginBottom: 16 }}>Urgency Heatmap</span>
+          {heatmapData ? (
+            <div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto repeat(7, 1fr)', gap: 4, alignItems: 'center' }}>
+                <div />
+                {heatmapData.days.map(d => <span key={d} className="font-body" style={{ fontSize: 10, color: 'var(--muted)', textAlign: 'center' }}>{d}</span>)}
+                {heatmapData.urgencies.map(urg => {
+                  const urgColors: Record<string, string> = { critical: '#FF3B5C', high: '#FF9500', medium: '#00E5FF', low: 'rgba(255,255,255,0.05)' };
+                  const maxCount = Math.max(...heatmapData.heatmap.map(h => h.count), 1);
+                  return [
+                    <span key={`label-${urg}`} className="font-body" style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'capitalize' }}>{urg}</span>,
+                    ...heatmapData.days.map(day => {
+                      const cell = heatmapData.heatmap.find(h => h.day === day && h.urgency === urg);
+                      const count = cell?.count || 0;
+                      const opacity = count > 0 ? Math.max(0.2, count / maxCount) : 0.05;
+                      return (
+                        <div key={`${day}-${urg}`} title={`${count} ${urg} cases on ${day}`} style={{
+                          width: '100%', aspectRatio: '1', borderRadius: 4,
+                          background: urgColors[urg] || 'var(--muted)', opacity,
+                          minWidth: 20, minHeight: 20
+                        }} />
+                      );
+                    })
+                  ];
+                })}
+              </div>
+            </div>
+          ) : <SkeletonCard height={120} />}
         </div>
 
         {/* System Health */}
@@ -367,7 +434,6 @@ const Dashboard = () => {
               let color = 'var(--green)';
               if (m.invert) { color = m.value < m.threshold2 ? 'var(--red)' : m.value < m.threshold1 ? 'var(--amber)' : 'var(--green)'; }
               else { color = m.value > m.threshold2 ? 'var(--red)' : m.value > m.threshold1 ? 'var(--amber)' : 'var(--green)'; }
-
               return (
                 <div key={m.label}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -375,90 +441,14 @@ const Dashboard = () => {
                     <span className="font-number" style={{ fontSize: 13, color: 'var(--text)' }}>{m.value}{m.unit}</span>
                   </div>
                   <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' }}>
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min(Math.max(pct, 5), 100)}%` }} // ensure non-zero width for visibility
-                      transition={{ duration: 0.8, ease: 'easeOut' }}
-                      style={{ height: '100%', background: color, borderRadius: 2 }}
-                    />
+                    <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(Math.max(pct, 5), 100)}%` }} transition={{ duration: 0.8 }}
+                      style={{ height: '100%', background: color, borderRadius: 2 }} />
                   </div>
                 </div>
               );
             })}
           </div>
         </div>
-      </motion.div>
-
-      {/* ROW 4: Table */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}
-        style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, overflowX: 'auto' }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <span className="font-heading" style={{ fontSize: 16, color: 'var(--text)', fontWeight: 600 }}>Recent Sessions</span>
-          <span className="font-body" data-cursor="hover" style={{ fontSize: 12, color: 'var(--cyan)' }}>View All →</span>
-        </div>
-
-        {loadingSessions ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {[1, 2, 3, 4, 5].map(i => <SkeletonCard key={i} height={40} />)}
-          </div>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: 800 }}>
-            <thead>
-              <tr>
-                {['PATIENT', 'AGENT', 'CONDITIONS', 'CONFIDENCE', 'URGENCY', 'TIME', 'ACTION'].map(h => (
-                  <th key={h} className="font-body" style={{
-                    fontSize: 11, color: 'var(--muted)', letterSpacing: '0.08em', padding: '0 16px 12px',
-                    textAlign: 'left', borderBottom: '1px solid var(--border)', fontWeight: 400, textTransform: 'uppercase'
-                  }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {recentSessions?.map((s: any) => {
-                const conf = Math.round(s.confidence_score * 100);
-                const confCol = conf > 80 ? 'var(--green)' : conf > 60 ? 'var(--cyan)' : 'var(--amber)';
-
-                return (
-                  <tr key={s.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background 150ms' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                    <td className="font-number" style={{ fontSize: 12, color: 'var(--cyan)', padding: '14px 16px' }}>{s.patient_code}</td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <AgentBadge agent={s.agent_type} />
-                    </td>
-                    <td style={{ padding: '14px 16px', display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                      {(s.conditions_detected || []).slice(0, 2).map((c: string) => (
-                        <span key={c} className="font-body" style={{ fontSize: 11, padding: '2px 8px', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }}>{c}</span>
-                      ))}
-                      {(s.conditions_detected || []).length > 2 && <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>+{(s.conditions_detected || []).length - 2}</span>}
-                    </td>
-                    <td className="font-number" style={{ fontSize: 13, padding: '14px 16px', color: confCol }}>{conf}%</td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <UrgencyBadge urgency={s.urgency_level} />
-                    </td>
-                    <td className="font-body" style={{ fontSize: 11, color: 'var(--muted)', padding: '14px 16px' }}>
-                      {formatDistanceToNow(new Date(s.created_at), { addSuffix: true })}
-                    </td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <button
-                        data-cursor="hover"
-                        onClick={() => navigate(`/sessions/${s.id}`)}
-                        className="font-body"
-                        style={{ fontSize: 12, color: 'var(--cyan)', background: 'transparent', border: 'none', padding: 0 }}
-                      >
-                        View →
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
       </motion.div>
     </div>
   );
