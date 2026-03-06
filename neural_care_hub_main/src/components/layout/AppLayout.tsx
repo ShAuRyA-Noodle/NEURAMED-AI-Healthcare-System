@@ -13,9 +13,13 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', width: '100%', overflow: 'hidden' }}>
       <Sidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
-      {isSidebarOpen && <div onClick={() => setSidebarOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 90 }} />}
+      {/* Mobile overlay */}
+      {isSidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 90 }} />
+      )}
       <div className="main-content" style={{ marginLeft: 220, flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <TopBar onMenuClick={() => setSidebarOpen(true)} />
+        <TopBar onMenuClick={() => setSidebarOpen(prev => !prev)} />
         <main style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
           <AnimatePresence mode="wait">
             <motion.div

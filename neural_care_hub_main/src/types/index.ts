@@ -329,3 +329,33 @@ export interface AppointmentStats {
     this_week_count: number
     completion_rate: number
 }
+
+// --- Auth Types ---
+export interface User {
+    id: number
+    email: string
+    full_name: string
+    role: 'doctor' | 'patient'
+    patient_code: string | null
+    avatar_emoji: string
+    created_at: string
+}
+
+export interface AuthToken {
+    access_token: string
+    token_type: string
+    user: User
+}
+
+export interface LoginCredentials {
+    email: string
+    password: string
+}
+
+export interface RegisterData {
+    email: string
+    full_name: string
+    password: string
+    role: 'doctor' | 'patient'
+    invite_code?: string
+}
