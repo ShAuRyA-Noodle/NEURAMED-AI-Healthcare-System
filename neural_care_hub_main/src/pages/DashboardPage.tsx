@@ -19,6 +19,7 @@ import { CountUpNumber } from '@/components/shared/CountUpNumber';
 import { AgentBadge } from '@/components/shared/AgentBadge';
 import { UrgencyBadge } from '@/components/shared/UrgencyBadge';
 import { ConfidenceMeter } from '@/components/shared/ConfidenceMeter';
+import DashboardHero from '@/components/three/DashboardHero';
 
 const PIE_COLORS = ['#00E5FF', '#00FF9D', '#FF9500', '#FF3B5C', '#8B5CF6', '#EC4899'];
 
@@ -55,27 +56,44 @@ const UptimeCounter = ({ seconds }: { seconds: number }) => {
   const s = elapsed % 60;
   return (
     <span className="font-number" style={{ fontSize: 11, color: 'var(--cyan)' }}>
-      {d}d {String(h).padStart(2,'0')}:{String(m).padStart(2,'0')}:{String(s).padStart(2,'0')}
+      {d}d {String(h).padStart(2, '0')}:{String(m).padStart(2, '0')}:{String(s).padStart(2, '0')}
     </span>
   );
 };
 
 /* ── Stat Card (reusable) ── */
-const StatCard = ({ label, value, icon, sparkData, trendColor }: {
-  label: string; value: number; icon: React.ReactNode; sparkData?: number[]; trendColor?: string
+const StatCard = ({ label, value, icon, sparkData, trendColor, accentColor }: {
+  label: string; value: number; icon: React.ReactNode; sparkData?: number[]; trendColor?: string; accentColor?: string
 }) => (
   <div style={{
-    background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
-    padding: 20, transition: 'all 300ms ease', cursor: 'default'
+    background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 12,
+    padding: 20, transition: 'all 250ms cubic-bezier(0.16, 1, 0.3, 1)', cursor: 'default',
+    position: 'relative', overflow: 'hidden',
   }}
-    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'var(--border-glow)'; }}
-    onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = 'var(--border-glow)'; e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.3)'; }}
+    onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none'; }}
   >
+    {/* Left accent stripe */}
+    <div style={{
+      position: 'absolute', left: 0, top: '20%', bottom: '20%', width: 3, borderRadius: 3,
+      background: `linear-gradient(180deg, transparent, ${accentColor || trendColor || 'var(--cyan)'}, transparent)`,
+      boxShadow: `0 0 8px ${accentColor || trendColor || 'rgba(0,229,255,0.3)'}`,
+    }} />
+    {/* Corner accent */}
+    <div style={{
+      position: 'absolute', top: 0, left: 0, width: 60, height: 60,
+      background: `radial-gradient(circle at top left, ${accentColor || 'rgba(0,229,255,0.04)'}, transparent 70%)`,
+      pointerEvents: 'none',
+    }} />
     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-      <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</span>
+      <span className="font-body" style={{ fontSize: 9, color: 'var(--dim)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>{label}</span>
       {icon}
     </div>
-    <div className="font-number" style={{ fontSize: 32, color: 'var(--text)', lineHeight: 1 }}>
+    <div className="font-number" style={{
+      fontSize: 32, lineHeight: 1,
+      background: `linear-gradient(135deg, var(--text) 0%, ${trendColor || 'var(--cyan)'} 100%)`,
+      WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+    }}>
       <CountUpNumber value={value} />
     </div>
     {sparkData && (
@@ -87,36 +105,57 @@ const StatCard = ({ label, value, icon, sparkData, trendColor }: {
 );
 
 /* ── Quick Action Card ── */
-const QuickActionCard = ({ emoji, title, desc, stat, statLabel, cta, to, bgGrad }: {
-  emoji: string; title: string; desc: string; stat: number; statLabel: string; cta: string; to: string; bgGrad: string
+const QuickActionCard = ({ emoji, title, desc, stat, statLabel, cta, to, bgGrad, accentColor }: {
+  emoji: string; title: string; desc: string; stat: number; statLabel: string; cta: string; to: string; bgGrad: string; accentColor: string
 }) => {
   const navigate = useNavigate();
   return (
     <motion.div
-      whileHover={{ y: -8, boxShadow: '0 16px 48px rgba(0,229,255,0.08)' }}
+      whileHover={{ y: -6 }}
       style={{
         background: bgGrad, border: '1px solid var(--border)', borderRadius: 16,
-        padding: 28, cursor: 'pointer', transition: 'border-color 300ms',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12
+        padding: 28, cursor: 'pointer', transition: 'all 250ms cubic-bezier(0.16, 1, 0.3, 1)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12,
+        position: 'relative', overflow: 'hidden',
       }}
       onClick={() => navigate(to)}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-glow)'; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-glow)'; e.currentTarget.style.boxShadow = `0 16px 48px rgba(0,0,0,0.3), 0 0 0 1px ${accentColor}15`; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none'; }}
     >
-      <motion.div style={{ fontSize: 56 }} whileHover={{ scale: 1.1, y: -4 }} transition={{ type: 'spring', stiffness: 400 }}>
+      {/* Top edge gradient line */}
+      <div style={{
+        position: 'absolute', top: 0, left: '20%', right: '20%', height: 1,
+        background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)`,
+        opacity: 0, transition: 'opacity 300ms',
+      }}
+        className="card-top-edge"
+      />
+      {/* Background orb */}
+      <div style={{
+        position: 'absolute', top: -20, right: -20, width: 100, height: 100,
+        background: `radial-gradient(circle, ${accentColor}0A, transparent 70%)`,
+        transition: 'all 400ms cubic-bezier(0.16, 1, 0.3, 1)',
+        pointerEvents: 'none',
+      }} />
+      <motion.div style={{
+        fontSize: 52, filter: `drop-shadow(0 0 12px ${accentColor}40)`,
+      }}
+        whileHover={{ scale: 1.1, y: -6 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+      >
         {emoji}
       </motion.div>
       <span className="font-heading" style={{ fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
       <span className="font-body" style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>{desc}</span>
-      <span className="font-number" style={{ fontSize: 13, color: 'var(--cyan)' }}>
+      <span className="font-number" style={{ fontSize: 13, color: accentColor }}>
         <CountUpNumber value={stat} /> {statLabel}
       </span>
-      <div style={{
+      <div className="btn-primary" style={{
         marginTop: 8, padding: '8px 24px', borderRadius: 8,
-        background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.15)',
-        color: 'var(--cyan)', fontFamily: 'var(--font-heading)', fontSize: 13, fontWeight: 600
+        background: `rgba(0,229,255,0.08)`, border: `1px solid ${accentColor}25`,
+        color: accentColor, fontFamily: 'Syne, sans-serif', fontSize: 13, fontWeight: 600,
       }}>
-        {cta}
+        {cta.replace(' →', '')} <span style={{ display: 'inline-block', transition: 'transform 200ms var(--spring)' }}>→</span>
       </div>
     </motion.div>
   );
@@ -146,8 +185,8 @@ const Dashboard = () => {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <SkeletonCard height={200} />
-        <div className="responsive-grid-4">{[1,2,3,4].map(i => <SkeletonCard key={i} height={220} />)}</div>
-        <div className="responsive-grid-4">{[1,2,3,4,5].map(i => <SkeletonCard key={i} height={100} />)}</div>
+        <div className="responsive-grid-4">{[1, 2, 3, 4].map(i => <SkeletonCard key={i} height={220} />)}</div>
+        <div className="responsive-grid-4">{[1, 2, 3, 4, 5].map(i => <SkeletonCard key={i} height={100} />)}</div>
       </div>
     );
   }
@@ -158,59 +197,66 @@ const Dashboard = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* ═══════ 1A. HERO SECTION ═══════ */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-        style={{
-          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16,
-          padding: '32px 40px', minHeight: 180,
-          backgroundImage: 'linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px)',
-          backgroundSize: '32px 32px',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 24
-        }}
-      >
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
-            <span style={{ fontSize: 48 }}>{isPatient ? '👋' : '🏥'}</span>
-            <span className="font-number" style={{ fontSize: 32, fontWeight: 700, color: 'var(--cyan)' }}>
-              {isPatient ? `Welcome, ${user?.full_name?.split(' ')[0]}` : 'NEURAMED'}
-            </span>
-          </div>
-          <div className="font-heading" style={{ fontSize: 16, color: 'var(--muted)', marginBottom: 16 }}>
-            {isPatient ? 'Your AI health assistant is ready' : 'Clinical AI Diagnostic Intelligence Platform'}
-          </div>
-          {isPatient && user?.patient_code && (
-            <span className="font-number" style={{ fontSize: 13, color: 'var(--cyan)', background: 'rgba(0,229,255,0.06)', border: '1px solid rgba(0,229,255,0.15)', padding: '4px 12px', borderRadius: 20, marginBottom: 12, display: 'inline-block' }}>
-              Your ID: {user.patient_code}
-            </span>
-          )}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {['🎤 Voice Diagnosis', '🧠 Imaging AI', '📄 OCR Reports'].map(pill => (
-              <span key={pill} className="font-body" style={{
-                fontSize: 11, padding: '4px 12px', borderRadius: 20,
-                background: 'rgba(0,229,255,0.06)', border: '1px solid rgba(0,229,255,0.15)', color: 'var(--text)'
-              }}>{pill}</span>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green)', animation: 'pulse-dot 2s infinite' }} />
-            <span className="font-body" style={{ fontSize: 12, color: 'var(--green)' }}>⚡ SYSTEM ONLINE</span>
-          </div>
-          <span className="font-body" style={{ fontSize: 12, color: 'var(--muted)' }}>
-            {format(now, 'MMM d, yyyy')} — {format(now, 'HH:mm:ss')}
-          </span>
-          <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>🤖 LLaMA 3 70B — ⚡ Groq Inference</span>
-          {sysInfo && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Clock size={12} style={{ color: 'var(--muted)' }} />
-              <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>Uptime:</span>
-              <UptimeCounter seconds={sysInfo.uptime_seconds} />
+      {/* ═══════ 1A. HERO SECTION — Three.js Command Center ═══════ */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+        <DashboardHero>
+          <div style={{
+            height: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '32px 40px', flexWrap: 'wrap', gap: 24,
+          }}>
+            <div style={{ position: 'relative', zIndex: 2 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
+                <span style={{ fontSize: 42, filter: 'drop-shadow(0 0 12px rgba(0,229,255,0.3))' }}>{isPatient ? '👋' : '🏥'}</span>
+                <span className="font-number" style={{
+                  fontSize: 30, fontWeight: 700,
+                  background: 'linear-gradient(135deg, #00E5FF 0%, #00FF9D 100%)',
+                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                }}>
+                  {isPatient ? `Welcome, ${user?.full_name?.split(' ')[0]}` : 'NEURAMED'}
+                </span>
+              </div>
+              <div className="font-heading" style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', marginBottom: 14 }}>
+                {isPatient ? 'Your AI health assistant is ready' : 'Clinical AI Diagnostic Intelligence Platform'}
+              </div>
+              {isPatient && user?.patient_code && (
+                <span className="font-number" style={{ fontSize: 12, color: 'var(--cyan)', background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.15)', padding: '4px 12px', borderRadius: 20, marginBottom: 12, display: 'inline-block' }}>
+                  ID: {user.patient_code}
+                </span>
+              )}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {['🎤 Voice Diagnosis', '🧠 Imaging AI', '📄 OCR Reports'].map(pill => (
+                  <span key={pill} className="font-body" style={{
+                    fontSize: 11, padding: '5px 14px', borderRadius: 20,
+                    background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(0,229,255,0.1)', color: 'var(--text)',
+                  }}>{pill}</span>
+                ))}
+              </div>
             </div>
-          )}
-        </div>
+
+            <div style={{
+              display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end',
+              background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(16px)',
+              border: '1px solid rgba(0,229,255,0.1)', borderRadius: 12,
+              padding: '16px 20px', position: 'relative', zIndex: 2,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green)', animation: 'pulse-dot 2s infinite', boxShadow: '0 0 8px rgba(0,255,157,0.4)' }} />
+                <span className="font-body" style={{ fontSize: 11, color: 'var(--green)', letterSpacing: '0.1em' }}>SYSTEM ONLINE</span>
+              </div>
+              <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>
+                {format(now, 'MMM d, yyyy')} — {format(now, 'HH:mm:ss')}
+              </span>
+              <span className="font-body" style={{ fontSize: 10, color: 'var(--dim)' }}>LLaMA 3 70B · Groq Inference</span>
+              {sysInfo && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Clock size={11} style={{ color: 'var(--dim)' }} />
+                  <UptimeCounter seconds={sysInfo.uptime_seconds} />
+                </div>
+              )}
+            </div>
+          </div>
+        </DashboardHero>
       </motion.div>
 
       {/* ═══════ 1B. QUICK ACTION CARDS ═══════ */}
@@ -220,16 +266,16 @@ const Dashboard = () => {
       >
         <QuickActionCard emoji="🎤" title="Voice Diagnosis" desc="Speak or type symptoms. Get AI differential diagnosis in seconds."
           stat={quickStats?.total_voice ?? 0} statLabel="diagnoses run" cta="Start Diagnosis →" to="/voice"
-          bgGrad="linear-gradient(135deg, #020608 0%, rgba(0,229,255,0.04) 100%)" />
+          bgGrad="linear-gradient(135deg, #020608 0%, rgba(0,229,255,0.04) 100%)" accentColor="#00E5FF" />
         <QuickActionCard emoji="🧠" title="Imaging AI" desc="Upload CT, MRI, X-Ray. OpenCV + LLaMA detects anomalies automatically."
           stat={quickStats?.total_imaging ?? 0} statLabel="scans analyzed" cta="Analyze Scan →" to="/imaging"
-          bgGrad="linear-gradient(135deg, #020608 0%, rgba(0,255,157,0.04) 100%)" />
+          bgGrad="linear-gradient(135deg, #020608 0%, rgba(0,255,157,0.04) 100%)" accentColor="#00FF9D" />
         <QuickActionCard emoji="📄" title="OCR Reports" desc="Upload any medical PDF. AI extracts findings, flags, medications instantly."
           stat={quickStats?.total_ocr ?? 0} statLabel="reports processed" cta="Process Report →" to="/ocr"
-          bgGrad="linear-gradient(135deg, #020608 0%, rgba(255,149,0,0.04) 100%)" />
+          bgGrad="linear-gradient(135deg, #020608 0%, rgba(255,149,0,0.04) 100%)" accentColor="#FF9500" />
         <QuickActionCard emoji="📅" title="Appointments" desc="Manage patient appointments. Track status and upcoming schedules."
           stat={quickStats?.upcoming_appointments ?? 0} statLabel="upcoming" cta="View Schedule →" to="/appointments"
-          bgGrad="linear-gradient(135deg, #020608 0%, rgba(139,92,246,0.04) 100%)" />
+          bgGrad="linear-gradient(135deg, #020608 0%, rgba(139,92,246,0.04) 100%)" accentColor="#8B5CF6" />
       </motion.div>
 
       {/* ═══════ 1C. METRICS ROW ═══════ */}
@@ -253,7 +299,7 @@ const Dashboard = () => {
       {/* ═══════ 1D. ACTIVITY CHART ═══════ */}
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15 }}
-        style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}
+        style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <span className="font-heading" style={{ fontSize: 16, color: 'var(--text)', fontWeight: 600 }}>Diagnostic Activity</span>
@@ -270,9 +316,9 @@ const Dashboard = () => {
         <ResponsiveContainer width="100%" height={240}>
           <AreaChart data={chartData}>
             <defs>
-              <linearGradient id="gCyan" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#00E5FF" stopOpacity={0.25}/><stop offset="95%" stopColor="#00E5FF" stopOpacity={0}/></linearGradient>
-              <linearGradient id="gGreen" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#00FF9D" stopOpacity={0.25}/><stop offset="95%" stopColor="#00FF9D" stopOpacity={0}/></linearGradient>
-              <linearGradient id="gAmber" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#FF9500" stopOpacity={0.25}/><stop offset="95%" stopColor="#FF9500" stopOpacity={0}/></linearGradient>
+              <linearGradient id="gCyan" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#00E5FF" stopOpacity={0.25} /><stop offset="95%" stopColor="#00E5FF" stopOpacity={0} /></linearGradient>
+              <linearGradient id="gGreen" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#00FF9D" stopOpacity={0.25} /><stop offset="95%" stopColor="#00FF9D" stopOpacity={0} /></linearGradient>
+              <linearGradient id="gAmber" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#FF9500" stopOpacity={0.25} /><stop offset="95%" stopColor="#FF9500" stopOpacity={0} /></linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
             <XAxis dataKey="date" tick={{ fontFamily: 'DM Mono', fontSize: 10, fill: '#445566' }} tickLine={false} axisLine={false} tickFormatter={d => format(new Date(d), 'MMM d')} />
@@ -291,7 +337,7 @@ const Dashboard = () => {
         style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 16 }}
       >
         {/* Recent Sessions */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, overflowX: 'auto' }}>
+        <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, overflowX: 'auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <span className="font-heading" style={{ fontSize: 16, color: 'var(--text)', fontWeight: 600 }}>Recent Sessions</span>
             <button onClick={() => navigate('/sessions')} className="font-body" style={{ fontSize: 12, color: 'var(--cyan)', background: 'none', border: 'none', cursor: 'pointer' }}>View All →</button>
@@ -324,7 +370,7 @@ const Dashboard = () => {
         </div>
 
         {/* AI Insights */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
+        <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <span className="font-heading" style={{ fontSize: 16, color: 'var(--text)', fontWeight: 600 }}>AI Insights</span>
             <button onClick={() => refetchInsights()} className="font-body" style={{
@@ -368,7 +414,7 @@ const Dashboard = () => {
         style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}
       >
         {/* Condition Distribution Donut */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
+        <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}>
           <span className="font-heading" style={{ fontSize: 16, color: 'var(--text)', fontWeight: 600, display: 'block', marginBottom: 16 }}>Top Conditions</span>
           <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
             <PieChart width={200} height={200}>
@@ -397,7 +443,7 @@ const Dashboard = () => {
         </div>
 
         {/* Urgency Heatmap */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
+        <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}>
           <span className="font-heading" style={{ fontSize: 16, color: 'var(--text)', fontWeight: 600, display: 'block', marginBottom: 16 }}>Urgency Heatmap</span>
           {heatmapData ? (
             <div>
@@ -429,7 +475,7 @@ const Dashboard = () => {
         </div>
 
         {/* System Health */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
+        <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}>
           <span className="font-heading" style={{ fontSize: 16, color: 'var(--text)', fontWeight: 600, display: 'block', marginBottom: 20 }}>System Health</span>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {[

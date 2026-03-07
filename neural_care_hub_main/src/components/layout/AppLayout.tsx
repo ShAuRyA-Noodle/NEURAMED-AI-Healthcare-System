@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
+import AmbientBackground from '../three/AmbientBackground';
 
 const AppLayout = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
@@ -12,6 +13,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', width: '100%', overflow: 'hidden' }}>
+      <AmbientBackground />
       <Sidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
       {/* Mobile overlay */}
       {isSidebarOpen && (
