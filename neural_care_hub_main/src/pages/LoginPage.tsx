@@ -363,14 +363,14 @@ const LoginPage = () => {
               <motion.div key="login" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ duration: 0.2 }}>
                 <div style={{ marginBottom: 16 }}>
                   <label style={labelStyle}>Email Address</label>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="doctor@hospital.com"
+                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder=""
                     style={inputStyle} onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                     onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
                     onKeyDown={e => e.key === 'Enter' && handleLogin()} />
                 </div>
                 <div style={{ marginBottom: 20, position: 'relative' }}>
                   <label style={labelStyle}>Password</label>
-                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••"
+                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder=""
                     style={inputStyle} onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                     onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
                     onKeyDown={e => e.key === 'Enter' && handleLogin()} />
@@ -394,13 +394,13 @@ const LoginPage = () => {
               <motion.div key="register" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.2 }}>
                 <div style={{ marginBottom: 14 }}>
                   <label style={labelStyle}>Full Name</label>
-                  <input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Dr. John Doe" style={inputStyle}
+                  <input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="" style={inputStyle}
                     onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                     onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }} />
                 </div>
                 <div style={{ marginBottom: 14 }}>
                   <label style={labelStyle}>Email Address</label>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="doctor@hospital.com" style={inputStyle}
+                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="" style={inputStyle}
                     onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                     onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }} />
                 </div>
@@ -441,7 +441,7 @@ const LoginPage = () => {
                   {role === 'doctor' && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ marginBottom: 14, overflow: 'hidden' }}>
                       <label style={labelStyle}>Doctor Invite Code</label>
-                      <input value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())} placeholder="NEURAMED-DOCTOR-XXXX"
+                      <input value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())} placeholder=""
                         style={{ ...inputStyle, textTransform: 'uppercase', letterSpacing: '0.1em' }}
                         onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                         onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }} />
@@ -452,7 +452,7 @@ const LoginPage = () => {
 
                 <div style={{ marginBottom: 14 }}>
                   <label style={labelStyle}>Password</label>
-                  <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" style={inputStyle}
+                  <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="" style={inputStyle}
                     onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                     onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }} />
                   {password && (
@@ -466,7 +466,7 @@ const LoginPage = () => {
 
                 <div style={{ marginBottom: 20 }}>
                   <label style={labelStyle}>Confirm Password</label>
-                  <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="••••••••" style={inputStyle}
+                  <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="" style={inputStyle}
                     onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                     onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
                     onKeyDown={e => e.key === 'Enter' && handleRegister()} />
