@@ -13,7 +13,7 @@ const statusBg = (s: AppointmentStatus) => s === 'completed' ? 'rgba(0,255,157,0
 const SPECIALTIES = ['General', 'Cardiology', 'Pulmonology', 'Neurology', 'Orthopedics', 'Radiology', 'Dermatology', 'Oncology', 'Pediatrics', 'Psychiatry'];
 
 const StatCard = ({ label, value, icon: Icon, color }: { label: string; value: number | string; icon: any; color?: string }) => (
-  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
+  <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
     <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <Icon size={20} style={{ color: color || 'var(--muted)' }} />
     </div>
@@ -150,7 +150,7 @@ const Appointments = () => {
       )}
 
       {/* Table */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, overflowX: 'auto' }}>
+      <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, overflowX: 'auto' }}>
         {isLoading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {[1, 2, 3, 4, 5].map(i => <SkeletonCard key={i} height={44} />)}
@@ -209,7 +209,7 @@ const Appointments = () => {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 32, width: '100%', maxWidth: 500, position: 'relative' }}>
+              style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 32, width: '100%', maxWidth: 500, position: 'relative' }}>
 
               <button data-cursor="hover" onClick={() => { setIsModalOpen(false); setModalStep(1); }} style={{ position: 'absolute', top: 24, right: 24, background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>
                 <X size={20} />
@@ -333,7 +333,7 @@ const Appointments = () => {
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
               onClick={e => e.stopPropagation()}
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, width: 400 }}>
+              style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, width: 400 }}>
               <span className="font-heading" style={{ fontSize: 16, color: 'var(--text)', display: 'block', marginBottom: 16 }}>Appointment Notes</span>
               <textarea value={notesText} onChange={e => setNotesText(e.target.value)} placeholder="Add clinical notes..."
                 style={{ width: '100%', height: 120, background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: 14, fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text)', outline: 'none', resize: 'none' }} />

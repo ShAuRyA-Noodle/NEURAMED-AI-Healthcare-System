@@ -22,9 +22,11 @@ client.interceptors.response.use(
   response => response,
   error => {
     if (error.response?.status === 401) {
+      // Don't redirect for auth-check calls — let AuthContext handle cleanup
+      const isAuthCheck = error.config?.url?.includes('/api/auth/me');
       localStorage.removeItem('neuramed_token');
       localStorage.removeItem('neuramed_user');
-      if (window.location.pathname !== '/login') {
+      if (!isAuthCheck && window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
     }
