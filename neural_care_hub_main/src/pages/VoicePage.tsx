@@ -8,6 +8,7 @@ import { ConfidenceMeter } from '@/components/shared/ConfidenceMeter';
 import { UrgencyBadge } from '@/components/shared/UrgencyBadge';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { SkeletonCard } from '@/components/shared/SkeletonCard';
+import VoiceOrb from '@/components/three/VoiceOrb';
 import type { DiagnosisResult, ConditionDetail } from '@/types';
 
 // 12 clinical templates
@@ -47,11 +48,11 @@ const highlightMedical = (text: string) => {
   );
 };
 
-const URGENCY_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  critical: { bg: 'rgba(239,68,68,0.15)', border: '#ef4444', text: '#fca5a5' },
-  high: { bg: 'rgba(249,115,22,0.15)', border: '#f97316', text: '#fdba74' },
-  medium: { bg: 'rgba(234,179,8,0.15)', border: '#eab308', text: '#fde047' },
-  low: { bg: 'rgba(34,197,94,0.15)', border: '#22c55e', text: '#86efac' },
+const URGENCY_COLORS: Record<string, { bg: string; border: string; text: string; glow: string }> = {
+  critical: { bg: 'linear-gradient(135deg, rgba(255,59,92,0.12) 0%, rgba(239,68,68,0.06) 100%)', border: '#FF3B5C', text: '#fca5a5', glow: '0 0 20px rgba(255,59,92,0.15)' },
+  high: { bg: 'linear-gradient(135deg, rgba(255,149,0,0.12) 0%, rgba(249,115,22,0.06) 100%)', border: '#FF9500', text: '#fdba74', glow: '0 0 20px rgba(255,149,0,0.12)' },
+  medium: { bg: 'linear-gradient(135deg, rgba(0,229,255,0.1) 0%, rgba(0,229,255,0.03) 100%)', border: '#00E5FF', text: '#00E5FF', glow: '0 0 20px rgba(0,229,255,0.1)' },
+  low: { bg: 'linear-gradient(135deg, rgba(0,255,157,0.1) 0%, rgba(34,197,94,0.03) 100%)', border: '#00FF9D', text: '#86efac', glow: '0 0 20px rgba(0,255,157,0.1)' },
 };
 
 const VoicePage = () => {
@@ -273,7 +274,7 @@ const VoicePage = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: '5fr 7fr', gap: 24 }}>
         {/* LEFT: Input Panel */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column' }}>
           {/* Tab Bar */}
           <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 20, position: 'relative' }}>
             {(['type', 'record'] as const).map(t => (
@@ -365,27 +366,22 @@ const VoicePage = () => {
                 </select>
               </div>
 
-              {/* Mic Button */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '20px 0' }}>
-                <motion.div
-                  data-cursor="hover"
-                  onClick={toggleRecording}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  style={{
-                    width: 96, height: 96, borderRadius: '50%',
-                    background: isRecording ? 'rgba(255,59,92,0.1)' : 'rgba(0,229,255,0.1)',
-                    border: `2px solid ${isRecording ? 'var(--red)' : 'var(--cyan)'}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: isRecording ? '0 0 0 8px rgba(255,59,92,0.05), 0 0 30px rgba(255,59,92,0.1)' : 'none',
-                    transition: 'all 300ms', cursor: 'pointer'
-                  }}
-                >
-                  {isRecording
-                    ? <MicOff size={36} style={{ color: 'var(--red)' }} />
-                    : <Mic size={36} style={{ color: 'var(--cyan)' }} />
-                  }
-                </motion.div>
+              {/* VoiceOrb + Mic Button */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '10px 0' }}>
+                {/* Three.js VoiceOrb */}
+                <div data-cursor="hover" onClick={toggleRecording} style={{ cursor: 'pointer', position: 'relative' }}>
+                  <VoiceOrb isRecording={isRecording} audioLevel={waveData.length > 0 ? Math.max(...waveData) / 56 : 0} />
+                  {/* Overlay mic icon */}
+                  <div style={{
+                    position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    pointerEvents: 'none',
+                  }}>
+                    {isRecording
+                      ? <MicOff size={28} style={{ color: 'var(--red)', filter: 'drop-shadow(0 0 8px rgba(255,59,92,0.5))' }} />
+                      : <Mic size={28} style={{ color: 'var(--cyan)', filter: 'drop-shadow(0 0 8px rgba(0,229,255,0.5))' }} />
+                    }
+                  </div>
+                </div>
 
                 {/* Waveform */}
                 <div style={{ height: 48, marginTop: 20, display: 'flex', alignItems: 'center', gap: 3 }}>
@@ -439,7 +435,7 @@ const VoicePage = () => {
         </div>
 
         {/* RIGHT: Results Panel */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {!result && !isPending ? (
             <div style={{ padding: 24, flex: 1 }}>
               <EmptyState icon={Stethoscope} title="Run a diagnosis" subtitle="Describe symptoms or record speech to receive AI-powered differential diagnosis with ICD-10 codes" />
@@ -461,12 +457,22 @@ const VoicePage = () => {
               {/* Urgency Banner */}
               <div style={{
                 padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                background: urgencyColor.bg, borderBottom: `1px solid ${urgencyColor.border}`
+                background: urgencyColor.bg, borderBottom: `1px solid ${urgencyColor.border}30`,
+                boxShadow: urgencyColor.glow, position: 'relative', overflow: 'hidden',
+                animation: urgency === 'critical' ? 'border-breathe 2s ease-in-out infinite' : 'none',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <AlertTriangle size={18} style={{ color: urgencyColor.text }} />
-                  <span className="font-heading" style={{ fontSize: 14, color: urgencyColor.text, textTransform: 'uppercase' }}>
-                    {urgency} Urgency
+                {/* Pulsing dot for critical */}
+                {urgency === 'critical' && (
+                  <div style={{
+                    position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                    width: 8, height: 8, borderRadius: '50%', background: '#FF3B5C',
+                    animation: 'pulse-red 1.5s ease-in-out infinite',
+                  }} />
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingLeft: urgency === 'critical' ? 16 : 0 }}>
+                  <AlertTriangle size={18} style={{ color: urgencyColor.text, filter: `drop-shadow(0 0 4px ${urgencyColor.border}40)` }} />
+                  <span className="font-number" style={{ fontSize: 13, color: urgencyColor.text, textTransform: 'uppercase', letterSpacing: '0.15em' }}>
+                    {urgency}
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>

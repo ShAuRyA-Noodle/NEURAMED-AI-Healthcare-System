@@ -17,12 +17,12 @@ const highlightMedical = (text: string) => {
   );
 };
 
-const ACR_COLORS: Record<string, { bg: string; border: string; text: string; label: string }> = {
-  '1': { bg: 'rgba(34,197,94,0.12)', border: '#22c55e', text: '#86efac', label: 'ACR 1 — Negative' },
-  '2': { bg: 'rgba(34,197,94,0.08)', border: '#4ade80', text: '#86efac', label: 'ACR 2 — Benign' },
-  '3': { bg: 'rgba(234,179,8,0.12)', border: '#eab308', text: '#fde047', label: 'ACR 3 — Probably Benign' },
-  '4': { bg: 'rgba(249,115,22,0.12)', border: '#f97316', text: '#fdba74', label: 'ACR 4 — Suspicious' },
-  '5': { bg: 'rgba(239,68,68,0.12)', border: '#ef4444', text: '#fca5a5', label: 'ACR 5 — Highly Suggestive' },
+const ACR_COLORS: Record<string, { bg: string; border: string; text: string; label: string; glow: string }> = {
+  '1': { bg: 'linear-gradient(135deg, rgba(0,255,157,0.08) 0%, rgba(0,255,157,0.02) 100%)', border: '#00FF9D', text: '#86efac', label: 'ACR 1 — Negative', glow: '0 0 16px rgba(0,255,157,0.1)' },
+  '2': { bg: 'linear-gradient(135deg, rgba(0,255,157,0.06) 0%, rgba(0,255,157,0.02) 100%)', border: '#00FF9D', text: '#86efac', label: 'ACR 2 — Benign', glow: '0 0 16px rgba(0,255,157,0.08)' },
+  '3': { bg: 'linear-gradient(135deg, rgba(255,149,0,0.1) 0%, rgba(255,149,0,0.03) 100%)', border: '#FF9500', text: '#fde047', label: 'ACR 3 — Probably Benign', glow: '0 0 16px rgba(255,149,0,0.1)' },
+  '4': { bg: 'linear-gradient(135deg, rgba(255,149,0,0.12) 0%, rgba(249,115,22,0.04) 100%)', border: '#f97316', text: '#fdba74', label: 'ACR 4 — Suspicious', glow: '0 0 20px rgba(249,115,22,0.12)' },
+  '5': { bg: 'linear-gradient(135deg, rgba(255,59,92,0.15) 0%, rgba(239,68,68,0.05) 100%)', border: '#FF3B5C', text: '#fca5a5', label: 'ACR 5 — Highly Suggestive', glow: '0 0 24px rgba(255,59,92,0.15)' },
 };
 
 const ImagingAI = () => {
@@ -126,7 +126,7 @@ const ImagingAI = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: '5fr 7fr', gap: 24 }}>
         {/* LEFT */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column' }}>
           {/* Drop zone */}
           <div
             onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -234,7 +234,7 @@ const ImagingAI = () => {
         </div>
 
         {/* RIGHT */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {!result ? (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }}>
               <Brain size={48} style={{ color: 'var(--dim)' }} strokeWidth={1} />
