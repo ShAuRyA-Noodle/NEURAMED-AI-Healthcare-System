@@ -503,18 +503,6 @@ const LoginPage = () => {
             </span>
           </p>
 
-          {/* Demo credentials */}
-          <div style={{
-            background: 'rgba(255,255,255,0.02)', borderRadius: 8, padding: 12, marginTop: 16
-          }}>
-            <p style={{ fontFamily: '"DM Mono", monospace', fontSize: 10, color: '#445566', marginBottom: 6 }}>🔑 Demo Access</p>
-            <p style={{ fontFamily: '"DM Mono", monospace', fontSize: 10, color: 'rgba(255,255,255,0.3)', margin: '2px 0' }}>
-              Doctor: <span style={{ color: '#00E5FF', cursor: 'pointer' }} onClick={() => { setEmail('demo@doctor.com'); setPassword('demo1234'); setTab('login'); }}>demo@doctor.com</span> / demo1234
-            </p>
-            <p style={{ fontFamily: '"DM Mono", monospace', fontSize: 10, color: 'rgba(255,255,255,0.3)', margin: '2px 0' }}>
-              Patient: <span style={{ color: '#00E5FF', cursor: 'pointer' }} onClick={() => { setEmail('demo@patient.com'); setPassword('demo1234'); setTab('login'); }}>demo@patient.com</span> / demo1234
-            </p>
-          </div>
         </motion.div>
       </div>
 
