@@ -32,7 +32,7 @@ const Identicon = ({ id }: { id: string }) => {
 };
 
 const StatCard = ({ label, value, icon: Icon, trend }: { label: string; value: number | string; icon: any; trend?: number }) => (
-  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
+  <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
     <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <Icon size={20} style={{ color: 'var(--muted)' }} />
     </div>
