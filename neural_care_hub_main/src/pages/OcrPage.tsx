@@ -17,11 +17,11 @@ const highlightMedical = (text: string) => {
   );
 };
 
-const SEVERITY_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  critical: { bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.3)', text: '#fca5a5' },
-  high: { bg: 'rgba(249,115,22,0.1)', border: 'rgba(249,115,22,0.3)', text: '#fdba74' },
-  medium: { bg: 'rgba(234,179,8,0.1)', border: 'rgba(234,179,8,0.3)', text: '#fde047' },
-  low: { bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.3)', text: '#86efac' },
+const SEVERITY_COLORS: Record<string, { bg: string; border: string; text: string; glow: string }> = {
+  critical: { bg: 'rgba(255,59,92,0.08)', border: 'rgba(255,59,92,0.3)', text: '#fca5a5', glow: '0 0 16px rgba(255,59,92,0.12)' },
+  high: { bg: 'rgba(255,149,0,0.08)', border: 'rgba(255,149,0,0.3)', text: '#fdba74', glow: '0 0 16px rgba(255,149,0,0.1)' },
+  medium: { bg: 'rgba(0,229,255,0.06)', border: 'rgba(0,229,255,0.2)', text: '#00E5FF', glow: '0 0 12px rgba(0,229,255,0.08)' },
+  low: { bg: 'rgba(0,255,157,0.06)', border: 'rgba(0,255,157,0.2)', text: '#86efac', glow: '0 0 12px rgba(0,255,157,0.08)' },
 };
 
 const REPORT_TYPES = ['Auto-Detect', 'Blood Work', 'Radiology', 'Pathology', 'Discharge Summary', 'Prescription'];
@@ -107,7 +107,7 @@ const OCRReports = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: '5fr 7fr', gap: 24 }}>
         {/* LEFT */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column' }}>
           {/* Drop zone */}
           {!file ? (
             <div
@@ -191,7 +191,7 @@ const OCRReports = () => {
         </div>
 
         {/* RIGHT */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {!result ? (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }}>
               <FileText size={48} style={{ color: 'var(--dim)' }} strokeWidth={1} />

@@ -122,19 +122,19 @@ const SessionDetail = () => {
 
       {/* Overview Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, textAlign: 'center' }}>
+        <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 20, textAlign: 'center' }}>
           <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 12 }}>CONFIDENCE</span>
           <ConfidenceMeter value={session.confidence_score || 0} size={80} />
         </div>
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
+        <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 20 }}>
           <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>PATIENT</span>
           <span className="font-number" style={{ fontSize: 20, color: 'var(--cyan)', display: 'block' }}>{session.patient_code}</span>
         </div>
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
+        <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 20 }}>
           <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>CONDITIONS</span>
           <span className="font-number" style={{ fontSize: 20, color: 'var(--text)', display: 'block' }}>{(session.conditions_detected || []).length}</span>
         </div>
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
+        <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 20 }}>
           <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>AGENT</span>
           <span className="font-body" style={{ fontSize: 20, color: 'var(--cyan)', textTransform: 'capitalize' }}>{agentType}</span>
         </div>
@@ -156,7 +156,7 @@ const SessionDetail = () => {
 
       {/* Content */}
       <div style={{ display: 'grid', gridTemplateColumns: session.related_sessions?.length ? '2fr 1fr' : '1fr', gap: 24 }}>
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
+        <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}>
           {activeTab === 'overview' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -336,7 +336,7 @@ const SessionDetail = () => {
 
         {/* Related Sessions */}
         {session.related_sessions?.length > 0 && (
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, height: 'fit-content' }}>
+          <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 20, height: 'fit-content' }}>
             <span className="font-heading" style={{ fontSize: 14, color: 'var(--text)', display: 'block', marginBottom: 16 }}>Related Sessions</span>
             {session.related_sessions.map((rs: any) => (
               <div key={rs.id} data-cursor="hover" onClick={() => navigate(`/sessions/${rs.id}`)} style={{
