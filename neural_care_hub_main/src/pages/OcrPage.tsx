@@ -1,9 +1,16 @@
 import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileText, Copy, ShieldCheck, AlertTriangle, Heart, Pill, ClipboardList, Search, Loader2, Download, RotateCcw } from 'lucide-react';
+import {
+  FileText, Copy, ShieldCheck, AlertTriangle, Heart, Pill, ClipboardList,
+  Search, Loader2, Download, RotateCcw, Volume2, VolumeX, Activity,
+  Stethoscope, User, Calendar, ChevronDown, ChevronUp, Zap, Star
+} from 'lucide-react';
 import { useOcrAnalysis } from '@/hooks/useOcrAnalysis';
 import { useToast } from '@/hooks/useToast';
-import type { ReportAnalysisResult, AbnormalValue, MedicationDetail } from '@/types';
+import type {
+  ReportAnalysisResult, RichAbnormalValue, MedicationDetail,
+  CriticalAlert, ActionItem, RichMedication
+} from '@/types';
 
 const MEDICAL_TERMS = ['WBC', 'CRP', 'ABG', 'COPD', 'pneumonia', 'dyspnea', 'sputum', 'fever', 'antibiotic', 'prednisone', 'azithromycin', 'albuterol', 'ipratropium', 'leukocytosis', 'hypercapnia', 'exacerbation', 'Haemophilus', 'influenzae', 'acidosis', 'hyperinflation', 'hemoglobin', 'platelet', 'creatinine', 'glucose', 'cholesterol', 'triglyceride'];
 
@@ -24,7 +31,61 @@ const SEVERITY_COLORS: Record<string, { bg: string; border: string; text: string
   low: { bg: 'rgba(0,255,157,0.06)', border: 'rgba(0,255,157,0.2)', text: '#86efac', glow: '0 0 12px rgba(0,255,157,0.08)' },
 };
 
+const URGENCY_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  immediate: { bg: 'rgba(255,59,92,0.1)', border: 'rgba(255,59,92,0.3)', text: '#fca5a5' },
+  soon: { bg: 'rgba(255,149,0,0.1)', border: 'rgba(255,149,0,0.3)', text: '#fdba74' },
+  routine: { bg: 'rgba(0,229,255,0.08)', border: 'rgba(0,229,255,0.2)', text: '#00E5FF' },
+};
+
+const TTS_LANGUAGES: Record<string, { label: string; bcp47: string }> = {
+  en: { label: 'English', bcp47: 'en-US' },
+  hi: { label: 'Hindi', bcp47: 'hi-IN' },
+  ta: { label: 'Tamil', bcp47: 'ta-IN' },
+  te: { label: 'Telugu', bcp47: 'te-IN' },
+  bn: { label: 'Bengali', bcp47: 'bn-IN' },
+  mr: { label: 'Marathi', bcp47: 'mr-IN' },
+  kn: { label: 'Kannada', bcp47: 'kn-IN' },
+  ml: { label: 'Malayalam', bcp47: 'ml-IN' },
+  pa: { label: 'Punjabi', bcp47: 'pa-IN' },
+};
+
 const REPORT_TYPES = ['Auto-Detect', 'Blood Work', 'Radiology', 'Pathology', 'Discharge Summary', 'Prescription'];
+
+const SEVERITY_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+
+const getScoreColor = (score: number): string => {
+  if (score > 80) return 'var(--green)';
+  if (score > 60) return 'var(--amber)';
+  if (score > 40) return '#ef4444';
+  return '#991b1b';
+};
+
+const HealthScoreGauge = ({ score }: { score: number }) => {
+  const color = getScoreColor(score);
+  const radius = 50;
+  const circumference = 2 * Math.PI * radius;
+  const progress = (score / 100) * circumference;
+
+  return (
+    <div style={{ position: 'relative', width: 120, height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <svg width={120} height={120} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={60} cy={60} r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={8} />
+        <motion.circle
+          cx={60} cy={60} r={radius} fill="none" stroke={color} strokeWidth={8}
+          strokeLinecap="round" strokeDasharray={circumference}
+          initial={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset: circumference - progress }}
+          transition={{ duration: 1.2, ease: 'easeOut' }}
+          style={{ filter: `drop-shadow(0 0 8px ${color})` }}
+        />
+      </svg>
+      <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <span className="font-number" style={{ fontSize: 28, color, fontWeight: 700 }}>{score}</span>
+        <span className="font-body" style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '0.1em' }}>HEALTH</span>
+      </div>
+    </div>
+  );
+};
 
 const OCRReports = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -32,10 +93,15 @@ const OCRReports = () => {
   const [patientId, setPatientId] = useState('');
   const [reportTypeHint, setReportTypeHint] = useState('Auto-Detect');
   const [result, setResult] = useState<ReportAnalysisResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'labs' | 'medications' | 'raw' | 'summary'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'labs' | 'medications' | 'actions' | 'plain' | 'clinician'>('overview');
   const [dragOver, setDragOver] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedClinician, setCopiedClinician] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [expandedLabs, setExpandedLabs] = useState<Set<number>>(new Set());
+  const [showNormal, setShowNormal] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [ttsLanguage, setTtsLanguage] = useState('en');
   const inputRef = useRef<HTMLInputElement>(null);
   const { addToast } = useToast();
 
@@ -90,9 +156,72 @@ const OCRReports = () => {
     }
   };
 
-  const tabs = ['overview', 'labs', 'medications', 'raw', 'summary'] as const;
-  const tabLabels = { overview: 'Overview', labs: 'Lab Values', medications: 'Medications', raw: 'Full Report', summary: 'Summary Card' };
-  const healthScore = result?.overall_health_score;
+  const toggleLabRow = (index: number) => {
+    setExpandedLabs(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+
+  const handleReadAloud = (text: string) => {
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = TTS_LANGUAGES[ttsLanguage]?.bcp47 || 'en-US';
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    window.speechSynthesis.speak(utterance);
+    setIsSpeaking(true);
+  };
+
+  const copyToClipboard = (text: string, setter: (v: boolean) => void) => {
+    navigator.clipboard.writeText(text);
+    setter(true);
+    setTimeout(() => setter(false), 2000);
+  };
+
+  const tabs = ['overview', 'labs', 'medications', 'actions', 'plain', 'clinician'] as const;
+  const tabLabels: Record<string, string> = {
+    overview: 'Overview',
+    labs: 'Lab Values',
+    medications: 'Medications',
+    actions: 'Action Plan',
+    plain: 'Plain Language',
+    clinician: 'Clinician'
+  };
+
+  const sortedAbnormals = (result?.abnormal_values || []).slice().sort((a, b) => {
+    return (SEVERITY_ORDER[a.severity] ?? 99) - (SEVERITY_ORDER[b.severity] ?? 99);
+  });
+
+  const getMedications = (): RichMedication[] => {
+    if (!result) return [];
+    if (result.medications_mentioned && result.medications_mentioned.length > 0) {
+      return result.medications_mentioned;
+    }
+    if (result.medications && result.medications.length > 0) {
+      return result.medications.map(m => {
+        if (typeof m === 'string') return { name: m };
+        return { name: m.name, dose: m.dose, frequency: m.frequency, purpose: m.purpose };
+      });
+    }
+    return [];
+  };
+
+  const getCriticalAlerts = (): CriticalAlert[] => {
+    if (!result?.critical_alerts || result.critical_alerts.length === 0) return [];
+    return result.critical_alerts.map(a => {
+      if (typeof a === 'string') return { parameter: '', value: '', reason: a, immediate_action: '', severity: 'critical' };
+      return a;
+    });
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -221,16 +350,12 @@ const OCRReports = () => {
                     }}>{result.urgency} urgency</span>
                   )}
                 </div>
-                {healthScore && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Heart size={14} style={{ color: 'var(--green)' }} />
-                    <span className="font-body" style={{ fontSize: 12, color: 'var(--text)' }}>Health Score: </span>
-                    <span className="font-heading" style={{ fontSize: 14, color: 'var(--green)' }}>{healthScore}</span>
-                  </div>
+                {result.extraction_method && (
+                  <span className="font-body" style={{ fontSize: 10, color: 'var(--dim)' }}>Extracted via: {result.extraction_method}</span>
                 )}
               </div>
 
-              {/* 5 Tabs */}
+              {/* 6 Tabs */}
               <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', position: 'relative', padding: '0 24px' }}>
                 {tabs.map(t => (
                   <button key={t} data-cursor="hover" onClick={() => setActiveTab(t)} style={{
@@ -253,27 +378,123 @@ const OCRReports = () => {
                   <motion.div key={activeTab} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.15 }}
                     style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
+                    {/* ====== TAB 1: OVERVIEW ====== */}
                     {activeTab === 'overview' && (
                       <>
-                        {/* Critical Alerts */}
-                        {result.critical_alerts && result.critical_alerts.length > 0 && (
+                        {/* Critical Alerts - pulsing red at TOP */}
+                        {getCriticalAlerts().length > 0 && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            {result.critical_alerts.map((alert, i) => (
-                              <div key={i} style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                            {getCriticalAlerts().map((alert, i) => (
+                              <motion.div
+                                key={i}
+                                animate={{ boxShadow: ['0 0 0px rgba(239,68,68,0)', '0 0 16px rgba(239,68,68,0.3)', '0 0 0px rgba(239,68,68,0)'] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                                style={{
+                                  background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
+                                  borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 10
+                                }}
+                              >
                                 <AlertTriangle size={16} style={{ color: '#ef4444', flexShrink: 0, marginTop: 2 }} />
-                                <span className="font-body" style={{ fontSize: 13, color: '#fca5a5', lineHeight: 1.5 }}>{alert}</span>
-                              </div>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                    <motion.span
+                                      animate={{ opacity: [1, 0.5, 1] }}
+                                      transition={{ duration: 1.5, repeat: Infinity }}
+                                      style={{
+                                        fontSize: 9, fontFamily: 'var(--font-heading)', padding: '2px 6px',
+                                        borderRadius: 4, background: 'rgba(239,68,68,0.2)', color: '#fca5a5',
+                                        border: '1px solid rgba(239,68,68,0.4)', letterSpacing: '0.15em'
+                                      }}
+                                    >CRITICAL</motion.span>
+                                    {alert.parameter && (
+                                      <span className="font-heading" style={{ fontSize: 12, color: '#fca5a5' }}>{alert.parameter}: {alert.value}</span>
+                                    )}
+                                  </div>
+                                  <span className="font-body" style={{ fontSize: 12, color: '#fca5a5', lineHeight: 1.5, display: 'block' }}>{alert.reason}</span>
+                                  {alert.immediate_action && (
+                                    <span className="font-body" style={{ fontSize: 11, color: 'var(--amber)', display: 'block', marginTop: 4 }}>
+                                      Action: {alert.immediate_action}
+                                    </span>
+                                  )}
+                                </div>
+                              </motion.div>
                             ))}
                           </div>
                         )}
 
-                        {/* Summary */}
-                        <div style={{ background: 'var(--elevated)', borderRadius: 10, padding: 20, borderLeft: '2px solid var(--cyan)' }}>
-                          <p className="font-body" style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.8, margin: 0 }}>{result.summary}</p>
+                        {/* Health Score + Executive Summary row */}
+                        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                          {/* Health Score Gauge */}
+                          {result.overall_health_score_numeric != null && (
+                            <div style={{
+                              background: 'var(--elevated)', borderRadius: 12, padding: 20,
+                              border: '1px solid var(--border)', display: 'flex', flexDirection: 'column',
+                              alignItems: 'center', gap: 8, flexShrink: 0
+                            }}>
+                              <HealthScoreGauge score={result.overall_health_score_numeric} />
+                            </div>
+                          )}
+
+                          {/* Executive Summary */}
+                          <div style={{
+                            flex: 1, background: 'var(--elevated)', borderRadius: 10, padding: 20,
+                            borderLeft: '2px solid var(--cyan)'
+                          }}>
+                            <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>EXECUTIVE SUMMARY</span>
+                            <p className="font-body" style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.8, margin: 0 }}>
+                              {result.executive_summary || result.summary}
+                            </p>
+                          </div>
                         </div>
 
+                        {/* Metadata row: report type badge, report_date, doctor_info, overall_status */}
+                        <div style={{
+                          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10,
+                          padding: '10px 14px', background: 'var(--elevated)', borderRadius: 8,
+                          border: '1px solid var(--border)'
+                        }}>
+                          {result.report_type && (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11,
+                              padding: '3px 10px', borderRadius: 12, fontFamily: 'var(--font-body)',
+                              background: 'rgba(0,229,255,0.1)', color: 'var(--cyan)', border: '1px solid rgba(0,229,255,0.2)'
+                            }}>
+                              <FileText size={10} /> {result.report_type}
+                            </span>
+                          )}
+                          {result.report_date && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-body)' }}>
+                              <Calendar size={10} /> {result.report_date}
+                            </span>
+                          )}
+                          {result.doctor_info && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-body)' }}>
+                              <Stethoscope size={10} /> {result.doctor_info}
+                            </span>
+                          )}
+                          {result.overall_status && (
+                            <span style={{
+                              marginLeft: 'auto', fontSize: 11, padding: '3px 10px', borderRadius: 12,
+                              fontFamily: 'var(--font-heading)',
+                              background: result.overall_status.toLowerCase().includes('normal') ? 'rgba(0,255,157,0.1)' :
+                                result.overall_status.toLowerCase().includes('critical') ? 'rgba(255,59,92,0.1)' : 'rgba(255,149,0,0.1)',
+                              color: result.overall_status.toLowerCase().includes('normal') ? 'var(--green)' :
+                                result.overall_status.toLowerCase().includes('critical') ? '#fca5a5' : 'var(--amber)',
+                              border: `1px solid ${result.overall_status.toLowerCase().includes('normal') ? 'rgba(0,255,157,0.2)' :
+                                result.overall_status.toLowerCase().includes('critical') ? 'rgba(255,59,92,0.3)' : 'rgba(255,149,0,0.3)'}`
+                            }}>{result.overall_status}</span>
+                          )}
+                        </div>
+
+                        {/* Extraction method */}
+                        {result.extraction_method && (
+                          <span className="font-body" style={{ fontSize: 11, color: 'var(--dim)', fontStyle: 'italic' }}>
+                            Extracted via: {result.extraction_method}
+                          </span>
+                        )}
+
                         {/* Conditions + Diagnoses */}
-                        {(result.conditions?.length || result.diagnoses?.length) && (
+                        {(result.conditions?.length || result.diagnoses?.length) ? (
                           <div>
                             <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>DIAGNOSES / CONDITIONS</span>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -282,25 +503,7 @@ const OCRReports = () => {
                               ))}
                             </div>
                           </div>
-                        )}
-
-                        {/* Patient Action Items */}
-                        {result.patient_action_items && result.patient_action_items.length > 0 && (
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                              <ClipboardList size={14} style={{ color: 'var(--green)' }} />
-                              <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em' }}>PATIENT ACTION ITEMS</span>
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                              {result.patient_action_items.map((item, i) => (
-                                <div key={i} style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.1)', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                                  <span className="font-number" style={{ fontSize: 11, color: 'var(--green)', width: 18, flexShrink: 0 }}>{i + 1}.</span>
-                                  <span className="font-body" style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.5 }}>{item}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                        ) : null}
 
                         {/* Key Findings */}
                         {result.key_findings?.length > 0 && (
@@ -318,71 +521,155 @@ const OCRReports = () => {
                       </>
                     )}
 
+                    {/* ====== TAB 2: LAB VALUES ====== */}
                     {activeTab === 'labs' && (
                       <>
-                        {/* Abnormal Values */}
-                        {result.abnormal_values && result.abnormal_values.length > 0 ? (
+                        {sortedAbnormals.length > 0 ? (
                           <div>
-                            <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 10 }}>ABNORMAL VALUES</span>
-                            <div style={{ background: 'var(--elevated)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
-                              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <thead>
-                                  <tr>
-                                    {['Test', 'Value', 'Normal Range', 'Interpretation', 'Severity'].map(h => (
-                                      <th key={h} className="font-body" style={{ fontSize: 10, color: 'var(--muted)', padding: '8px 10px', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>{h}</th>
-                                    ))}
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {(result.abnormal_values as AbnormalValue[]).map((v, i) => {
-                                    const sev = SEVERITY_COLORS[v.severity] || SEVERITY_COLORS.low;
-                                    return (
-                                      <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                                        <td className="font-body" style={{ fontSize: 12, color: 'var(--text)', padding: '8px 10px', fontWeight: 600 }}>{v.test}</td>
-                                        <td className="font-number" style={{ fontSize: 12, color: sev.text, padding: '8px 10px' }}>{v.value}</td>
-                                        <td className="font-body" style={{ fontSize: 11, color: 'var(--muted)', padding: '8px 10px' }}>{v.normal_range}</td>
-                                        <td className="font-body" style={{ fontSize: 11, color: 'var(--text)', padding: '8px 10px' }}>{v.interpretation}</td>
-                                        <td style={{ padding: '8px 10px' }}>
-                                          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: sev.bg, color: sev.text, border: `1px solid ${sev.border}`, fontFamily: 'var(--font-body)', textTransform: 'capitalize' }}>{v.severity}</span>
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
+                            <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 10 }}>
+                              ABNORMAL VALUES ({sortedAbnormals.length})
+                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {sortedAbnormals.map((v: RichAbnormalValue, i: number) => {
+                                const sev = SEVERITY_COLORS[v.severity] || SEVERITY_COLORS.low;
+                                const isExpanded = expandedLabs.has(i);
+                                const paramName = v.parameter || v.test || 'Unknown';
+                                const refRange = v.reference_range || v.normal_range || '-';
+                                const hasDetails = v.clinical_meaning || v.contributing_factors?.length || v.what_to_do;
+
+                                return (
+                                  <div key={i} style={{
+                                    background: 'var(--elevated)', border: `1px solid ${sev.border}`,
+                                    borderRadius: 8, overflow: 'hidden', boxShadow: sev.glow,
+                                    cursor: hasDetails ? 'pointer' : 'default'
+                                  }}>
+                                    {/* Collapsed row */}
+                                    <div
+                                      onClick={() => hasDetails && toggleLabRow(i)}
+                                      style={{
+                                        display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.5fr 0.8fr 0.8fr 24px',
+                                        alignItems: 'center', padding: '10px 14px', gap: 8
+                                      }}
+                                    >
+                                      <span className="font-heading" style={{ fontSize: 12, color: 'var(--text)' }}>{paramName}</span>
+                                      <span className="font-number" style={{ fontSize: 12, color: sev.text, fontWeight: 600 }}>
+                                        {v.value}{v.unit ? ` ${v.unit}` : ''}
+                                      </span>
+                                      <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>{refRange}</span>
+                                      <span className="font-number" style={{ fontSize: 11, color: sev.text }}>
+                                        {v.deviation_percent != null ? `${v.deviation_direction === 'low' ? '-' : '+'}${v.deviation_percent}%` : '-'}
+                                      </span>
+                                      <span style={{
+                                        fontSize: 9, padding: '2px 6px', borderRadius: 4, background: sev.bg,
+                                        color: sev.text, border: `1px solid ${sev.border}`, fontFamily: 'var(--font-body)',
+                                        textTransform: 'capitalize', textAlign: 'center'
+                                      }}>{v.severity}</span>
+                                      {hasDetails && (
+                                        isExpanded ? <ChevronUp size={12} style={{ color: 'var(--muted)' }} /> : <ChevronDown size={12} style={{ color: 'var(--muted)' }} />
+                                      )}
+                                    </div>
+
+                                    {/* Expanded details */}
+                                    {isExpanded && hasDetails && (
+                                      <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        style={{
+                                          borderTop: `1px solid ${sev.border}`, padding: '12px 14px',
+                                          background: sev.bg, display: 'flex', flexDirection: 'column', gap: 8
+                                        }}
+                                      >
+                                        {v.clinical_meaning && (
+                                          <div>
+                                            <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 4 }}>CLINICAL MEANING</span>
+                                            <span className="font-body" style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6 }}>{v.clinical_meaning}</span>
+                                          </div>
+                                        )}
+                                        {v.contributing_factors && v.contributing_factors.length > 0 && (
+                                          <div>
+                                            <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 4 }}>CONTRIBUTING FACTORS</span>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                              {v.contributing_factors.map((f, fi) => (
+                                                <span key={fi} style={{
+                                                  fontSize: 10, padding: '2px 8px', borderRadius: 12,
+                                                  background: 'rgba(0,229,255,0.08)', color: 'var(--cyan)',
+                                                  border: '1px solid rgba(0,229,255,0.15)', fontFamily: 'var(--font-body)'
+                                                }}>{f}</span>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                        {v.what_to_do && (
+                                          <div>
+                                            <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 4 }}>WHAT TO DO</span>
+                                            <span className="font-body" style={{ fontSize: 12, color: 'var(--green)', lineHeight: 1.6 }}>{v.what_to_do}</span>
+                                          </div>
+                                        )}
+                                      </motion.div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: 40, border: '1px dashed rgba(0,255,157,0.3)', borderRadius: 12, background: 'rgba(0,255,157,0.02)' }}>
                             <ShieldCheck size={48} style={{ color: 'var(--green)' }} strokeWidth={1} />
-                            <span className="font-heading" style={{ fontSize: 16, color: 'var(--green)' }}>No abnormal values detected</span>
+                            <span className="font-heading" style={{ fontSize: 16, color: 'var(--green)' }}>All values normal</span>
+                            <span className="font-body" style={{ fontSize: 12, color: 'var(--muted)' }}>No abnormal values detected in this report</span>
                           </div>
                         )}
 
-                        {/* Normal Values */}
+                        {/* Normal Values - collapsible */}
                         {result.normal_values && result.normal_values.length > 0 && (
-                          <details style={{ marginTop: 8 }}>
-                            <summary className="font-body" style={{ fontSize: 12, color: 'var(--muted)', cursor: 'pointer', padding: '8px 0' }}>
-                              Normal Values ({result.normal_values.length})
-                            </summary>
-                            <div style={{ background: 'var(--elevated)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden', marginTop: 8 }}>
-                              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <tbody>
-                                  {result.normal_values.map((v, i) => (
-                                    <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                                      <td className="font-body" style={{ fontSize: 12, color: 'var(--text)', padding: '6px 10px' }}>{v.test}</td>
-                                      <td className="font-number" style={{ fontSize: 12, color: 'var(--green)', padding: '6px 10px' }}>{v.value}</td>
-                                      <td className="font-body" style={{ fontSize: 11, color: 'var(--muted)', padding: '6px 10px' }}>{v.normal_range}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </details>
+                          <div style={{ marginTop: 8 }}>
+                            <button
+                              data-cursor="hover"
+                              onClick={() => setShowNormal(!showNormal)}
+                              style={{
+                                background: 'transparent', border: '1px solid var(--border)', borderRadius: 8,
+                                color: 'var(--muted)', fontFamily: 'var(--font-body)', fontSize: 12,
+                                cursor: 'pointer', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 6,
+                                width: '100%', justifyContent: 'space-between'
+                              }}
+                            >
+                              <span>Normal Values ({result.normal_values.length})</span>
+                              {showNormal ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            </button>
+                            {showNormal && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                style={{ marginTop: 8 }}
+                              >
+                                <div style={{ background: 'var(--elevated)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
+                                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                      <tr>
+                                        {['Test', 'Value', 'Normal Range'].map(h => (
+                                          <th key={h} className="font-body" style={{ fontSize: 10, color: 'var(--muted)', padding: '8px 10px', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>{h}</th>
+                                        ))}
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {result.normal_values.map((v, i) => (
+                                        <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                          <td className="font-body" style={{ fontSize: 12, color: 'var(--text)', padding: '6px 10px' }}>{v.test}</td>
+                                          <td className="font-number" style={{ fontSize: 12, color: 'var(--green)', padding: '6px 10px' }}>{v.value}</td>
+                                          <td className="font-body" style={{ fontSize: 11, color: 'var(--muted)', padding: '6px 10px' }}>{v.normal_range}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </motion.div>
+                            )}
+                          </div>
                         )}
 
                         {/* Abnormal Flags fallback */}
-                        {(!result.abnormal_values || result.abnormal_values.length === 0) && result.abnormal_flags?.length > 0 && (
+                        {sortedAbnormals.length === 0 && result.abnormal_flags?.length > 0 && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                             <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em' }}>FLAGGED ITEMS</span>
                             {result.abnormal_flags.map((flag, i) => (
@@ -396,85 +683,382 @@ const OCRReports = () => {
                       </>
                     )}
 
+                    {/* ====== TAB 3: MEDICATIONS ====== */}
                     {activeTab === 'medications' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {result.medications?.length > 0 ? result.medications.map((m, i) => {
-                          const med: MedicationDetail = typeof m === 'string' ? { name: m, dose: '', frequency: '', purpose: '' } : m;
-                          return (
-                            <div key={i} style={{ background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 10, padding: 16, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                        {getMedications().length > 0 ? getMedications().map((med: RichMedication, i: number) => (
+                          <div key={i} style={{ display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: med.drug_lab_flags?.length ? '10px 10px 0 0' : 10, padding: 16, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                               <Pill size={18} style={{ color: 'var(--green)', marginTop: 2, flexShrink: 0 }} />
                               <div style={{ flex: 1 }}>
                                 <span className="font-heading" style={{ fontSize: 14, color: 'var(--text)', display: 'block' }}>{med.name}</span>
-                                {med.dose && <span className="font-body" style={{ fontSize: 12, color: 'var(--cyan)', display: 'block', marginTop: 2 }}>{med.dose} — {med.frequency}</span>}
+                                {med.dose && (
+                                  <span className="font-body" style={{ fontSize: 12, color: 'var(--cyan)', display: 'block', marginTop: 2 }}>
+                                    {med.dose}{med.frequency ? ` — ${med.frequency}` : ''}
+                                  </span>
+                                )}
                                 {med.purpose && <span className="font-body" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginTop: 4 }}>{med.purpose}</span>}
                               </div>
                             </div>
-                          );
-                        }) : (
+                            {/* Drug-Lab Flags */}
+                            {med.drug_lab_flags && med.drug_lab_flags.length > 0 && (
+                              <div style={{
+                                background: 'rgba(255,59,92,0.06)', border: '1px solid rgba(255,59,92,0.2)',
+                                borderTop: 'none', borderRadius: '0 0 10px 10px', padding: '8px 14px',
+                                display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap'
+                              }}>
+                                <AlertTriangle size={12} style={{ color: '#ef4444', flexShrink: 0 }} />
+                                {med.drug_lab_flags.map((flag, fi) => (
+                                  <span key={fi} className="font-body" style={{ fontSize: 11, color: '#fca5a5' }}>{flag}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )) : (
                           <span className="font-body" style={{ fontSize: 13, color: 'var(--muted)' }}>No medications found in document.</span>
+                        )}
+
+                        {/* Drug-Lab Interactions section */}
+                        {result.drug_lab_interactions && result.drug_lab_interactions.length > 0 && (
+                          <div style={{ marginTop: 12 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                              <Zap size={14} style={{ color: 'var(--amber)' }} />
+                              <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em' }}>DRUG-LAB INTERACTIONS</span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {result.drug_lab_interactions.map((interaction, i) => (
+                                <div key={i} style={{
+                                  background: 'rgba(255,149,0,0.05)', border: '1px solid rgba(255,149,0,0.2)',
+                                  borderRadius: 8, padding: '12px 14px', borderLeft: '3px solid var(--amber)'
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                    <span className="font-heading" style={{ fontSize: 12, color: 'var(--amber)' }}>{interaction.drug}</span>
+                                    <span className="font-body" style={{ fontSize: 10, color: 'var(--dim)' }}>affects</span>
+                                    <span className="font-heading" style={{ fontSize: 12, color: 'var(--cyan)' }}>{interaction.lab_finding}</span>
+                                  </div>
+                                  <span className="font-body" style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.5, display: 'block' }}>{interaction.interaction}</span>
+                                  {interaction.action && (
+                                    <span className="font-body" style={{ fontSize: 11, color: 'var(--green)', display: 'block', marginTop: 4 }}>
+                                      Action: {interaction.action}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         )}
                       </div>
                     )}
 
-                    {activeTab === 'raw' && (
-                      <div style={{ position: 'relative' }}>
-                        {/* Search + Copy */}
-                        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                          <div style={{ position: 'relative', flex: 1 }}>
-                            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)' }} />
-                            <input value={searchText} onChange={e => setSearchText(e.target.value)} placeholder="Search in text..."
-                              style={{ width: '100%', height: 32, background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 6, padding: '0 10px 0 30px', fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--text)', outline: 'none' }}
-                            />
+                    {/* ====== TAB 4: ACTION PLAN ====== */}
+                    {activeTab === 'actions' && (
+                      <>
+                        {/* Action Items */}
+                        {result.action_items && result.action_items.length > 0 ? (
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                              <ClipboardList size={14} style={{ color: 'var(--cyan)' }} />
+                              <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em' }}>ACTION ITEMS</span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {(result.action_items as ActionItem[]).sort((a, b) => a.priority - b.priority).map((item, i) => {
+                                const urgColor = URGENCY_COLORS[item.urgency] || URGENCY_COLORS.routine;
+                                return (
+                                  <div key={i} style={{
+                                    background: 'var(--elevated)', border: '1px solid var(--border)',
+                                    borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12,
+                                    borderLeft: `3px solid ${urgColor.text}`
+                                  }}>
+                                    <div style={{
+                                      width: 24, height: 24, borderRadius: '50%', background: urgColor.bg,
+                                      border: `1px solid ${urgColor.border}`, display: 'flex', alignItems: 'center',
+                                      justifyContent: 'center', flexShrink: 0
+                                    }}>
+                                      <span className="font-number" style={{ fontSize: 11, color: urgColor.text, fontWeight: 700 }}>{item.priority}</span>
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                        <span style={{
+                                          fontSize: 9, padding: '2px 6px', borderRadius: 4, background: urgColor.bg,
+                                          color: urgColor.text, border: `1px solid ${urgColor.border}`,
+                                          fontFamily: 'var(--font-body)', textTransform: 'capitalize', letterSpacing: '0.05em'
+                                        }}>{item.urgency}</span>
+                                        {item.timeframe && (
+                                          <span className="font-body" style={{ fontSize: 10, color: 'var(--dim)' }}>{item.timeframe}</span>
+                                        )}
+                                      </div>
+                                      <span className="font-body" style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5 }}>{item.action}</span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                          <button data-cursor="hover" onClick={() => { navigator.clipboard.writeText(result.extracted_text || ''); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-                            style={{ background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-body)', fontSize: 11, padding: '0 12px', cursor: 'pointer' }}>
-                            <Copy size={12} /> {copied ? 'COPIED!' : 'COPY'}
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: 32 }}>
+                            <ClipboardList size={36} style={{ color: 'var(--dim)' }} strokeWidth={1} />
+                            <span className="font-body" style={{ fontSize: 13, color: 'var(--muted)' }}>No action items generated for this report.</span>
+                          </div>
+                        )}
+
+                        {/* Specialist Referrals */}
+                        {result.specialist_referrals && result.specialist_referrals.length > 0 && (
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                              <Stethoscope size={14} style={{ color: 'var(--amber)' }} />
+                              <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em' }}>SPECIALIST REFERRALS</span>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                              {result.specialist_referrals.map((ref, i) => {
+                                const urgColor = URGENCY_COLORS[ref.urgency] || URGENCY_COLORS.routine;
+                                return (
+                                  <div key={i} style={{
+                                    background: 'var(--elevated)', border: '1px solid var(--border)',
+                                    borderRadius: 8, padding: '12px 14px'
+                                  }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                      <span className="font-heading" style={{ fontSize: 13, color: 'var(--text)' }}>{ref.specialty}</span>
+                                      <span style={{
+                                        fontSize: 9, padding: '2px 6px', borderRadius: 4, background: urgColor.bg,
+                                        color: urgColor.text, border: `1px solid ${urgColor.border}`,
+                                        fontFamily: 'var(--font-body)', textTransform: 'capitalize'
+                                      }}>{ref.urgency}</span>
+                                    </div>
+                                    <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>{ref.reason}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Follow-up Tests */}
+                        {result.follow_up_tests && result.follow_up_tests.length > 0 && (
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                              <Activity size={14} style={{ color: 'var(--cyan)' }} />
+                              <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em' }}>FOLLOW-UP TESTS</span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {result.follow_up_tests.map((test, i) => (
+                                <div key={i} style={{
+                                  background: 'var(--elevated)', border: '1px solid var(--border)',
+                                  borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'flex-start', gap: 10
+                                }}>
+                                  <Search size={12} style={{ color: 'var(--cyan)', marginTop: 3, flexShrink: 0 }} />
+                                  <div style={{ flex: 1 }}>
+                                    <span className="font-heading" style={{ fontSize: 12, color: 'var(--text)', display: 'block' }}>{test.test}</span>
+                                    <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginTop: 2 }}>{test.reason}</span>
+                                    {test.timeframe && (
+                                      <span className="font-body" style={{ fontSize: 10, color: 'var(--dim)', display: 'block', marginTop: 2 }}>Timeframe: {test.timeframe}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Lifestyle Recommendations */}
+                        {result.lifestyle_recommendations && result.lifestyle_recommendations.length > 0 && (
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                              <Heart size={14} style={{ color: 'var(--green)' }} />
+                              <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em' }}>LIFESTYLE RECOMMENDATIONS</span>
+                            </div>
+                            <div style={{
+                              background: 'var(--elevated)', border: '1px solid var(--border)',
+                              borderRadius: 8, padding: '14px 18px'
+                            }}>
+                              <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {result.lifestyle_recommendations.map((rec, i) => (
+                                  <li key={i} className="font-body" style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6 }}>
+                                    {rec}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Legacy patient_action_items fallback */}
+                        {(!result.action_items || result.action_items.length === 0) && result.patient_action_items && result.patient_action_items.length > 0 && (
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                              <ClipboardList size={14} style={{ color: 'var(--green)' }} />
+                              <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em' }}>PATIENT ACTION ITEMS</span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {result.patient_action_items.map((item, i) => (
+                                <div key={i} style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.1)', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                  <span className="font-number" style={{ fontSize: 11, color: 'var(--green)', width: 18, flexShrink: 0 }}>{i + 1}.</span>
+                                  <span className="font-body" style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.5 }}>{item}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* ====== TAB 5: PLAIN LANGUAGE ====== */}
+                    {activeTab === 'plain' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        {/* Action buttons */}
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            data-cursor="hover"
+                            onClick={() => handleReadAloud(result.patient_plain_language_summary || result.summary || '')}
+                            style={{
+                              background: isSpeaking ? 'rgba(255,59,92,0.1)' : 'rgba(0,229,255,0.08)',
+                              border: `1px solid ${isSpeaking ? 'rgba(255,59,92,0.3)' : 'rgba(0,229,255,0.2)'}`,
+                              borderRadius: 8, color: isSpeaking ? '#fca5a5' : 'var(--cyan)',
+                              fontFamily: 'var(--font-body)', fontSize: 12, cursor: 'pointer',
+                              padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 200ms'
+                            }}
+                          >
+                            {isSpeaking ? <><VolumeX size={14} /> Stop Reading</> : <><Volume2 size={14} /> Read Aloud</>}
+                          </button>
+                          <select
+                            value={ttsLanguage}
+                            onChange={(e) => setTtsLanguage(e.target.value)}
+                            style={{
+                              background: 'var(--elevated)', border: '1px solid var(--border)',
+                              borderRadius: 8, color: 'var(--cyan)', fontFamily: 'var(--font-body)', fontSize: 11,
+                              cursor: 'pointer', padding: '6px 8px', outline: 'none', appearance: 'none',
+                              WebkitAppearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'6\'%3E%3Cpath d=\'M0 0l5 6 5-6z\' fill=\'%2300E5FF\'/%3E%3C/svg%3E")',
+                              backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center', paddingRight: 20,
+                              minWidth: 90, transition: 'all 200ms'
+                            }}
+                          >
+                            {Object.entries(TTS_LANGUAGES).map(([code, { label }]) => (
+                              <option key={code} value={code} style={{ background: '#0a0a14', color: '#e0e0e0' }}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            data-cursor="hover"
+                            onClick={() => copyToClipboard(result.patient_plain_language_summary || result.summary || '', setCopied)}
+                            style={{
+                              background: 'var(--elevated)', border: '1px solid var(--border)',
+                              borderRadius: 8, color: 'var(--muted)', fontFamily: 'var(--font-body)', fontSize: 12,
+                              cursor: 'pointer', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6
+                            }}
+                          >
+                            <Copy size={12} /> {copied ? 'COPIED!' : 'Copy'}
                           </button>
                         </div>
-                        <div style={{ background: 'var(--elevated)', borderRadius: 10, padding: '20px 16px', border: '1px solid var(--border)', maxHeight: 400, overflowY: 'auto' }}>
-                          {result.extracted_text ? (
-                            <pre className="font-body" style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.8, whiteSpace: 'pre-wrap', margin: 0 }}>
-                              {searchText ? result.extracted_text.split(new RegExp(`(${searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')).map((part: string, i: number) =>
-                                part.toLowerCase() === searchText.toLowerCase() ? <mark key={i} style={{ background: 'rgba(0,229,255,0.3)', color: 'var(--text)' }}>{part}</mark> : part
-                              ) : highlightMedical(result.extracted_text)}
-                            </pre>
+
+                        {/* Plain language text */}
+                        <div style={{
+                          background: 'var(--elevated)', borderRadius: 12, padding: '28px 24px',
+                          border: '1px solid var(--border)', borderLeft: '3px solid var(--green)'
+                        }}>
+                          {result.patient_plain_language_summary ? (
+                            <p className="font-body" style={{
+                              fontSize: 15, color: 'var(--text)', lineHeight: 2.0, margin: 0
+                            }}>
+                              {result.patient_plain_language_summary}
+                            </p>
+                          ) : result.summary ? (
+                            <p className="font-body" style={{
+                              fontSize: 15, color: 'var(--text)', lineHeight: 2.0, margin: 0
+                            }}>
+                              {result.summary}
+                            </p>
                           ) : (
-                            <span className="font-body" style={{ fontSize: 13, color: 'var(--muted)' }}>No text could be extracted.</span>
+                            <span className="font-body" style={{ fontSize: 14, color: 'var(--muted)' }}>
+                              No plain language summary available for this report.
+                            </span>
                           )}
                         </div>
                       </div>
                     )}
 
-                    {activeTab === 'summary' && (
-                      <div style={{ background: 'var(--elevated)', borderRadius: 12, padding: 24, border: '1px solid var(--border)' }}>
-                        <div style={{ textAlign: 'center', marginBottom: 20 }}>
-                          <span className="font-heading" style={{ fontSize: 18, color: 'var(--cyan)', display: 'block' }}>Patient Health Summary</span>
-                          <span className="font-body" style={{ fontSize: 12, color: 'var(--muted)' }}>Generated by NEURAMED AI</span>
+                    {/* ====== TAB 6: CLINICIAN SUMMARY ====== */}
+                    {activeTab === 'clinician' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        {/* Copy button */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <button
+                            data-cursor="hover"
+                            onClick={() => copyToClipboard(result.clinician_summary || result.summary || '', setCopiedClinician)}
+                            style={{
+                              background: 'var(--elevated)', border: '1px solid var(--border)',
+                              borderRadius: 8, color: 'var(--muted)', fontFamily: 'var(--font-body)', fontSize: 12,
+                              cursor: 'pointer', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6
+                            }}
+                          >
+                            <Copy size={12} /> {copiedClinician ? 'COPIED!' : 'Copy to Clipboard'}
+                          </button>
                         </div>
 
-                        {healthScore && (
-                          <div style={{ textAlign: 'center', marginBottom: 20 }}>
-                            <span className="font-number" style={{ fontSize: 36, color: 'var(--green)' }}>{healthScore}</span>
-                            <span className="font-body" style={{ fontSize: 12, color: 'var(--muted)', display: 'block' }}>Overall Health Score</span>
-                          </div>
-                        )}
-
-                        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-                          <p className="font-body" style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.8, margin: 0 }}>{result.summary}</p>
+                        {/* Clinician summary in monospace */}
+                        <div style={{
+                          background: 'var(--elevated)', borderRadius: 12, padding: '20px 18px',
+                          border: '1px solid var(--border)'
+                        }}>
+                          {result.clinician_summary ? (
+                            <pre style={{
+                              fontSize: 12, color: 'var(--text)', lineHeight: 1.8,
+                              whiteSpace: 'pre-wrap', margin: 0,
+                              fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace'
+                            }}>
+                              {result.clinician_summary}
+                            </pre>
+                          ) : result.summary ? (
+                            <pre style={{
+                              fontSize: 12, color: 'var(--text)', lineHeight: 1.8,
+                              whiteSpace: 'pre-wrap', margin: 0,
+                              fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace'
+                            }}>
+                              {result.summary}
+                            </pre>
+                          ) : (
+                            <span className="font-body" style={{ fontSize: 14, color: 'var(--muted)' }}>
+                              No clinician summary available for this report.
+                            </span>
+                          )}
                         </div>
 
-                        {result.follow_up_instructions && result.follow_up_instructions.length > 0 && (
-                          <div style={{ marginTop: 16 }}>
-                            <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>FOLLOW-UP INSTRUCTIONS</span>
-                            <ul style={{ margin: 0, paddingLeft: 20 }}>
-                              {result.follow_up_instructions.map((inst, i) => (
-                                <li key={i} className="font-body" style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6, marginBottom: 4 }}>{inst}</li>
-                              ))}
-                            </ul>
+                        {/* ICD-10 Codes */}
+                        {result.icd10_codes && result.icd10_codes.length > 0 && (
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                              <Star size={14} style={{ color: 'var(--amber)' }} />
+                              <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em' }}>ICD-10 CODES</span>
+                            </div>
+                            <div style={{ background: 'var(--elevated)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
+                              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                  <tr>
+                                    <th className="font-body" style={{ fontSize: 10, color: 'var(--muted)', padding: '8px 14px', textAlign: 'left', borderBottom: '1px solid var(--border)', width: 100 }}>CODE</th>
+                                    <th className="font-body" style={{ fontSize: 10, color: 'var(--muted)', padding: '8px 14px', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>DESCRIPTION</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {result.icd10_codes.map((code, i) => (
+                                    <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                      <td style={{ padding: '8px 14px' }}>
+                                        <span style={{
+                                          fontSize: 11, padding: '2px 8px', borderRadius: 4,
+                                          background: 'rgba(0,229,255,0.08)', color: 'var(--cyan)',
+                                          border: '1px solid rgba(0,229,255,0.15)',
+                                          fontFamily: '"JetBrains Mono", monospace', fontWeight: 600
+                                        }}>{code.code}</span>
+                                      </td>
+                                      <td className="font-body" style={{ fontSize: 12, color: 'var(--text)', padding: '8px 14px' }}>{code.description}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
                         )}
                       </div>
                     )}
+
                   </motion.div>
                 </AnimatePresence>
               </div>

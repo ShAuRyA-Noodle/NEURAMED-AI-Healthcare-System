@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Users, UserPlus, Calendar, Activity, Search, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
-import { usePatients } from '@/hooks/usePatients';
+import { Users, UserPlus, Calendar, Activity, Search, AlertTriangle, ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
+import { usePatients, useCreatePatient } from '@/hooks/usePatients';
 import { AgentBadge } from '@/components/shared/AgentBadge';
 import { UrgencyBadge } from '@/components/shared/UrgencyBadge';
 import { SkeletonCard } from '@/components/shared/SkeletonCard';
@@ -53,12 +53,18 @@ const PatientsPage = () => {
   const [riskFilter, setRiskFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState('recent');
   const [expandedPatient, setExpandedPatient] = useState<number | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newPatient, setNewPatient] = useState({ first_name: '', last_name: '', age: '', gender: '', phone: '', email: '', blood_type: '', emergency_contact: '', allergies: '', chronic_conditions: '' });
 
   const { data: patients, isLoading } = usePatients();
+  const createPatient = useCreatePatient();
 
   const filteredPatients = (patients || []).filter((p: any) => {
     const s = search.toLowerCase();
-    const matchSearch = !s || p.patient_code.toLowerCase().includes(s) || (p.demographics?.gender || p.gender || '').toLowerCase().startsWith(s);
+    const matchSearch = !s || p.patient_code.toLowerCase().includes(s) ||
+      (p.full_name || '').toLowerCase().includes(s) ||
+      (p.phone || '').toLowerCase().includes(s) ||
+      (p.demographics?.gender || p.gender || '').toLowerCase().startsWith(s);
     const matchAgent = agentFilter === 'all' || p.last_session_agent === agentFilter;
     const matchGender = genderFilter === 'all' || (p.demographics?.gender || p.gender || '').toLowerCase() === genderFilter;
     const matchRisk = riskFilter === 'all' ||
@@ -79,10 +85,19 @@ const PatientsPage = () => {
       {/* Page Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <div style={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>👥</div>
-        <div>
+        <div style={{ flex: 1 }}>
           <h1 className="font-heading" style={{ fontSize: 24, color: 'var(--text)', margin: 0 }}>Patient Registry</h1>
           <p className="font-body" style={{ fontSize: 13, color: 'var(--muted)', margin: 0 }}>Manage and monitor patient records</p>
         </div>
+        <button data-cursor="hover" onClick={() => setShowAddModal(true)} style={{
+          width: 44, height: 44, borderRadius: 12, border: '1px solid var(--cyan)', background: 'rgba(0,229,255,0.08)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 200ms ease'
+        }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,229,255,0.18)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,229,255,0.08)'; }}
+        >
+          <Plus size={22} style={{ color: 'var(--cyan)' }} />
+        </button>
       </div>
 
       {/* Stats Row */}
@@ -101,7 +116,7 @@ const PatientsPage = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface)', padding: '12px 16px', borderRadius: 12, border: '1px solid var(--border)', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ position: 'relative' }}>
           <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)' }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search patient code..."
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, code, or phone..."
             data-cursor="hover"
             style={{
               width: 260, height: 36, background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 20,
@@ -181,7 +196,8 @@ const PatientsPage = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <Identicon id={p.patient_code} />
                   <div style={{ flex: 1 }}>
-                    <span className="font-number" style={{ fontSize: 16, color: 'var(--cyan)' }}>{p.patient_code}</span>
+                    <span className="font-number" style={{ fontSize: 16, color: 'var(--text)' }}>{p.full_name || p.patient_code}</span>
+                    <span className="font-body" style={{ fontSize: 11, color: 'var(--cyan)', display: 'block', marginTop: 1 }}>{p.full_name ? p.patient_code : ''}</span>
                     <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginTop: 2 }}>
                       {p.demographics?.age || p.age}yo · {p.demographics?.gender || p.gender} {p.demographics?.blood_type ? `· ${p.demographics.blood_type}` : ''}
                     </span>
@@ -224,16 +240,63 @@ const PatientsPage = () => {
 
                 {/* Expanded details */}
                 {isExpanded && (
-                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} style={{ borderTop: '1px solid var(--border)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {p.last_session_date && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>Last Session</span>
-                        <span className="font-body" style={{ fontSize: 11, color: 'var(--text)' }}>{new Date(p.last_session_date).toLocaleDateString()}</span>
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} style={{ borderTop: '1px solid var(--border)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      {[
+                        { label: 'Phone', value: p.phone },
+                        { label: 'Email', value: p.email },
+                        { label: 'Blood Type', value: p.demographics?.blood_type },
+                        { label: 'Date of Birth', value: p.demographics?.date_of_birth ? new Date(p.demographics.date_of_birth).toLocaleDateString() : null },
+                      ].filter(f => f.value).map(f => (
+                        <div key={f.label}>
+                          <span className="font-body" style={{ fontSize: 9, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 2 }}>{f.label}</span>
+                          <span className="font-body" style={{ fontSize: 12, color: 'var(--text)' }}>{f.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {p.address && (
+                      <div>
+                        <span className="font-body" style={{ fontSize: 9, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 2 }}>Address</span>
+                        <span className="font-body" style={{ fontSize: 12, color: 'var(--text)' }}>{p.address}</span>
                       </div>
                     )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>Created</span>
-                      <span className="font-body" style={{ fontSize: 11, color: 'var(--text)' }}>{new Date(p.created_at).toLocaleDateString()}</span>
+                    {p.emergency_contact && (
+                      <div>
+                        <span className="font-body" style={{ fontSize: 9, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 2 }}>Emergency Contact</span>
+                        <span className="font-body" style={{ fontSize: 12, color: 'var(--text)' }}>{p.emergency_contact}</span>
+                      </div>
+                    )}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      {p.allergies && (
+                        <div>
+                          <span className="font-body" style={{ fontSize: 9, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 2 }}>Allergies</span>
+                          <span className="font-body" style={{ fontSize: 12, color: 'var(--amber)' }}>{p.allergies}</span>
+                        </div>
+                      )}
+                      {p.chronic_conditions && (
+                        <div>
+                          <span className="font-body" style={{ fontSize: 9, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 2 }}>Chronic Conditions</span>
+                          <span className="font-body" style={{ fontSize: 12, color: 'var(--text)' }}>{p.chronic_conditions}</span>
+                        </div>
+                      )}
+                    </div>
+                    {p.insurance_id && (
+                      <div>
+                        <span className="font-body" style={{ fontSize: 9, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 2 }}>Insurance ID</span>
+                        <span className="font-number" style={{ fontSize: 12, color: 'var(--text)' }}>{p.insurance_id}</span>
+                      </div>
+                    )}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                      {p.last_session_date && (
+                        <div>
+                          <span className="font-body" style={{ fontSize: 9, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 2 }}>Last Session</span>
+                          <span className="font-body" style={{ fontSize: 12, color: 'var(--text)' }}>{new Date(p.last_session_date).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                      <div>
+                        <span className="font-body" style={{ fontSize: 9, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 2 }}>Created</span>
+                        <span className="font-body" style={{ fontSize: 12, color: 'var(--text)' }}>{new Date(p.created_at).toLocaleDateString()}</span>
+                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -246,6 +309,156 @@ const PatientsPage = () => {
           })
         )}
       </div>
+
+      {/* Add Patient Modal */}
+      {showAddModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} onClick={() => setShowAddModal(false)} />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            style={{ position: 'relative', width: 520, maxHeight: '85vh', overflowY: 'auto', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 28 }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h2 className="font-heading" style={{ fontSize: 20, color: 'var(--text)', margin: 0 }}>Add New Patient</h2>
+              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                <X size={18} style={{ color: 'var(--muted)' }} />
+              </button>
+            </div>
+
+            <form onSubmit={e => {
+              e.preventDefault();
+              if (!newPatient.first_name || !newPatient.last_name || !newPatient.age || !newPatient.gender) return;
+              createPatient.mutate({
+                first_name: newPatient.first_name,
+                last_name: newPatient.last_name,
+                age: parseInt(newPatient.age),
+                gender: newPatient.gender,
+                phone: newPatient.phone || undefined,
+                email: newPatient.email || undefined,
+                blood_type: newPatient.blood_type || undefined,
+                emergency_contact: newPatient.emergency_contact || undefined,
+                allergies: newPatient.allergies || undefined,
+                chronic_conditions: newPatient.chronic_conditions || undefined,
+              }, {
+                onSuccess: () => {
+                  setShowAddModal(false);
+                  setNewPatient({ first_name: '', last_name: '', age: '', gender: '', phone: '', email: '', blood_type: '', emergency_contact: '', allergies: '', chronic_conditions: '' });
+                }
+              });
+            }} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                {/* First Name */}
+                <div>
+                  <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>First Name *</label>
+                  <input required value={newPatient.first_name} onChange={e => setNewPatient(s => ({ ...s, first_name: e.target.value }))}
+                    style={{ width: '100%', height: 36, background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '0 12px', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+                {/* Last Name */}
+                <div>
+                  <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Last Name *</label>
+                  <input required value={newPatient.last_name} onChange={e => setNewPatient(s => ({ ...s, last_name: e.target.value }))}
+                    style={{ width: '100%', height: 36, background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '0 12px', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                {/* Age */}
+                <div>
+                  <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Age *</label>
+                  <input required type="number" min={0} max={150} value={newPatient.age} onChange={e => setNewPatient(s => ({ ...s, age: e.target.value }))}
+                    style={{ width: '100%', height: 36, background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '0 12px', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+                {/* Gender */}
+                <div>
+                  <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Gender *</label>
+                  <select required value={newPatient.gender} onChange={e => setNewPatient(s => ({ ...s, gender: e.target.value }))}
+                    style={{ width: '100%', height: 36, background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '0 12px', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text)', outline: 'none', boxSizing: 'border-box', cursor: 'pointer' }}
+                  >
+                    <option value="">Select...</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                {/* Phone */}
+                <div>
+                  <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Phone</label>
+                  <input value={newPatient.phone} onChange={e => setNewPatient(s => ({ ...s, phone: e.target.value }))}
+                    style={{ width: '100%', height: 36, background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '0 12px', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+                {/* Email */}
+                <div>
+                  <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Email</label>
+                  <input type="email" value={newPatient.email} onChange={e => setNewPatient(s => ({ ...s, email: e.target.value }))}
+                    style={{ width: '100%', height: 36, background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '0 12px', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+
+              {/* Blood Type */}
+              <div>
+                <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Blood Type</label>
+                <select value={newPatient.blood_type} onChange={e => setNewPatient(s => ({ ...s, blood_type: e.target.value }))}
+                  style={{ width: '100%', height: 36, background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '0 12px', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text)', outline: 'none', boxSizing: 'border-box', cursor: 'pointer' }}
+                >
+                  <option value="">Select...</option>
+                  {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bt => (
+                    <option key={bt} value={bt}>{bt}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Emergency Contact */}
+              <div>
+                <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Emergency Contact</label>
+                <input value={newPatient.emergency_contact} onChange={e => setNewPatient(s => ({ ...s, emergency_contact: e.target.value }))}
+                  style={{ width: '100%', height: 36, background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '0 12px', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text)', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                {/* Allergies */}
+                <div>
+                  <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Allergies</label>
+                  <input value={newPatient.allergies} onChange={e => setNewPatient(s => ({ ...s, allergies: e.target.value }))}
+                    style={{ width: '100%', height: 36, background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '0 12px', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+                {/* Chronic Conditions */}
+                <div>
+                  <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Chronic Conditions</label>
+                  <input value={newPatient.chronic_conditions} onChange={e => setNewPatient(s => ({ ...s, chronic_conditions: e.target.value }))}
+                    style={{ width: '100%', height: 36, background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '0 12px', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+
+              {createPatient.isError && (
+                <div className="font-body" style={{ fontSize: 12, color: 'var(--red)', padding: '8px 12px', background: 'rgba(255,59,48,0.08)', borderRadius: 8 }}>
+                  Failed to create patient. Please try again.
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+                <button type="button" onClick={() => setShowAddModal(false)} style={{
+                  height: 38, padding: '0 20px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent',
+                  fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--muted)', cursor: 'pointer'
+                }}>Cancel</button>
+                <button type="submit" disabled={createPatient.isPending} style={{
+                  height: 38, padding: '0 24px', borderRadius: 10, border: '1px solid var(--cyan)', background: 'rgba(0,229,255,0.12)',
+                  fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--cyan)', cursor: 'pointer', opacity: createPatient.isPending ? 0.6 : 1
+                }}>{createPatient.isPending ? 'Creating...' : 'Create Patient'}</button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };

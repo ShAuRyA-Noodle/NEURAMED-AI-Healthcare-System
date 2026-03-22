@@ -2,14 +2,17 @@ from sqlalchemy.orm import Session
 from db.models import Appointment
 from datetime import datetime
 
-def create_appointment(db: Session, patient_id: int, doctor_name: str, specialty: str, appointment_datetime: datetime, reason: str):
+def create_appointment(db: Session, patient_id: int, doctor_name: str, specialty: str, appointment_datetime: datetime, reason: str, appointment_type: str = "initial", duration_minutes: int = 30, location: str = None):
     new_app = Appointment(
         patient_id=patient_id,
         doctor_name=doctor_name,
         specialty=specialty,
         appointment_datetime=appointment_datetime,
         reason=reason,
-        status="scheduled"
+        status="scheduled",
+        appointment_type=appointment_type,
+        duration_minutes=duration_minutes,
+        location=location,
     )
     db.add(new_app)
     db.commit()

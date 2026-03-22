@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, UserPlus, FileText, CheckCircle, Clock, XCircle, Plus, X, TrendingUp, Loader2, StickyNote } from 'lucide-react';
 import { format } from 'date-fns';
-import { useAppointments, useCreateAppointment, useUpdateAppointmentStatus, useAppointmentStats } from '@/hooks/useAppointments';
+import { useAppointments, useCreateAppointment, useUpdateAppointmentStatus, useAppointmentStats, useAddAppointmentNotes } from '@/hooks/useAppointments';
+import { usePatients } from '@/hooks/usePatients';
 import { useToast } from '@/hooks/useToast';
 import { SkeletonCard } from '@/components/shared/SkeletonCard';
 import type { AppointmentStatus } from '@/types';
@@ -32,10 +33,23 @@ const Appointments = () => {
   const [notesText, setNotesText] = useState('');
   const { addToast } = useToast();
 
+  const [patientSearch, setPatientSearch] = useState('');
+
   const { data: appts, isLoading } = useAppointments();
   const { data: stats } = useAppointmentStats();
+  const { data: allPatients } = usePatients();
   const { mutateAsync: createAppt, isPending: isCreating } = useCreateAppointment();
   const { mutateAsync: updateStatus } = useUpdateAppointmentStatus();
+  const { mutateAsync: saveNotes, isPending: isSavingNotes } = useAddAppointmentNotes();
+
+  // Filter patients for the create modal search
+  const matchedPatients = (allPatients || []).filter((p: any) => {
+    if (!patientSearch) return false;
+    const s = patientSearch.toLowerCase();
+    return (p.full_name || '').toLowerCase().includes(s) ||
+      p.patient_code.toLowerCase().includes(s) ||
+      (p.phone || '').includes(s);
+  }).slice(0, 5);
 
   const filteredAppts = appts?.filter(a => filter === 'all' || a.status === filter) || [];
 
@@ -59,8 +73,11 @@ const Appointments = () => {
         specialty: formData.specialty,
         appointment_datetime: new Date(formData.appointment_date).toISOString(),
         reason: formData.reason,
-        status: 'scheduled'
-      });
+        status: 'scheduled',
+        appointment_type: formData.appointment_type,
+        duration_minutes: parseInt(formData.duration_minutes, 10) || 30,
+        location: formData.location || undefined,
+      } as any);
       setIsModalOpen(false);
       setModalStep(1);
       setFormData({ patient_id: '', doctor_name: '', specialty: 'General', appointment_date: '', reason: '', appointment_type: 'initial', duration_minutes: '30', location: '' });
@@ -128,7 +145,10 @@ const Appointments = () => {
               {todayAppts.map((a: any) => (
                 <div key={a.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <span className="font-number" style={{ fontSize: 13, color: 'var(--cyan)' }}>{a.patient_code || `PT-${a.patient_id}`}</span>
+                    <div>
+                      <span className="font-body" style={{ fontSize: 13, color: 'var(--text)' }}>{a.patient_name || a.patient_code}</span>
+                      {a.patient_name && <span className="font-number" style={{ fontSize: 10, color: 'var(--cyan)', marginLeft: 8 }}>{a.patient_code}</span>}
+                    </div>
                     <span className="font-body" style={{ fontSize: 12, color: 'var(--text)' }}>Dr. {a.doctor_name}</span>
                     <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>{format(new Date(a.appointment_datetime), 'HH:mm')}</span>
                     <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>{a.reason}</span>
@@ -164,7 +184,7 @@ const Appointments = () => {
           <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: 900 }}>
             <thead>
               <tr>
-                {['PATIENT', 'DOCTOR', 'SPECIALTY', 'DATE & TIME', 'REASON', 'STATUS', 'ACTIONS'].map(h => (
+                {['PATIENT', 'DOCTOR', 'SPECIALTY', 'DATE & TIME', 'TYPE', 'REASON', 'STATUS', 'ACTIONS'].map(h => (
                   <th key={h} className="font-body" style={{
                     fontSize: 11, color: 'var(--muted)', letterSpacing: '0.08em', padding: '0 14px 12px',
                     textAlign: 'left', borderBottom: '1px solid var(--border)', fontWeight: 400
@@ -177,12 +197,16 @@ const Appointments = () => {
                 <tr key={a.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background 150ms' }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  <td className="font-number" style={{ fontSize: 13, color: 'var(--cyan)', padding: '14px' }}>{a.patient_code || `PT-${a.patient_id}`}</td>
+                  <td style={{ padding: '14px' }}>
+                    <span className="font-body" style={{ fontSize: 13, color: 'var(--text)', display: 'block' }}>{a.patient_name || a.patient_code}</span>
+                    {a.patient_name && <span className="font-number" style={{ fontSize: 10, color: 'var(--cyan)' }}>{a.patient_code}</span>}
+                  </td>
                   <td className="font-body" style={{ fontSize: 13, color: 'var(--text)', padding: '14px' }}>Dr. {a.doctor_name}</td>
                   <td className="font-body" style={{ fontSize: 12, color: 'var(--muted)', padding: '14px' }}>{a.specialty}</td>
                   <td className="font-body" style={{ fontSize: 12, color: 'var(--text)', padding: '14px' }}>
                     {a.appointment_datetime ? format(new Date(a.appointment_datetime), 'MMM d, yyyy - HH:mm') : '—'}
                   </td>
+                  <td className="font-body" style={{ fontSize: 11, color: 'var(--muted)', padding: '14px', textTransform: 'capitalize' }}>{(a.appointment_type || 'initial').replace('_', ' ')}</td>
                   <td className="font-body" style={{ fontSize: 12, color: 'var(--muted)', padding: '14px', maxWidth: 180, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.reason}</td>
                   <td style={{ padding: '14px' }}>
                     <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: statusBg(a.status), color: statusColor(a.status), border: `1px solid ${statusColor(a.status)}40`, fontFamily: 'var(--font-body)', textTransform: 'capitalize' }}>{a.status}</span>
@@ -229,9 +253,37 @@ const Appointments = () => {
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {modalStep === 1 && (
                   <>
-                    <div>
-                      <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>PATIENT ID</label>
-                      <input required type="number" value={formData.patient_id} onChange={e => setFormData({ ...formData, patient_id: e.target.value })} style={inputStyle} />
+                    <div style={{ position: 'relative' }}>
+                      <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>SEARCH PATIENT</label>
+                      <input
+                        placeholder="Type name, code, or phone..."
+                        value={patientSearch}
+                        onChange={e => { setPatientSearch(e.target.value); setFormData({ ...formData, patient_id: '' }); }}
+                        style={inputStyle}
+                      />
+                      {formData.patient_id && (
+                        <div style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.2)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span className="font-body" style={{ fontSize: 12, color: 'var(--cyan)' }}>
+                            {(allPatients || []).find((p: any) => String(p.id) === formData.patient_id)?.full_name || ''}{' '}
+                            <span style={{ color: 'var(--muted)', fontSize: 10 }}>{(allPatients || []).find((p: any) => String(p.id) === formData.patient_id)?.patient_code}</span>
+                          </span>
+                          <button type="button" onClick={() => { setFormData({ ...formData, patient_id: '' }); setPatientSearch(''); }} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 0 }}><X size={14} /></button>
+                        </div>
+                      )}
+                      {!formData.patient_id && matchedPatients.length > 0 && (
+                        <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', zIndex: 10, background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, marginTop: 4, maxHeight: 200, overflow: 'auto' }}>
+                          {matchedPatients.map((p: any) => (
+                            <div key={p.id} data-cursor="hover" onClick={() => { setFormData({ ...formData, patient_id: String(p.id) }); setPatientSearch(''); }}
+                              style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border)', transition: 'background 150ms' }}
+                              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+                              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                              <span className="font-body" style={{ fontSize: 13, color: 'var(--text)' }}>{p.full_name || p.patient_code}</span>
+                              <span className="font-number" style={{ fontSize: 10, color: 'var(--cyan)', marginLeft: 8 }}>{p.patient_code}</span>
+                              <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 8 }}>{p.phone || ''}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>REASON FOR VISIT</label>
@@ -265,7 +317,16 @@ const Appointments = () => {
                       <input required type="datetime-local" value={formData.appointment_date} onChange={e => setFormData({ ...formData, appointment_date: e.target.value })}
                         style={{ ...inputStyle, colorScheme: 'dark' }} />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+                      <div>
+                        <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>TYPE</label>
+                        <select value={formData.appointment_type} onChange={e => setFormData({ ...formData, appointment_type: e.target.value })} style={{ ...inputStyle, cursor: 'pointer' }}>
+                          <option value="initial">Initial Visit</option>
+                          <option value="follow_up">Follow-up</option>
+                          <option value="emergency">Emergency</option>
+                          <option value="teleconsult">Teleconsult</option>
+                        </select>
+                      </div>
                       <div>
                         <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>DURATION (MIN)</label>
                         <input type="number" value={formData.duration_minutes} onChange={e => setFormData({ ...formData, duration_minutes: e.target.value })} style={inputStyle} />
@@ -288,7 +349,12 @@ const Appointments = () => {
                     <div style={{ background: 'var(--elevated)', borderRadius: 10, padding: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span className="font-body" style={{ color: 'var(--muted)', fontSize: 12 }}>Patient</span>
-                        <span className="font-number" style={{ color: 'var(--cyan)', fontSize: 13 }}>PT-{formData.patient_id.padStart(4, '0')}</span>
+                        <span className="font-body" style={{ color: 'var(--text)', fontSize: 13 }}>
+                          {(allPatients || []).find((p: any) => String(p.id) === formData.patient_id)?.full_name || `Patient #${formData.patient_id}`}
+                          <span className="font-number" style={{ color: 'var(--cyan)', fontSize: 10, marginLeft: 8 }}>
+                            {(allPatients || []).find((p: any) => String(p.id) === formData.patient_id)?.patient_code || ''}
+                          </span>
+                        </span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span className="font-body" style={{ color: 'var(--muted)', fontSize: 12 }}>Doctor</span>
@@ -339,7 +405,13 @@ const Appointments = () => {
                 style={{ width: '100%', height: 120, background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: 14, fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--text)', outline: 'none', resize: 'none' }} />
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                 <button onClick={() => setNotesId(null)} style={{ flex: 1, height: 36, background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: 'var(--font-body)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
-                <button onClick={() => { addToast('success', 'Notes saved'); setNotesId(null); }} style={{ flex: 1, height: 36, background: 'var(--cyan)', border: 'none', borderRadius: 8, color: '#000', fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Save</button>
+                <button disabled={isSavingNotes} onClick={async () => {
+                  try {
+                    await saveNotes({ id: notesId!, notes: notesText });
+                    addToast('success', 'Notes saved');
+                    setNotesId(null);
+                  } catch { addToast('error', 'Failed to save notes'); }
+                }} style={{ flex: 1, height: 36, background: 'var(--cyan)', border: 'none', borderRadius: 8, color: '#000', fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: isSavingNotes ? 0.5 : 1 }}>{isSavingNotes ? 'Saving...' : 'Save'}</button>
               </div>
             </motion.div>
           </motion.div>

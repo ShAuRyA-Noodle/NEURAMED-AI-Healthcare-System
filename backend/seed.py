@@ -48,14 +48,44 @@ def seed_db():
 
     print("Seeding database...")
 
-    # 50 patients
+    # 50 patients with realistic Indian names and medical data
     patients = []
-    genders = ["Male", "Female", "Other"]
+    male_first = ["Aarav", "Arjun", "Vivaan", "Reyansh", "Krishna", "Ishaan", "Shaurya", "Dhruv", "Kabir",
+                  "Aditya", "Rohan", "Rahul", "Vikram", "Sanjay", "Raj", "Amit", "Suresh", "Mahesh", "Pranav", "Karthik",
+                  "Ravi", "Deepak", "Manish", "Nikhil", "Gaurav"]
+    female_first = ["Ananya", "Diya", "Saanvi", "Aadhya", "Priya", "Neha", "Kavya", "Isha", "Meera",
+                    "Pooja", "Shreya", "Sneha", "Anjali", "Rani", "Lakshmi", "Sunita", "Geeta", "Sita", "Nisha", "Ritu",
+                    "Deepika", "Swati", "Komal", "Jyoti", "Divya"]
+    last_names = ["Sharma", "Patel", "Singh", "Kumar", "Gupta", "Verma", "Joshi", "Reddy", "Nair", "Iyer",
+                  "Mehta", "Shah", "Bhat", "Das", "Roy", "Rao", "Menon", "Kapoor", "Malhotra", "Chopra"]
+    blood_types = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
+    cities = ["Mumbai", "Delhi", "Bengaluru", "Chennai", "Hyderabad", "Kolkata", "Pune", "Ahmedabad",
+              "Jaipur", "Lucknow", "Chandigarh", "Kochi"]
+    allergy_pool = ["Penicillin", "Sulfonamides", "Aspirin", "Ibuprofen", "Peanuts", "Latex", "None known"]
+    chronic_pool = ["Hypertension", "Type 2 Diabetes", "Asthma", "Hypothyroidism", "GERD", "Arthritis", "None"]
+    insurance_prefixes = ["PMJAY", "STAR", "HDFC", "ICICI", "MAX"]
+
     for i in range(1, 51):
+        gender = random.choice(["Male", "Female"])
+        fn = random.choice(male_first if gender == "Male" else female_first)
+        ln = random.choice(last_names)
+        age = random.randint(18, 85)
+        dob_year = 2026 - age
         p = Patient(
             patient_code=f"PT-{i:04d}",
-            age=random.randint(18, 90),
-            gender=random.choice(genders)
+            first_name=fn,
+            last_name=ln,
+            age=age,
+            gender=gender,
+            date_of_birth=f"{dob_year}-{random.randint(1,12):02d}-{random.randint(1,28):02d}",
+            blood_type=random.choice(blood_types),
+            phone=f"+91 {random.randint(70000,99999)}{random.randint(10000,99999)}",
+            email=f"{fn.lower()}.{ln.lower()}{i}@email.com",
+            address=f"{random.randint(1,500)}, {random.choice(['MG Road','Station Road','Gandhi Nagar','Nehru Colony'])}, {random.choice(cities)}",
+            emergency_contact=f"{random.choice(male_first+female_first)} {random.choice(last_names)} (+91 {random.randint(70000,99999)}{random.randint(10000,99999)})",
+            allergies=random.choice(allergy_pool),
+            chronic_conditions=random.choice(chronic_pool),
+            insurance_id=f"{random.choice(insurance_prefixes)}-{random.randint(100000,999999)}",
         )
         db.add(p)
         patients.append(p)
@@ -211,7 +241,7 @@ def seed_db():
         dt = datetime.utcnow() + timedelta(days=days_ahead, hours=random.randint(9,16))
         app = Appointment(
             patient_id=p.id,
-            doctor_name=f"Dr. {random.choice(['Smith', 'Jones', 'Williams', 'Brown', 'Davis', 'Wilson'])}",
+            doctor_name=random.choice(['Rajesh Sharma', 'Priya Patel', 'Anil Gupta', 'Sunita Reddy', 'Vikram Mehta', 'Deepa Nair']),
             specialty=random.choice(specialties),
             appointment_datetime=dt,
             reason=random.choice(["Follow-up", "Initial consultation", "Lab review", "Imaging review"]),
