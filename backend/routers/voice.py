@@ -15,14 +15,16 @@ class DiagnoseRequest(BaseModel):
     transcript: Optional[str] = None
     audio_base64: Optional[str] = None
     patient_id: Optional[int] = None
+    language: Optional[str] = "en"
 
 @router.post("/diagnose", response_model=DiagnosisResult)
 async def diagnose(request: DiagnoseRequest, db: Session = Depends(get_db)):
     try:
         res = voice_agent.diagnose(
-            transcript=request.transcript, 
+            transcript=request.transcript,
             audio_base64=request.audio_base64,
-            patient_id=request.patient_id, 
+            patient_id=request.patient_id,
+            language=request.language or "en",
             db=db
         )
         

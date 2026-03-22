@@ -5,13 +5,24 @@ from .database import Base
 
 class Patient(Base):
     __tablename__ = "patients"
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    patient_code = Column(String, unique=True, index=True) # PT-XXXX
+    patient_code = Column(String, unique=True, index=True)  # PT-XXXX
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
     age = Column(Integer)
     gender = Column(String)
+    date_of_birth = Column(String, nullable=True)
+    blood_type = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    address = Column(String, nullable=True)
+    emergency_contact = Column(String, nullable=True)
+    allergies = Column(String, nullable=True)
+    chronic_conditions = Column(String, nullable=True)
+    insurance_id = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+
     sessions = relationship("DiagnosisSession", back_populates="patient")
     appointments = relationship("Appointment", back_populates="patient")
 
@@ -77,6 +88,25 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     avatar_emoji = Column(String, default="👤")
+    # Doctor profile fields
+    medical_license_number = Column(String, nullable=True)
+    specialization = Column(String, nullable=True)
+    hospital_name = Column(String, nullable=True)
+    years_of_practice = Column(Integer, nullable=True)
+    is_verified = Column(Boolean, default=False)
+    onboarding_completed = Column(Boolean, default=False)
+    # Patient profile fields
+    date_of_birth = Column(String, nullable=True)
+    blood_type = Column(String, nullable=True)
+    height_cm = Column(Float, nullable=True)
+    weight_kg = Column(Float, nullable=True)
+    emergency_contact_name = Column(String, nullable=True)
+    emergency_contact_phone = Column(String, nullable=True)
+    existing_conditions = Column(JSON, nullable=True)
+    current_medications = Column(String, nullable=True)
+    known_allergies = Column(String, nullable=True)
+    previous_surgeries = Column(String, nullable=True)
+    language_preference = Column(String, default="en")
 
 class Appointment(Base):
     __tablename__ = "appointments"

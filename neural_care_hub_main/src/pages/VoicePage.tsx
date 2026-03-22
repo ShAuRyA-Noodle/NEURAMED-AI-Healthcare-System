@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, MicOff, Stethoscope, ChevronDown, ChevronUp, AlertTriangle, Clock, FileText, RotateCcw, Download, Activity, Shield, Pill, Heart, FlaskConical, Languages, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Stethoscope, ChevronDown, ChevronUp, AlertTriangle, Clock, FileText, RotateCcw, Download, Activity, Shield, Pill, Heart, FlaskConical, Languages, Loader2, Volume2, VolumeX } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { sarvamTTS } from '@/api/sarvam';
 import { useVoiceDiagnosis } from '@/hooks/useVoiceDiagnosis';
 import { useToast } from '@/hooks/useToast';
 import { ConfidenceMeter } from '@/components/shared/ConfidenceMeter';
@@ -28,12 +29,15 @@ const TEMPLATES = [
 ];
 
 const LANGUAGES = [
-  { code: 'en-US', label: 'English' },
-  { code: 'es-ES', label: 'Español' },
-  { code: 'fr-FR', label: 'Français' },
-  { code: 'hi-IN', label: 'हिन्दी' },
-  { code: 'ar-SA', label: 'العربية' },
-  { code: 'zh-CN', label: '中文' },
+  { code: 'en-US', label: 'English', ttsCode: 'en' },
+  { code: 'hi-IN', label: 'हिन्दी (Hindi)', ttsCode: 'hi' },
+  { code: 'ta-IN', label: 'தமிழ் (Tamil)', ttsCode: 'ta' },
+  { code: 'te-IN', label: 'తెలుగు (Telugu)', ttsCode: 'te' },
+  { code: 'bn-IN', label: 'বাংলা (Bengali)', ttsCode: 'bn' },
+  { code: 'mr-IN', label: 'मराठी (Marathi)', ttsCode: 'mr' },
+  { code: 'kn-IN', label: 'ಕನ್ನಡ (Kannada)', ttsCode: 'kn' },
+  { code: 'ml-IN', label: 'മലയാളം (Malayalam)', ttsCode: 'ml' },
+  { code: 'pa-IN', label: 'ਪੰਜਾਬੀ (Punjabi)', ttsCode: 'pa' },
 ];
 
 const MEDICAL_TERMS = ['pain', 'fever', 'breath', 'chest', 'cough', 'fatigue', 'nausea', 'dizziness', 'swelling', 'infection', 'inflammation', 'cardiac', 'pulmonary', 'pneumonia', 'sputum', 'chills', 'crackles', 'hemoptysis', 'pleuritic', 'respiratory', 'temperature', 'auscultation', 'dyspnea', 'wheezing', 'bronchitis', 'edema', 'hypertension', 'diabetes', 'arrhythmia', 'anemia', 'fracture', 'antibiotic', 'diagnosis', 'symptoms', 'chronic', 'acute', 'syncope', 'palpitations', 'dermatome', 'arthralgias', 'conjunctival', 'polydipsia', 'polyuria'];
@@ -79,6 +83,42 @@ const VoicePage = () => {
   const animationFrameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [waveData, setWaveData] = useState<number[]>(Array(24).fill(4));
+
+  // TTS state
+  const [listenLang, setListenLang] = useState('en');
+  const [ttsLoading, setTtsLoading] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const speakAnalysis = async (text: string, lang: string) => {
+    if (isSpeaking) {
+      ttsAudioRef.current?.pause();
+      ttsAudioRef.current = null;
+      setIsSpeaking(false);
+      return;
+    }
+    ttsAudioRef.current?.pause();
+    ttsAudioRef.current = null;
+    setTtsLoading(true);
+    setIsSpeaking(true);
+    try {
+      const blob = await sarvamTTS(text, lang);
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      ttsAudioRef.current = audio;
+      audio.onended = () => { setIsSpeaking(false); URL.revokeObjectURL(url); };
+      audio.onerror = () => { setIsSpeaking(false); URL.revokeObjectURL(url); addToast('error', 'Audio playback failed'); };
+      await audio.play();
+    } catch (err: any) {
+      setIsSpeaking(false);
+      addToast('error', `TTS failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setTtsLoading(false);
+    }
+  };
+
+  // Cleanup TTS on unmount
+  useEffect(() => { return () => { ttsAudioRef.current?.pause(); }; }, []);
 
   // Collapsible states
   const [showTranscript, setShowTranscript] = useState(false);
@@ -198,7 +238,8 @@ const VoicePage = () => {
     if (finalText && finalText.length >= 10) {
       setTimeout(async () => {
         try {
-          const res = await diagnose({ transcript: finalText, patient_id: user?.patient_code ? parseInt(user.patient_code.replace('PT-', '')) : 1 });
+          const ttsCode = LANGUAGES.find(l => l.code === language)?.ttsCode || 'en';
+          const res = await diagnose({ transcript: finalText, patient_id: user?.patient_code ? parseInt(user.patient_code.replace('PT-', '')) : 1, language: ttsCode });
           setResult(res);
         } catch {
           addToast('error', 'Voice diagnosis failed');
@@ -212,7 +253,8 @@ const VoicePage = () => {
   const handleTypeAnalysis = async () => {
     if (transcript.length < 10 || isPending) return;
     try {
-      const res = await diagnose({ transcript, patient_id: user?.patient_code ? parseInt(user.patient_code.replace('PT-', '')) : 1 });
+      const ttsCode = LANGUAGES.find(l => l.code === language)?.ttsCode || 'en';
+      const res = await diagnose({ transcript, patient_id: user?.patient_code ? parseInt(user.patient_code.replace('PT-', '')) : 1, language: ttsCode });
       setResult(res);
     } catch {
       addToast('error', 'Text diagnosis failed');
@@ -492,6 +534,46 @@ const VoicePage = () => {
               </div>
 
               <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20, flex: 1, overflowY: 'auto' }}>
+                {/* Listen to Analysis */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px',
+                  background: 'var(--elevated)', borderRadius: 10, border: '1px solid var(--border)',
+                }}>
+                  <Volume2 size={15} style={{ color: 'var(--cyan)', flexShrink: 0 }} />
+                  <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>Listen in</span>
+                  <select value={listenLang} onChange={e => setListenLang(e.target.value)}
+                    style={{
+                      background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6,
+                      padding: '4px 8px', color: 'var(--text)', fontFamily: 'var(--font-body)', fontSize: 12,
+                      cursor: 'pointer', outline: 'none',
+                    }}>
+                    {LANGUAGES.map(l => (
+                      <option key={l.ttsCode} value={l.ttsCode}>{l.label}</option>
+                    ))}
+                  </select>
+                  <button onClick={() => {
+                    const parts: string[] = [];
+                    if (conditions.length > 0) parts.push(`Primary diagnosis: ${conditions[0].name}. ${conditions[0].description || ''}`);
+                    if (result.immediate_actions?.length) parts.push(`Immediate actions: ${result.immediate_actions.join('. ')}`);
+                    if (result.follow_up) parts.push(`Follow up: ${result.follow_up}`);
+                    if (result.when_to_go_to_er) parts.push(`Warning: ${result.when_to_go_to_er}`);
+                    const summary = parts.join('. ') || 'No analysis available';
+                    speakAnalysis(summary, listenLang);
+                  }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px',
+                      borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap',
+                      background: isSpeaking ? 'rgba(255,59,92,0.12)' : 'var(--cyan)',
+                      border: isSpeaking ? '1px solid rgba(255,59,92,0.3)' : '1px solid transparent',
+                      color: isSpeaking ? '#fca5a5' : '#000',
+                      fontFamily: 'var(--font-heading)', fontSize: 12, fontWeight: 700, transition: 'all 200ms',
+                    }}>
+                    {isSpeaking
+                      ? (ttsLoading ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Loading...</> : <><VolumeX size={14} /> Stop</>)
+                      : <><Volume2 size={14} /> Play</>}
+                  </button>
+                </div>
+
                 {/* Conditions + Right Column */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                   {/* Left: Condition Cards */}

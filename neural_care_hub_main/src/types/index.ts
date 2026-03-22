@@ -68,9 +68,8 @@ export interface ScanAnalysisResult {
     original_image_b64: string
     annotated_image_b64: string
     impression?: string
-    recommendations?: (string | RecommendationItem)[]
+    recommendations?: (string | RecommendationItem | RichRecommendation)[]
     follow_up?: string
-    // New fields
     primary_finding?: string
     acr_category?: string
     acr_description?: string
@@ -81,6 +80,65 @@ export interface ScanAnalysisResult {
     follow_up_imaging?: string
     anomaly_type?: string
     urgency?: string
+    // Rich vision analysis fields
+    clinical_impression?: string
+    overall_assessment?: string
+    confidence_reasoning?: string
+    systematic_findings?: Record<string, SystematicFinding>
+    primary_finding_detail?: PrimaryFindingDetail
+    secondary_findings?: SecondaryFinding[]
+    differential_diagnoses_detail?: DifferentialDiagnosis[]
+    red_flags?: RedFlag[]
+    comparison_note?: string
+    icd10_codes?: { code: string; description: string }[]
+    report_text?: string
+    body_region?: string
+}
+
+export interface RichRecommendation {
+    priority: number | string
+    action: string
+    timeframe?: string
+    rationale?: string
+    guideline_reference?: string
+}
+
+export interface SystematicFinding {
+    name: string
+    status: 'normal' | 'abnormal'
+    finding: string
+    significance?: string
+    measurement?: string
+}
+
+export interface PrimaryFindingDetail {
+    description?: string
+    location?: string
+    size_mm?: number[]
+    characteristics?: string[]
+    acr_lung_rads?: string
+}
+
+export interface SecondaryFinding {
+    description: string
+    clinical_significance: string
+    action_required?: string
+}
+
+export interface DifferentialDiagnosis {
+    diagnosis: string
+    probability: number
+    icd10?: string
+    supporting_features?: string[]
+    against_features?: string[]
+    next_step?: string
+}
+
+export interface RedFlag {
+    finding: string
+    urgency: string
+    action: string
+    guideline?: string
 }
 
 // --- OCR Agent Types ---
@@ -115,21 +173,92 @@ export interface ReportAnalysisResult {
     extracted_text: string
     conditions?: string[]
     urgency?: string
-    // New fields
     report_type?: string
     patient_info?: { name_redacted?: boolean; age_mentioned?: string | null; gender_mentioned?: string | null }
-    abnormal_values?: AbnormalValue[]
+    abnormal_values?: RichAbnormalValue[]
     normal_values?: NormalValue[]
     diagnoses?: string[]
     procedures?: string[]
     allergies?: string[]
-    critical_alerts?: string[]
+    critical_alerts?: (string | CriticalAlert)[]
     overall_health_score?: string
     patient_action_items?: string[]
     follow_up_instructions?: string[]
     doctor_info?: string
     facility?: string
     report_date?: string
+    // Rich analysis fields
+    extraction_method?: string
+    executive_summary?: string
+    overall_health_score_numeric?: number
+    overall_status?: string
+    patient_plain_language_summary?: string
+    clinician_summary?: string
+    action_items?: ActionItem[]
+    specialist_referrals?: SpecialistReferral[]
+    lifestyle_recommendations?: string[]
+    follow_up_tests?: FollowUpTest[]
+    icd10_codes?: { code: string; description: string }[]
+    drug_lab_interactions?: DrugLabInteraction[]
+    medications_mentioned?: RichMedication[]
+}
+
+export interface RichAbnormalValue {
+    parameter?: string
+    test?: string
+    value: string
+    unit?: string
+    reference_range?: string
+    normal_range?: string
+    deviation_percent?: number
+    deviation_direction?: string
+    severity: string
+    clinical_meaning?: string
+    interpretation?: string
+    contributing_factors?: string[]
+    what_to_do?: string
+}
+
+export interface CriticalAlert {
+    parameter: string
+    value: string
+    reason: string
+    immediate_action: string
+    severity: string
+}
+
+export interface ActionItem {
+    priority: number
+    urgency: string
+    action: string
+    timeframe: string
+}
+
+export interface SpecialistReferral {
+    specialty: string
+    reason: string
+    urgency: string
+}
+
+export interface FollowUpTest {
+    test: string
+    reason: string
+    timeframe: string
+}
+
+export interface DrugLabInteraction {
+    drug: string
+    lab_finding: string
+    interaction: string
+    action: string
+}
+
+export interface RichMedication {
+    name: string
+    dose?: string
+    frequency?: string
+    purpose?: string
+    drug_lab_flags?: string[]
 }
 
 // --- Dashboard Types ---
@@ -339,6 +468,160 @@ export interface User {
     patient_code: string | null
     avatar_emoji: string
     created_at: string
+    medical_license_number?: string
+    specialization?: string
+    hospital_name?: string
+    years_of_practice?: number
+    is_verified?: boolean
+    onboarding_completed?: boolean
+    date_of_birth?: string
+    blood_type?: string
+    height_cm?: number
+    weight_kg?: number
+    emergency_contact_name?: string
+    emergency_contact_phone?: string
+    existing_conditions?: string[]
+    current_medications?: string
+    known_allergies?: string
+    previous_surgeries?: string
+    language_preference?: string
+}
+
+// --- Drug Interaction Types ---
+export interface DrugInteractionResult {
+    overall_risk: string
+    interaction_count: Record<string, number>
+    interactions: DrugInteraction[]
+    safe_pairs: SafePair[]
+    overall_recommendations: string[]
+}
+
+export interface DrugInteraction {
+    drug_a: string
+    drug_b: string
+    severity: string
+    severity_score: number
+    mechanism: string
+    clinical_effect: string
+    onset?: string
+    documentation?: string
+    management: string
+    alternatives?: { replace: string; with: string; note: string }[]
+    references?: string[]
+}
+
+export interface SafePair {
+    drug_a: string
+    drug_b: string
+    note: string
+}
+
+// --- Timeline Types ---
+export interface TimelineData {
+    patient_id: number
+    patient_code: string
+    total_sessions: number
+    date_range: { first: string | null; last: string | null }
+    timeline: TimelineEntry[]
+    health_score_series: { date: string; score: number }[]
+    trend_analysis: TrendAnalysis | null
+}
+
+export interface TimelineEntry {
+    id: number
+    date: string
+    agent_type: string
+    urgency: string
+    primary_conditions: string[]
+    health_score: number | null
+    summary: string
+    confidence: number
+}
+
+export interface TrendAnalysis {
+    overall_trajectory: string
+    trajectory_confidence: number
+    trajectory_summary: string
+    improving_conditions: TrendCondition[]
+    worsening_conditions: TrendCondition[]
+    new_conditions: NewCondition[]
+    recurring_conditions: RecurringCondition[]
+    specialist_referral_recommended: SpecialistReferral[]
+    risk_trend: { month: string; risk_score: number }[]
+}
+
+export interface TrendCondition {
+    condition: string
+    evidence: string
+    timeline: string
+}
+
+export interface NewCondition {
+    condition: string
+    first_appeared: string
+    current_status: string
+    sessions_count: number
+}
+
+export interface RecurringCondition {
+    condition: string
+    occurrences: number
+    pattern: string
+    possible_cause: string
+}
+
+// --- Second Opinion Types ---
+export interface SecondOpinionResult {
+    session_id: number
+    opinions: {
+        conservative: PhysicianOpinion
+        balanced: PhysicianOpinion
+        differential: PhysicianOpinion
+    }
+    synthesis: OpinionSynthesis
+}
+
+export interface PhysicianOpinion {
+    physician_id: string
+    primary_diagnosis: string
+    confidence: number
+    reasoning: string
+    agreed_findings: string[]
+    disputed_findings: string[]
+    additional_diagnoses: string[]
+    recommended_tests: string[]
+    urgency_assessment: string
+    key_message: string
+}
+
+export interface OpinionSynthesis {
+    consensus_level: string
+    consensus_diagnosis: string | null
+    majority_diagnosis: string | null
+    agreement_areas: string[]
+    dispute_areas: string[]
+    synthesized_recommendation: string
+    clinical_note: string
+}
+
+// --- Sarvam Types ---
+export interface SarvamHealthStatus {
+    ollama_running: boolean
+    sarvam_available: boolean
+    available_models: string[]
+    model?: string
+    note?: string
+}
+
+export interface SarvamDiagnoseResult {
+    session_id?: number
+    response_native: string
+    response_english: string
+    urgency: string
+    primary_concern: string
+    immediate_advice_native?: string
+    see_doctor_urgency?: string
+    medical_terms_explained?: { term: string; native_explanation: string }[]
 }
 
 export interface AuthToken {
