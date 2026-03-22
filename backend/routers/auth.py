@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from db.database import get_db
 from db.models import User, Patient
-from db.schemas import UserCreate, UserLogin, UserOut, Token
+from db.schemas import UserCreate, UserLogin, UserOut, Token, UserProfileUpdate
 from utils.auth import (verify_password, get_password_hash,
                          create_access_token, DOCTOR_INVITE_CODE,
                          require_user)
@@ -79,6 +79,22 @@ def login(credentials: UserLogin, db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=UserOut)
 def get_me(current_user: User = Depends(require_user)):
+    return current_user
+
+
+@router.patch("/profile", response_model=UserOut)
+def update_profile(
+    profile: UserProfileUpdate,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    update_data = profile.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(current_user, field, value)
+    if "onboarding_completed" not in update_data:
+        current_user.onboarding_completed = True
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 

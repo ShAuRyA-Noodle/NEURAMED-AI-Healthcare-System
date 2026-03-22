@@ -1,5 +1,12 @@
 from dotenv import load_dotenv
 import os
+import sys
+
+# Fix Windows console encoding for Indian language support
+if sys.platform == "win32":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # Define path to .env file relative to this script
 env_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -20,6 +27,7 @@ from datetime import datetime
 
 from db.database import engine, Base
 from routers import voice, imaging, ocr, dashboard, patients, appointments, search, system, auth
+from routers import drug_interactions, second_opinion, timeline, sarvam
 from seed import seed_db
 
 # Create all tables
@@ -51,6 +59,10 @@ app.include_router(export.router)
 app.include_router(search.router)
 app.include_router(system.router)
 app.include_router(auth.router)
+app.include_router(drug_interactions.router)
+app.include_router(second_opinion.router)
+app.include_router(timeline.router)
+app.include_router(sarvam.router)
 
 from ws_manager import manager, broadcast_to_clients
 

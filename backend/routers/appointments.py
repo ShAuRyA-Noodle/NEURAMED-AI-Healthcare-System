@@ -33,14 +33,23 @@ def create_appointment(app_req: AppointmentCreate, db: Session = Depends(get_db)
             doctor_name=app_req.doctor_name,
             specialty=app_req.specialty,
             appointment_datetime=app_req.appointment_datetime,
-            reason=app_req.reason
+            reason=app_req.reason,
+            appointment_type=app_req.appointment_type or "initial",
+            duration_minutes=app_req.duration_minutes or 30,
+            location=app_req.location,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 def _format_appointment(a):
-    p_code = a.patient.patient_code if a.patient else f"PT-{a.patient_id}"
+    p = a.patient
+    p_code = p.patient_code if p else f"PT-{a.patient_id}"
+    p_name = ""
+    if p:
+        first = getattr(p, "first_name", "") or ""
+        last = getattr(p, "last_name", "") or ""
+        p_name = f"{first} {last}".strip()
     now = datetime.utcnow()
     time_until = None
     if a.appointment_datetime and a.appointment_datetime > now:
@@ -49,6 +58,7 @@ def _format_appointment(a):
         "id": a.id,
         "patient_id": a.patient_id,
         "patient_code": p_code,
+        "patient_name": p_name,
         "doctor_name": a.doctor_name,
         "specialty": a.specialty,
         "appointment_datetime": a.appointment_datetime.isoformat() if a.appointment_datetime else None,

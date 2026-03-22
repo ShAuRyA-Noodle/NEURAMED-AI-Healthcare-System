@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Mic, ScanLine, FileSearch, Users, Calendar, Activity, Power } from 'lucide-react';
+import { LayoutDashboard, Mic, ScanLine, FileSearch, Users, Calendar, Activity, Power, Pill, Globe } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -8,8 +8,10 @@ import { useAuth } from '../../context/AuthContext';
 const ALL_NAV_ITEMS = [
   { path: '/dashboard', label: 'Overview', icon: LayoutDashboard, roles: ['doctor', 'patient'] },
   { path: '/voice', label: 'Voice Agent', icon: Mic, roles: ['doctor', 'patient'] },
+  { path: '/voice/vernacular', label: 'Indian Languages', icon: Globe, roles: ['doctor', 'patient'] },
   { path: '/imaging', label: 'Imaging AI', icon: ScanLine, roles: ['doctor', 'patient'] },
   { path: '/ocr', label: 'OCR Reports', icon: FileSearch, roles: ['doctor', 'patient'] },
+  { path: '/drug-interactions', label: 'Drug Interactions', icon: Pill, roles: ['doctor', 'patient'] },
   { path: '/patients', label: 'Patients', icon: Users, roles: ['doctor'] },
   { path: '/appointments', label: 'Appointments', icon: Calendar, roles: ['doctor'] },
   { path: '/sessions', label: 'Sessions', icon: Activity, roles: ['doctor'], badge: true },

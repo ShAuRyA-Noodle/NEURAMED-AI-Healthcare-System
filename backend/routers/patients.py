@@ -19,8 +19,19 @@ def create_patient(patient: PatientCreate, db: Session = Depends(get_db)):
     code = generate_patient_code(db)
     db_patient = Patient(
         patient_code=code,
+        first_name=patient.first_name,
+        last_name=patient.last_name,
         age=patient.age,
-        gender=patient.gender
+        gender=patient.gender,
+        date_of_birth=patient.date_of_birth,
+        blood_type=patient.blood_type,
+        phone=patient.phone,
+        email=patient.email,
+        address=patient.address,
+        emergency_contact=patient.emergency_contact,
+        allergies=patient.allergies,
+        chronic_conditions=patient.chronic_conditions,
+        insurance_id=patient.insurance_id,
     )
     db.add(db_patient)
     db.commit()
@@ -47,7 +58,10 @@ def get_patients(
         query = query.filter(
             or_(
                 Patient.patient_code.ilike(f"%{search}%"),
-                Patient.gender.ilike(f"%{search}%")
+                Patient.first_name.ilike(f"%{search}%"),
+                Patient.last_name.ilike(f"%{search}%"),
+                Patient.gender.ilike(f"%{search}%"),
+                Patient.phone.ilike(f"%{search}%"),
             )
         )
     if gender:
@@ -104,13 +118,24 @@ def get_patients(
         result.append({
             "id": p.id,
             "patient_code": p.patient_code,
+            "first_name": getattr(p, "first_name", None),
+            "last_name": getattr(p, "last_name", None),
+            "full_name": f"{getattr(p, 'first_name', '') or ''} {getattr(p, 'last_name', '') or ''}".strip() or p.patient_code,
             "age": p.age,
             "gender": p.gender,
+            "phone": getattr(p, "phone", None),
+            "email": getattr(p, "email", None),
+            "address": getattr(p, "address", None),
+            "emergency_contact": getattr(p, "emergency_contact", None),
+            "allergies": getattr(p, "allergies", None),
+            "chronic_conditions": getattr(p, "chronic_conditions", None),
+            "insurance_id": getattr(p, "insurance_id", None),
             "created_at": p.created_at.isoformat() if p.created_at else None,
             "demographics": {
                 "age": p.age,
                 "gender": p.gender,
-                "blood_type": "N/A"
+                "blood_type": getattr(p, "blood_type", None) or "N/A",
+                "date_of_birth": getattr(p, "date_of_birth", None),
             },
             "total_sessions": total_sessions,
             "session_count": total_sessions,
