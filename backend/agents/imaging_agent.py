@@ -1,59 +1,311 @@
 import cv2
 import numpy as np
-from PIL import Image
-from io import BytesIO
 import base64
 import os
 import uuid
 import time
+import json
 import logging
 from utils.llm import call_llm
 from db.schemas import ScanAnalysisResult
 from db.models import ScanResult, DiagnosisSession
 from sqlalchemy.orm import Session
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-IMAGING_PROMPT = """You are a board-certified radiologist AI assistant.
-Analyze the following medical scan region statistics and provide a comprehensive radiological report.
 
-Return ONLY this exact JSON, no markdown:
-{
-  "primary_finding": "Most significant finding in one clinical sentence",
-  "findings": "Detailed radiological findings paragraph (3-4 sentences, clinical language)",
-  "impression": "Radiological impression — what this likely means clinically",
-  "anomaly_type": "nodule|mass|opacity|effusion|calcification|consolidation|normal|artifact",
-  "acr_category": "ACR 1|ACR 2|ACR 3|ACR 4|ACR 5",
-  "acr_description": "What this ACR category means for the patient",
-  "measurements": "Estimated size/extent of primary finding if applicable",
-  "distribution": "Unilateral/bilateral, location description",
-  "recommendations": [
-    {"priority": "immediate|routine|optional", "action": "specific recommendation"}
-  ],
-  "follow_up_imaging": "Specific follow-up scan recommended and timeframe",
-  "clinical_correlation": "How findings should be correlated with patient symptoms",
-  "differential_diagnoses": ["diagnosis1", "diagnosis2", "diagnosis3"],
-  "urgency": "routine|urgent|emergent",
-  "confidence": 0.81,
-  "follow_up": "Recommended next diagnostic step"
+# ── Examination protocols by scan type + body region ──
+
+EXAMINATION_PROTOCOLS = {
+    ("ct", "chest"): """Systematically examine:
+1. Lung parenchyma (density, nodules, consolidation, ground-glass)
+2. Airways (trachea, main bronchi, lobar bronchi)
+3. Pleura (effusion, pneumothorax, thickening, calcification)
+4. Mediastinum (lymphadenopathy, masses, vascular structures)
+5. Cardiac silhouette (size, pericardium, calcification)
+6. Chest wall (ribs, sternum, soft tissues)
+7. Upper abdomen (liver dome, stomach fundus, adrenals)""",
+
+    ("mri", "brain"): """Systematically examine:
+1. Cerebral cortex all lobes (gray-white differentiation, atrophy)
+2. White matter (signal changes, lesions, periventricular disease)
+3. Deep gray matter (basal ganglia, thalami, internal capsule)
+4. Ventricular system (size, configuration, hydrocephalus)
+5. Posterior fossa (cerebellum, brainstem, 4th ventricle)
+6. Vascular structures (flow voids, aneurysm, AVM)
+7. Extra-axial spaces (subdural, epidural, subarachnoid)
+8. Skull base and calvarium""",
+
+    ("x-ray", "chest"): """Systematically examine (PA and lateral if available):
+1. Lung fields (opacity, hyperlucency, nodules, masses)
+2. Costophrenic angles (blunting = effusion threshold ~200mL)
+3. Cardiac silhouette (CTR > 0.5 = cardiomegaly on PA)
+4. Mediastinum (width, contour, tracheal deviation)
+5. Hilum (size, density, position)
+6. Diaphragm (elevation, free air beneath)
+7. Bones (fractures, lytic lesions, sclerosis)
+8. Soft tissues (surgical emphysema, foreign bodies)""",
+
+    ("ct", "abdomen"): """Systematically examine:
+1. Liver (size, density, lesions, vasculature, biliary)
+2. Gallbladder and bile ducts (stones, wall thickening, dilation)
+3. Pancreas (size, density, ductal dilation, peripancreatic fat)
+4. Spleen (size, density, lesions)
+5. Kidneys bilateral (size, cortex, collecting system, stones)
+6. Adrenal glands (size, density, nodules)
+7. Bowel (wall thickening, obstruction, pneumatosis, free air)
+8. Mesentery and lymph nodes
+9. Aorta and major vessels
+10. Pelvis (bladder, reproductive organs, rectum)""",
+
+    ("mri", "spine"): """Systematically examine:
+1. Vertebral bodies (height, signal, alignment, fracture)
+2. Intervertebral discs (height, signal, herniation, bulge)
+3. Spinal canal (stenosis measurement in mm)
+4. Neural foramina bilateral (compression, narrowing)
+5. Spinal cord (signal, compression, syrinx)
+6. Posterior elements (facets, ligamentum flavum, spinous)
+7. Paraspinal soft tissues
+8. Level-by-level assessment""",
+
+    ("ultrasound", "abdomen"): """Systematically examine:
+1. Liver (echogenicity, size, focal lesions, vasculature)
+2. Gallbladder (stones, wall thickness, pericholecystic fluid)
+3. Common bile duct (diameter, stones)
+4. Pancreas (echogenicity, size, duct)
+5. Spleen (size, echogenicity)
+6. Kidneys bilateral (size, cortical thickness, hydronephrosis, stones)
+7. Aorta (diameter, aneurysm)
+8. Free fluid assessment""",
+
+    ("ct", "brain"): """Systematically examine:
+1. Brain parenchyma (density, edema, mass effect)
+2. Ventricles (size, midline shift)
+3. Extra-axial spaces (hemorrhage, collections)
+4. Skull (fractures, calvarial lesions)
+5. Orbits and sinuses
+6. Vascular structures (calcifications, dense vessel sign)""",
+
+    ("mri", "knee"): """Systematically examine:
+1. Menisci (medial and lateral — tears, degeneration)
+2. Cruciate ligaments (ACL, PCL — integrity, signal)
+3. Collateral ligaments (MCL, LCL)
+4. Articular cartilage (defects, thickness)
+5. Bone marrow (edema, fracture, lesions)
+6. Joint effusion and synovium
+7. Extensor mechanism (patellar tendon, quadriceps)
+8. Periarticular soft tissues""",
 }
 
-Rules:
-- acr_category: ACR 1=Negative, ACR 2=Benign, ACR 3=Probably Benign, ACR 4=Suspicious, ACR 5=Highly Suggestive of Malignancy
-- If no anomalies detected, use ACR 1 or ACR 2
-- recommendations: include priority level for each
-- Be clinically specific, avoid vague language
-- confidence: 0.0-1.0 based on image quality and finding clarity"""
 
+def get_examination_protocol(scan_type: str, body_region: str) -> str:
+    key = (scan_type.lower().replace("-", ""), body_region.lower())
+    if key in EXAMINATION_PROTOCOLS:
+        return EXAMINATION_PROTOCOLS[key]
+    # Try partial matches
+    for (st, br), protocol in EXAMINATION_PROTOCOLS.items():
+        if st in scan_type.lower() and br in body_region.lower():
+            return protocol
+    return f"Systematically examine all structures visible on this {scan_type} of the {body_region}."
+
+
+def get_radiologist_system_prompt(
+    scan_type: str, body_region: str, examination_protocol: str,
+    patient_age: Optional[int], patient_gender: Optional[str],
+    clinical_indication: str
+) -> str:
+    age_str = f"{patient_age} year old" if patient_age else "Unknown age"
+    gender_str = patient_gender or "Unknown gender"
+
+    return f"""You are a board-certified radiologist with subspecialty training in {scan_type} interpretation. You have 15 years of experience at a tertiary academic medical center.
+
+Patient: {age_str} {gender_str}
+Clinical indication: {clinical_indication}
+Scan type: {scan_type} — {body_region}
+
+Examination protocol:
+{examination_protocol}
+
+REPORTING STANDARDS:
+- Follow ACR (American College of Radiology) reporting guidelines
+- Use ACR BI-RADS / TI-RADS / Li-RADS / Lung-RADS as appropriate
+- Measurements in millimeters
+- Density/signal in standardized terminology
+- Laterality always specified (right/left/bilateral)
+- Compare to expected normal for patient's age and gender
+
+Return ONLY this JSON structure:
+
+{{
+  "clinical_impression": "One sentence headline finding",
+  "acr_category": 1,
+  "acr_category_meaning": "ACR category description",
+  "overall_assessment": "normal | incidental_finding | clinically_significant | urgent | critical",
+  "confidence_score": 0.85,
+  "confidence_reasoning": "Why this confidence level",
+  "systematic_findings": {{
+    "finding_1": {{
+      "name": "Anatomy name",
+      "status": "normal | abnormal",
+      "finding": "Detailed description",
+      "significance": "Clinical meaning",
+      "measurement": "if applicable in mm"
+    }}
+  }},
+  "primary_finding": {{
+    "description": "Main abnormality found or Normal study",
+    "location": "Location",
+    "size_mm": [0, 0, 0],
+    "characteristics": ["characteristic1"],
+    "acr_lung_rads": "if applicable"
+  }},
+  "secondary_findings": [
+    {{
+      "description": "Incidental finding",
+      "clinical_significance": "low | moderate | high",
+      "action_required": "action"
+    }}
+  ],
+  "differential_diagnoses": [
+    {{
+      "diagnosis": "Diagnosis name",
+      "probability": 0.65,
+      "icd10": "ICD-10 code",
+      "supporting_features": ["feature1"],
+      "against_features": ["feature1"],
+      "next_step": "Recommended next step"
+    }}
+  ],
+  "red_flags": [
+    {{
+      "finding": "Finding description",
+      "urgency": "urgent | critical",
+      "action": "Required action",
+      "guideline": "Clinical guideline reference"
+    }}
+  ],
+  "measurements": [
+    {{
+      "structure": "Structure name",
+      "dimension_1_mm": 0,
+      "dimension_2_mm": 0,
+      "dimension_3_mm": 0,
+      "measurement_method": "method"
+    }}
+  ],
+  "comparison_note": "Note about prior imaging comparison",
+  "recommendations": [
+    {{
+      "priority": 1,
+      "action": "Recommended action",
+      "timeframe": "When to do it",
+      "rationale": "Why",
+      "guideline_reference": "Guideline"
+    }}
+  ],
+  "icd10_codes": [
+    {{"code": "ICD-10", "description": "Description"}}
+  ],
+  "report_text": "Full formal radiology report: TECHNIQUE: ... COMPARISON: ... FINDINGS: ... IMPRESSION: ...",
+  "anomaly_type": "nodule|mass|opacity|effusion|calcification|consolidation|normal|artifact",
+  "findings": "Detailed findings paragraph",
+  "impression": "Clinical impression",
+  "urgency": "routine|urgent|emergent"
+}}
+
+Return ONLY valid JSON. No markdown."""
+
+
+def analyze_scan_with_vision(
+    image_bytes: bytes,
+    scan_type: str,
+    body_region: str,
+    clinical_indication: str,
+    patient_age: Optional[int] = None,
+    patient_gender: Optional[str] = None,
+) -> dict:
+    """Send actual image pixels to Groq Vision for real radiological analysis."""
+    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    if not api_key:
+        logger.warning("No GROQ_API_KEY for vision analysis")
+        return {}
+
+    try:
+        from groq import Groq
+
+        image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+
+        examination_protocol = get_examination_protocol(scan_type, body_region)
+        system_prompt = get_radiologist_system_prompt(
+            scan_type, body_region, examination_protocol,
+            patient_age, patient_gender, clinical_indication
+        )
+
+        client = Groq(api_key=api_key)
+        response = client.chat.completions.create(
+            model="llama-3.2-11b-vision-preview",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image_b64}"
+                            },
+                        },
+                        {
+                            "type": "text",
+                            "text": f"Analyze this {scan_type} of the {body_region}. Clinical indication: {clinical_indication}. Return your complete radiological report as JSON.",
+                        },
+                    ],
+                },
+            ],
+            max_tokens=4096,
+            temperature=0.1,
+        )
+
+        raw = response.choices[0].message.content or ""
+        # Try to parse JSON from response
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            # Try to extract JSON from markdown code blocks
+            import re
+            json_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw)
+            if json_match:
+                return json.loads(json_match.group(1))
+            # Try to find JSON object
+            json_match = re.search(r'\{[\s\S]*\}', raw)
+            if json_match:
+                return json.loads(json_match.group(0))
+            logger.error(f"Could not parse vision response as JSON: {raw[:200]}")
+            return {}
+
+    except Exception as e:
+        logger.error(f"Groq Vision imaging analysis failed: {e}")
+        return {}
+
+
+# ── Legacy OpenCV processing (kept for annotated image generation) ──
 
 def bytes_to_b64(img_bytes: bytes) -> str:
     return base64.b64encode(img_bytes).decode('utf-8')
 
 
-def analyze(image_bytes: bytes, scan_type: str, patient_id: int | None, session_id: int | None, db: Session) -> ScanAnalysisResult:
+def analyze(
+    image_bytes: bytes, scan_type: str,
+    patient_id: int | None, session_id: int | None, db: Session,
+    body_region: str = "Chest",
+    clinical_indication: str = "",
+    patient_age: Optional[int] = None,
+    patient_gender: Optional[str] = None,
+) -> ScanAnalysisResult:
     start = time.time()
 
-    # Decode bytes to numpy array
+    # Decode bytes to numpy array for OpenCV annotation
     nparr = np.frombuffer(image_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     if img is None:
@@ -61,11 +313,10 @@ def analyze(image_bytes: bytes, scan_type: str, patient_id: int | None, session_
 
     original_b64 = bytes_to_b64(image_bytes)
 
-    # Scan-type specific OpenCV pipeline
+    # OpenCV anomaly detection pipeline (kept for annotated image)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     img_height, img_width = gray.shape[:2]
 
-    # Adjust CLAHE parameters by scan type
     scan_lower = scan_type.lower() if scan_type else ""
     if "ct" in scan_lower:
         clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
@@ -78,7 +329,6 @@ def analyze(image_bytes: bytes, scan_type: str, patient_id: int | None, session_
     blurred = cv2.GaussianBlur(enhanced, (5, 5), 0)
     _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-    # Estimate pixel size for measurements (assume standard FOV ~350mm for chest)
     pixel_size_mm = 350.0 / max(img_width, 1)
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -109,7 +359,6 @@ def analyze(image_bytes: bytes, scan_type: str, patient_id: int | None, session_
         label = f"R{i + 1}: {confidence:.0%}"
         cv2.putText(annotated, label, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
 
-        # Estimate real-world size
         size_w_mm = round(w * pixel_size_mm, 1)
         size_h_mm = round(h * pixel_size_mm, 1)
 
@@ -125,7 +374,6 @@ def analyze(image_bytes: bytes, scan_type: str, patient_id: int | None, session_
             "size_mm": f"~{size_w_mm}mm x {size_h_mm}mm"
         })
 
-    # Encode annotated image
     _, buf = cv2.imencode('.jpg', annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
     annotated_bytes = buf.tobytes()
     annotated_b64 = bytes_to_b64(annotated_bytes)
@@ -142,28 +390,60 @@ def analyze(image_bytes: bytes, scan_type: str, patient_id: int | None, session_
     with open(anno_path, "wb") as f:
         f.write(annotated_bytes)
 
-    # LLM interpretation
-    stats_summary = f"""
-    Scan type: {scan_type}
-    Regions analyzed: {len(regions)}
-    Anomalies detected: {sum(1 for r in regions if r['is_anomaly'])}
-    Highest confidence region: {max([r['confidence'] for r in regions], default=0):.2%}
-    Region details: {regions[:3]}
-    """
-    llm_result = call_llm(IMAGING_PROMPT, stats_summary, fallback_type="imaging")
+    # ── Primary: Groq Vision analysis (real image pixels) ──
+    vision_result = analyze_scan_with_vision(
+        image_bytes, scan_type, body_region,
+        clinical_indication or "general screening",
+        patient_age, patient_gender
+    )
+
+    if not vision_result:
+        # Fallback: text-only LLM with OpenCV stats
+        stats_summary = f"""
+        Scan type: {scan_type}
+        Body region: {body_region}
+        Clinical indication: {clinical_indication}
+        Regions analyzed: {len(regions)}
+        Anomalies detected: {sum(1 for r in regions if r['is_anomaly'])}
+        Highest confidence region: {max([r['confidence'] for r in regions], default=0):.2%}
+        Region details: {regions[:3]}
+        """
+        vision_result = call_llm(IMAGING_PROMPT_FALLBACK, stats_summary, fallback_type="imaging")
 
     processing_ms = int((time.time() - start) * 1000)
+
+    # Use vision confidence if available
+    if vision_result.get("confidence_score"):
+        overall_confidence = max(overall_confidence, vision_result["confidence_score"])
+
+    # CRITICAL FIX: Override OpenCV anomaly_detected with LLM's actual medical assessment
+    # OpenCV only detects round bright objects — completely misses brain damage, edema, etc.
+    llm_assessment = vision_result.get("overall_assessment", "").lower()
+    llm_acr = vision_result.get("acr_category", 1)
+    try:
+        llm_acr = int(llm_acr)
+    except (ValueError, TypeError):
+        llm_acr = 1
+    llm_red_flags = vision_result.get("red_flags", [])
+    llm_urgency = vision_result.get("urgency", "routine").lower()
+
+    # LLM says anomaly if: ACR >= 3, or assessment is not normal, or red flags exist, or urgency is high
+    if llm_acr >= 3 or llm_assessment in ("clinically_significant", "urgent", "critical", "suspicious") \
+            or llm_red_flags or llm_urgency in ("urgent", "emergent", "critical", "stat"):
+        anomaly_detected = True
+    elif llm_acr >= 2 and llm_assessment not in ("normal", ""):
+        anomaly_detected = True
 
     # Save to DB
     if not session_id:
         session_record = DiagnosisSession(
             patient_id=patient_id,
             agent_type='imaging',
-            input_summary=f"{scan_type} scan analysis",
-            result_json=llm_result,
+            input_summary=f"{scan_type} scan — {body_region}",
+            result_json=vision_result,
             confidence_score=overall_confidence,
-            urgency_level=llm_result.get("urgency", "routine"),
-            conditions_detected=[llm_result.get("impression", "Scan analyzed")],
+            urgency_level=vision_result.get("urgency", "routine"),
+            conditions_detected=[vision_result.get("clinical_impression", vision_result.get("impression", "Scan analyzed"))],
             processing_time_ms=processing_ms
         )
         db.add(session_record)
@@ -177,33 +457,81 @@ def analyze(image_bytes: bytes, scan_type: str, patient_id: int | None, session_
         anomaly_detected=anomaly_detected,
         anomaly_regions=regions,
         confidence_score=overall_confidence,
-        model_findings=llm_result.get("findings", ""),
+        model_findings=vision_result.get("findings", ""),
         original_file_path=orig_path,
         annotated_file_path=anno_path
     )
     db.add(scan_result)
     db.commit()
 
+    # Extract differential diagnoses — handle both old format (list of strings) and new (list of dicts)
+    raw_diffs = vision_result.get("differential_diagnoses", [])
+    diff_list = []
+    for d in raw_diffs:
+        if isinstance(d, str):
+            diff_list.append(d)
+        elif isinstance(d, dict):
+            diff_list.append(d.get("diagnosis", str(d)))
+
     return ScanAnalysisResult(
         anomaly_detected=anomaly_detected,
         anomaly_regions=regions,
         confidence=overall_confidence,
-        findings=llm_result.get("findings", ""),
+        findings=vision_result.get("findings", ""),
         scan_type=scan_type,
         original_image_b64=original_b64,
         annotated_image_b64=annotated_b64,
         session_id=session_id,
-        impression=llm_result.get("impression", ""),
-        recommendations=llm_result.get("recommendations", []),
-        follow_up=llm_result.get("follow_up", ""),
-        primary_finding=llm_result.get("primary_finding", ""),
-        acr_category=llm_result.get("acr_category", ""),
-        acr_description=llm_result.get("acr_description", ""),
-        measurements=llm_result.get("measurements", ""),
-        distribution=llm_result.get("distribution", ""),
-        differential_diagnoses=llm_result.get("differential_diagnoses", []),
-        clinical_correlation=llm_result.get("clinical_correlation", ""),
-        follow_up_imaging=llm_result.get("follow_up_imaging", ""),
-        anomaly_type=llm_result.get("anomaly_type", ""),
-        urgency=llm_result.get("urgency", "routine")
+        impression=vision_result.get("impression", vision_result.get("clinical_impression", "")),
+        recommendations=vision_result.get("recommendations", []),
+        follow_up=vision_result.get("follow_up", ""),
+        primary_finding=vision_result.get("primary_finding", "") if isinstance(vision_result.get("primary_finding"), str) else json.dumps(vision_result.get("primary_finding", "")),
+        acr_category=str(vision_result.get("acr_category", "")),
+        acr_description=vision_result.get("acr_category_meaning", vision_result.get("acr_description", "")),
+        measurements=vision_result.get("measurements", "") if isinstance(vision_result.get("measurements"), str) else json.dumps(vision_result.get("measurements", "")),
+        distribution=vision_result.get("distribution", ""),
+        differential_diagnoses=diff_list,
+        clinical_correlation=vision_result.get("clinical_correlation", ""),
+        follow_up_imaging=vision_result.get("follow_up_imaging", ""),
+        anomaly_type=vision_result.get("anomaly_type", ""),
+        urgency=vision_result.get("urgency", "routine"),
+        # New rich fields
+        clinical_impression=vision_result.get("clinical_impression", ""),
+        overall_assessment=vision_result.get("overall_assessment", ""),
+        confidence_reasoning=vision_result.get("confidence_reasoning", ""),
+        systematic_findings=vision_result.get("systematic_findings", {}),
+        primary_finding_detail=vision_result.get("primary_finding", {}) if isinstance(vision_result.get("primary_finding"), dict) else {},
+        secondary_findings=vision_result.get("secondary_findings", []),
+        differential_diagnoses_detail=[d for d in raw_diffs if isinstance(d, dict)],
+        red_flags=vision_result.get("red_flags", []),
+        comparison_note=vision_result.get("comparison_note", ""),
+        icd10_codes=vision_result.get("icd10_codes", []),
+        report_text=vision_result.get("report_text", ""),
+        body_region=body_region,
     )
+
+
+# Fallback prompt when vision is unavailable
+IMAGING_PROMPT_FALLBACK = """You are a board-certified radiologist AI assistant.
+Analyze the following medical scan region statistics and provide a comprehensive radiological report.
+
+Return ONLY this exact JSON, no markdown:
+{
+  "primary_finding": "Most significant finding in one clinical sentence",
+  "findings": "Detailed radiological findings paragraph (3-4 sentences, clinical language)",
+  "impression": "Radiological impression — what this likely means clinically",
+  "anomaly_type": "nodule|mass|opacity|effusion|calcification|consolidation|normal|artifact",
+  "acr_category": "ACR 1|ACR 2|ACR 3|ACR 4|ACR 5",
+  "acr_description": "What this ACR category means for the patient",
+  "measurements": "Estimated size/extent of primary finding if applicable",
+  "distribution": "Unilateral/bilateral, location description",
+  "recommendations": [
+    {"priority": "immediate|routine|optional", "action": "specific recommendation"}
+  ],
+  "follow_up_imaging": "Specific follow-up scan recommended and timeframe",
+  "clinical_correlation": "How findings should be correlated with patient symptoms",
+  "differential_diagnoses": ["diagnosis1", "diagnosis2", "diagnosis3"],
+  "urgency": "routine|urgent|emergent",
+  "confidence": 0.81,
+  "follow_up": "Recommended next diagnostic step"
+}"""
