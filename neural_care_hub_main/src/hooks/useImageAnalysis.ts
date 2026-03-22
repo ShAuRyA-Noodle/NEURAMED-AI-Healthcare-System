@@ -7,8 +7,7 @@ export const useImageAnalysis = () => {
     const { addToast } = useToast()
 
     return useMutation({
-        mutationFn: ({ file, scanType, patientId }: { file: File, scanType: string, patientId?: number }) =>
-            analyzeImage(file, scanType, patientId),
+        mutationFn: analyzeImage,
         onSuccess: (data: any) => {
             queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
             queryClient.invalidateQueries({ queryKey: ['activity-feed'] })

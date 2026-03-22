@@ -1,98 +1,168 @@
-import io
 import re
-import os
 import time
 import logging
-from PIL import Image
 from utils.llm import call_llm
+from utils.ocr_engine import extract_text_from_file
 from db.schemas import ReportAnalysisResult
 from db.models import Report, DiagnosisSession
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-import pytesseract
-pytesseract.pytesseract.tesseract_cmd = os.getenv(
-    "TESSERACT_CMD",
-    r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-)
+OCR_PROMPT = """You are a board-certified Medical Records Specialist and Clinical Pathologist with 20 years of experience analyzing laboratory reports, imaging reports, discharge summaries, and clinical documents.
 
-OCR_PROMPT = """You are a medical records specialist AI with expertise in clinical documentation. Analyze this medical report and extract all clinically relevant information.
+CRITICAL VALUES requiring immediate action (flag these urgently):
+  Potassium: <2.5 or >6.5 mEq/L
+  Sodium: <120 or >160 mEq/L
+  Glucose: <40 or >500 mg/dL
+  INR/PT: >5 (on warfarin) or >3 (not on warfarin)
+  Hemoglobin: <7 g/dL
+  Platelets: <20,000 or >1,000,000
+  Creatinine: >10 mg/dL (acute)
+  Troponin: any elevation
+  pH: <7.2 or >7.6
+  pO2: <50 mmHg
 
-Return ONLY this exact JSON, no markdown:
+Analyze the provided medical document and return a structured JSON:
+
 {
-  "report_type": "Discharge Summary|Lab Report|Radiology Report|Prescription|Referral Letter|Clinic Note|Pathology Report|Other",
-  "patient_info": {
-    "name_redacted": true,
-    "age_mentioned": "age if found, else null",
-    "gender_mentioned": "gender if found, else null"
-  },
-  "summary": "3-4 sentence executive clinical summary of the entire report",
-  "key_findings": [
-    {"finding": "specific finding", "section": "where found", "significance": "high|medium|low"}
-  ],
-  "abnormal_values": [
+  "report_type": "CBC | Metabolic Panel | Lipid Panel | Urinalysis | Thyroid | Pathology | Radiology | Discharge Summary | Prescription | Other",
+  "report_date": "extracted date or null",
+  "patient_name": "if present or null",
+  "ordering_physician": "if present or null",
+
+  "executive_summary": "2-3 sentence plain English overview of the entire report — what it means for the patient",
+
+  "overall_health_score": 0,
+  "overall_status": "normal | attention_needed | concerning | critical",
+
+  "critical_alerts": [
     {
-      "test": "test name",
-      "value": "patient value",
-      "normal_range": "normal range",
-      "interpretation": "what this means clinically",
-      "severity": "critical|high|medium|low"
+      "parameter": "parameter name",
+      "value": "value with units",
+      "reason": "why critical",
+      "immediate_action": "what to do now",
+      "severity": "critical"
     }
   ],
+
+  "abnormal_values": [
+    {
+      "parameter": "test name",
+      "value": "patient value",
+      "unit": "unit",
+      "reference_range": "normal range",
+      "deviation_percent": 0,
+      "deviation_direction": "high | low",
+      "severity": "critical | high | moderate | mild",
+      "clinical_meaning": "what this means clinically",
+      "contributing_factors": ["possible causes"],
+      "what_to_do": "actionable recommendation"
+    }
+  ],
+
   "normal_values": [
-    {"test": "test name", "value": "value", "normal_range": "range"}
+    {
+      "parameter": "test name",
+      "value": "value with units",
+      "reference_range": "normal range",
+      "status": "normal"
+    }
   ],
-  "medications": [
-    {"name": "medication", "dose": "dose if found", "frequency": "frequency", "purpose": "what for"}
+
+  "medications_mentioned": [
+    {
+      "name": "medication name",
+      "dose": "dose",
+      "frequency": "frequency",
+      "purpose": "what for",
+      "drug_lab_flags": ["any concerning interactions with lab values"]
+    }
   ],
-  "diagnoses": ["diagnosis1", "diagnosis2"],
+
+  "drug_lab_interactions": [
+    {
+      "drug": "drug name",
+      "lab_finding": "relevant lab value",
+      "interaction": "description of interaction",
+      "action": "what to do"
+    }
+  ],
+
+  "patient_plain_language_summary": "Written for a patient with no medical background. Use simple words. Explain what each finding means for their daily life. Reassuring but honest tone.",
+
+  "clinician_summary": "Written for the ordering physician. Technical language acceptable. Highlight actionable findings.",
+
+  "action_items": [
+    {
+      "priority": 1,
+      "urgency": "immediate | soon | routine",
+      "action": "what to do",
+      "timeframe": "when to do it"
+    }
+  ],
+
+  "specialist_referrals": [
+    {
+      "specialty": "specialty name",
+      "reason": "why needed",
+      "urgency": "urgent | soon | routine"
+    }
+  ],
+
+  "lifestyle_recommendations": ["recommendation1"],
+
+  "follow_up_tests": [
+    {
+      "test": "test name",
+      "reason": "why needed",
+      "timeframe": "when"
+    }
+  ],
+
+  "icd10_codes": [
+    {"code": "ICD-10 code", "description": "description"}
+  ],
+
+  "key_findings": [
+    {"finding": "finding text", "section": "where found", "significance": "high|medium|low"}
+  ],
+
+  "diagnoses": ["diagnosis1"],
   "procedures": ["procedure if any"],
   "allergies": ["allergy if mentioned"],
-  "follow_up_instructions": ["specific instruction"],
-  "critical_alerts": ["anything requiring immediate attention"],
-  "doctor_info": "doctor name/specialty if mentioned",
-  "facility": "hospital/clinic name if mentioned",
-  "report_date": "date if found",
-  "overall_health_score": "good|fair|poor|critical",
-  "patient_action_items": [
-    "Clear plain-English instruction for the patient"
-  ],
-  "urgency": "routine|soon|urgent|emergent",
   "conditions": ["condition1"],
   "abnormal_flags": ["flag1"],
-  "sections_detected": ["section1"]
+  "sections_detected": ["section1"],
+  "urgency": "routine|soon|urgent|emergent",
+  "summary": "executive summary for backward compatibility",
+  "doctor_info": "doctor name/specialty if mentioned",
+  "facility": "hospital/clinic name if mentioned",
+  "patient_info": {"name_redacted": true, "age_mentioned": null, "gender_mentioned": null},
+  "patient_action_items": ["plain language instruction"],
+  "follow_up_instructions": ["specific instruction"]
 }
 
 Rules:
 - abnormal_values: only include genuinely abnormal results with clinical interpretation
-- medications: extract dose and frequency when available
-- patient_action_items: use simple patient-friendly language, not clinical jargon
-- critical_alerts: only truly urgent findings that need immediate attention
-- overall_health_score: based on the totality of findings"""
+- overall_health_score: 0-100 integer based on totality of findings
+- critical_alerts: only truly life-threatening values from the critical values list above
+- patient_plain_language_summary: use simple patient-friendly language, not clinical jargon
+- medications_mentioned: extract dose and frequency when available, flag drug-lab interactions
+- Return ONLY valid JSON. No markdown. No explanation outside JSON.
+"""
 
 
 def analyze(file_bytes: bytes, filename: str, patient_id: int | None, db: Session) -> ReportAnalysisResult:
     start = time.time()
-    extracted_text = ""
 
-    try:
-        filename_lower = filename.lower()
-        if filename_lower.endswith('.pdf'):
-            try:
-                from pdf2image import convert_from_bytes
-                images = convert_from_bytes(file_bytes, dpi=200)
-                for img in images:
-                    extracted_text += pytesseract.image_to_string(img, config='--psm 6') + "\n"
-            except Exception as e:
-                extracted_text = f"PDF conversion failed: {e}"
-        else:
-            img = Image.open(io.BytesIO(file_bytes))
-            extracted_text = pytesseract.image_to_string(img, config='--psm 6')
-    except pytesseract.TesseractNotFoundError:
-        extracted_text = "Tesseract OCR not found. Check TESSERACT_CMD in .env"
-    except Exception as e:
-        extracted_text = f"OCR extraction failed: {str(e)}"
+    # Use smart OCR engine instead of direct Tesseract
+    content_type = _guess_content_type(filename)
+    extraction = extract_text_from_file(filename, file_bytes, content_type)
+    extracted_text = extraction.get("text", "")
+    extraction_method = extraction.get("method", "unknown")
+
+    logger.info(f"OCR extraction method: {extraction_method}, text length: {len(extracted_text)}")
 
     # Section parsing
     section_headers = [
@@ -123,11 +193,25 @@ def analyze(file_bytes: bytes, filename: str, patient_id: int | None, db: Sessio
     if not sections or (len(sections) == 1 and "General" in sections and not sections["General"].strip()):
         sections["Full Report"] = extracted_text[:1000]
 
-    # LLM interpretation
-    llm_input = f"Medical report text:\n{extracted_text[:2000]}"
+    # LLM interpretation with enhanced prompt
+    llm_input = f"Medical report text:\n{extracted_text[:3000]}"
     llm_result = call_llm(OCR_PROMPT, llm_input, fallback_type="ocr")
 
     processing_ms = int((time.time() - start) * 1000)
+
+    # Map overall_health_score to legacy string format for DB
+    health_score_num = llm_result.get("overall_health_score", 0)
+    if isinstance(health_score_num, int):
+        if health_score_num >= 80:
+            health_score_str = "good"
+        elif health_score_num >= 60:
+            health_score_str = "fair"
+        elif health_score_num >= 40:
+            health_score_str = "poor"
+        else:
+            health_score_str = "critical"
+    else:
+        health_score_str = str(health_score_num) if health_score_num else ""
 
     # DB Save
     session_record = DiagnosisSession(
@@ -150,8 +234,8 @@ def analyze(file_bytes: bytes, filename: str, patient_id: int | None, db: Sessio
         sections=sections,
         key_findings=llm_result.get("key_findings", []),
         abnormal_flags=llm_result.get("abnormal_flags", []),
-        medications=llm_result.get("medications", []),
-        summary=llm_result.get("summary", "")
+        medications=llm_result.get("medications_mentioned", llm_result.get("medications", [])),
+        summary=llm_result.get("executive_summary", llm_result.get("summary", ""))
     )
     db.add(report_record)
     db.commit()
@@ -165,12 +249,15 @@ def analyze(file_bytes: bytes, filename: str, patient_id: int | None, db: Sessio
         else:
             key_findings_list.append(str(f))
 
+    # Build medications list for backward compat
+    meds = llm_result.get("medications_mentioned", llm_result.get("medications", []))
+
     return ReportAnalysisResult(
         sections=sections,
         key_findings=key_findings_list,
         abnormal_flags=llm_result.get("abnormal_flags", []),
-        medications=llm_result.get("medications", []),
-        summary=llm_result.get("summary") or "",
+        medications=meds,
+        summary=llm_result.get("executive_summary", llm_result.get("summary", "")),
         extracted_text=extracted_text,
         session_id=session_record.id,
         conditions=llm_result.get("conditions") or llm_result.get("diagnoses") or [],
@@ -183,10 +270,39 @@ def analyze(file_bytes: bytes, filename: str, patient_id: int | None, db: Sessio
         procedures=llm_result.get("procedures") or [],
         allergies=llm_result.get("allergies") or [],
         critical_alerts=llm_result.get("critical_alerts") or [],
-        overall_health_score=llm_result.get("overall_health_score") or "",
+        overall_health_score=health_score_str,
         patient_action_items=llm_result.get("patient_action_items") or [],
         follow_up_instructions=llm_result.get("follow_up_instructions") or [],
-        doctor_info=llm_result.get("doctor_info") or "",
+        doctor_info=llm_result.get("ordering_physician") or llm_result.get("doctor_info") or "",
         facility=llm_result.get("facility") or "",
-        report_date=llm_result.get("report_date") or ""
+        report_date=llm_result.get("report_date") or "",
+        # New rich fields
+        extraction_method=extraction_method,
+        executive_summary=llm_result.get("executive_summary") or "",
+        overall_health_score_numeric=health_score_num if isinstance(health_score_num, int) else 0,
+        overall_status=llm_result.get("overall_status") or "",
+        patient_plain_language_summary=llm_result.get("patient_plain_language_summary") or "",
+        clinician_summary=llm_result.get("clinician_summary") or "",
+        action_items=llm_result.get("action_items") or [],
+        specialist_referrals=llm_result.get("specialist_referrals") or [],
+        lifestyle_recommendations=llm_result.get("lifestyle_recommendations") or [],
+        follow_up_tests=llm_result.get("follow_up_tests") or [],
+        icd10_codes=llm_result.get("icd10_codes") or [],
+        drug_lab_interactions=llm_result.get("drug_lab_interactions") or [],
+        medications_mentioned=llm_result.get("medications_mentioned") or [],
     )
+
+
+def _guess_content_type(filename: str) -> str:
+    ext = filename.lower().rsplit(".", 1)[-1] if filename else ""
+    mapping = {
+        "pdf": "application/pdf",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "png": "image/png",
+        "bmp": "image/bmp",
+        "tiff": "image/tiff",
+        "tif": "image/tiff",
+        "webp": "image/webp",
+    }
+    return mapping.get(ext, "application/octet-stream")

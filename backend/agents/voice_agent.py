@@ -8,6 +8,132 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
+LANGUAGE_CONFIG = {
+    "hi": {"name": "Hindi", "script": "Devanagari"},
+    "ta": {"name": "Tamil", "script": "Tamil"},
+    "te": {"name": "Telugu", "script": "Telugu"},
+    "bn": {"name": "Bengali", "script": "Bengali"},
+    "mr": {"name": "Marathi", "script": "Devanagari"},
+    "kn": {"name": "Kannada", "script": "Kannada"},
+    "ml": {"name": "Malayalam", "script": "Malayalam"},
+    "pa": {"name": "Punjabi", "script": "Gurmukhi"},
+    "en": {"name": "English", "script": "Latin"},
+}
+
+
+def _translate_via_groq(text: str, target_lang: str) -> str:
+    """Translate text to target language using Groq. Returns original on failure."""
+    if not text or target_lang == "en":
+        return text
+    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    if not api_key:
+        return text
+    lang = LANGUAGE_CONFIG.get(target_lang, LANGUAGE_CONFIG["hi"])
+    try:
+        from groq import Groq
+        client = Groq(api_key=api_key)
+        resp = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": (
+                    f"Translate the following medical text to {lang['name']}. "
+                    f"Use {lang['script']} script. Write ONLY the translated text, nothing else. "
+                    f"If the text is already in {lang['name']}, return it as-is."
+                )},
+                {"role": "user", "content": text}
+            ],
+            temperature=0.3,
+            max_tokens=1000,
+        )
+        translated = resp.choices[0].message.content.strip()
+        if translated and len(translated) > 5:
+            return translated
+    except Exception as e:
+        logger.warning(f"Translation to {target_lang} failed: {e}")
+    return text
+
+
+def _batch_translate(texts: list, target_lang: str) -> list:
+    """Translate a list of texts in a single Groq call using numbered format."""
+    if not texts or target_lang == "en":
+        return texts
+    # Filter out empty strings
+    non_empty = [(i, t) for i, t in enumerate(texts) if t and t.strip()]
+    if not non_empty:
+        return texts
+    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    if not api_key:
+        return texts
+    lang = LANGUAGE_CONFIG.get(target_lang, LANGUAGE_CONFIG["hi"])
+    try:
+        import json as _json
+        from groq import Groq
+        client = Groq(api_key=api_key)
+        # Build numbered input
+        numbered = "\n".join(f"[{i+1}] {t}" for i, (_, t) in enumerate(non_empty))
+        resp = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": (
+                    f"Translate each numbered medical text below to {lang['name']} ({lang['script']} script). "
+                    f"Return ONLY a JSON array of translated strings in the same order. No extra text."
+                )},
+                {"role": "user", "content": numbered}
+            ],
+            temperature=0.3,
+            max_tokens=3000,
+            response_format={"type": "json_object"},
+        )
+        raw = resp.choices[0].message.content.strip()
+        parsed = _json.loads(raw)
+        # Handle both {"translations": [...]} and direct array
+        if isinstance(parsed, dict):
+            translated_list = parsed.get("translations") or parsed.get("results") or list(parsed.values())[0]
+        else:
+            translated_list = parsed
+        if isinstance(translated_list, list) and len(translated_list) == len(non_empty):
+            result = list(texts)  # copy
+            for idx, (orig_i, _) in enumerate(non_empty):
+                result[orig_i] = str(translated_list[idx])
+            logger.info(f"Batch translated {len(non_empty)} texts to {lang['name']}")
+            return result
+    except Exception as e:
+        logger.warning(f"Batch translation failed: {e}, falling back to individual")
+    # Fallback: translate individually
+    return [_translate_via_groq(t, target_lang) for t in texts]
+
+
+def _translate_to_english(text: str, source_lang: str) -> str:
+    """Translate non-English text to English for LLM processing."""
+    if not text or source_lang == "en":
+        return text
+    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    if not api_key:
+        return text
+    lang = LANGUAGE_CONFIG.get(source_lang, LANGUAGE_CONFIG["hi"])
+    try:
+        from groq import Groq
+        client = Groq(api_key=api_key)
+        resp = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": (
+                    f"The following text is in {lang['name']} ({lang['script']} script). "
+                    "Translate it to English accurately. Write ONLY the English translation."
+                )},
+                {"role": "user", "content": text}
+            ],
+            temperature=0.3,
+            max_tokens=1000,
+        )
+        translated = resp.choices[0].message.content.strip()
+        if translated and len(translated) > 5:
+            logger.info(f"Translated {lang['name']} transcript to English")
+            return translated
+    except Exception as e:
+        logger.warning(f"Translation from {source_lang} to English failed: {e}")
+    return text
+
 SYSTEM_PROMPT = """You are Dr. NEURAMED, an expert clinical AI diagnostic assistant trained on medical literature. Analyze the patient's reported symptoms with the thoroughness of a senior physician.
 
 Return ONLY this exact JSON structure, no markdown, no extra text:
@@ -82,6 +208,7 @@ def diagnose(transcript: str = None,
              audio_bytes: bytes = None,
              audio_base64: str = None,
              patient_id: int = None,
+             language: str = "en",
              db: Session = None) -> DiagnosisResult:
 
     # Resolve input
@@ -93,6 +220,10 @@ def diagnose(transcript: str = None,
             transcript = transcribe_audio(audio_bytes)
         else:
             transcript = "No symptoms provided"
+
+    # If non-English, translate transcript to English for the LLM
+    if language and language != "en":
+        transcript = _translate_to_english(transcript, language)
 
     start_time = time.time()
 
@@ -150,22 +281,68 @@ def diagnose(transcript: str = None,
     db.commit()
     db.refresh(session_record)
 
+    # Translate results to target language if non-English
+    urgency_val = result_json.get("urgency", "medium")
+    urgency_reasoning = result_json.get("urgency_reasoning", "")
+    immediate_actions = result_json.get("immediate_actions", [])
+    meds_to_avoid = result_json.get("medications_to_avoid", [])
+    lifestyle = result_json.get("lifestyle_advice", [])
+    follow_up_text = result_json.get("follow_up", "")
+    diff_summary = result_json.get("differential_summary", "")
+    er_text = result_json.get("when_to_go_to_er", "")
+
+    if language and language != "en":
+        logger.info(f"Translating diagnosis results to {language}")
+        # Collect ALL translatable text into one batch for speed
+        all_texts = [
+            urgency_reasoning, follow_up_text, diff_summary, er_text,
+            *immediate_actions, *meds_to_avoid, *lifestyle,
+        ]
+        # Add condition fields
+        for cd in condition_details:
+            all_texts.extend([cd.name, cd.description, *cd.matching_symptoms, *cd.red_flags])
+        # Add test fields
+        for rt in rec_tests:
+            all_texts.extend([rt.test, rt.reason])
+
+        translated = _batch_translate(all_texts, language)
+
+        # Unpack back
+        idx = 0
+        urgency_reasoning = translated[idx]; idx += 1
+        follow_up_text = translated[idx]; idx += 1
+        diff_summary = translated[idx]; idx += 1
+        er_text = translated[idx]; idx += 1
+        immediate_actions = translated[idx:idx+len(immediate_actions)]; idx += len(immediate_actions)
+        meds_to_avoid = translated[idx:idx+len(meds_to_avoid)]; idx += len(meds_to_avoid)
+        lifestyle = translated[idx:idx+len(lifestyle)]; idx += len(lifestyle)
+        for cd in condition_details:
+            cd.name = translated[idx]; idx += 1
+            cd.description = translated[idx]; idx += 1
+            sym_count = len(cd.matching_symptoms)
+            cd.matching_symptoms = translated[idx:idx+sym_count]; idx += sym_count
+            rf_count = len(cd.red_flags)
+            cd.red_flags = translated[idx:idx+rf_count]; idx += rf_count
+        for rt in rec_tests:
+            rt.test = translated[idx]; idx += 1
+            rt.reason = translated[idx]; idx += 1
+
     return DiagnosisResult(
         session_id=session_record.id,
         conditions=condition_details,
         overall_confidence=overall_conf,
         confidence=overall_conf,
-        urgency=result_json.get("urgency", "medium"),
-        urgency_reasoning=result_json.get("urgency_reasoning", ""),
-        immediate_actions=result_json.get("immediate_actions", []),
+        urgency=urgency_val,
+        urgency_reasoning=urgency_reasoning,
+        immediate_actions=immediate_actions,
         recommended_tests=rec_tests,
-        medications_to_avoid=result_json.get("medications_to_avoid", []),
-        lifestyle_advice=result_json.get("lifestyle_advice", []),
-        follow_up=result_json.get("follow_up", ""),
-        differential_summary=result_json.get("differential_summary", ""),
-        when_to_go_to_er=result_json.get("when_to_go_to_er", ""),
+        medications_to_avoid=meds_to_avoid,
+        lifestyle_advice=lifestyle,
+        follow_up=follow_up_text,
+        differential_summary=diff_summary,
+        when_to_go_to_er=er_text,
         transcript=transcript,
         processing_time_ms=processing_time_ms,
-        recommendations=result_json.get("recommendations", result_json.get("immediate_actions", [])),
-        differential_diagnosis=result_json.get("differential_summary", result_json.get("differential_diagnosis", ""))
+        recommendations=result_json.get("recommendations", immediate_actions),
+        differential_diagnosis=diff_summary
     )
