@@ -17,6 +17,9 @@ import NotFound from "./pages/NotFound";
 import Sessions from "./pages/SessionsPage";
 import SessionDetail from "./pages/SessionDetailPage";
 import LoginPage from "./pages/LoginPage";
+import DrugInteractionPage from "./pages/DrugInteractionPage";
+import SarvamVoicePage from "./pages/SarvamVoicePage";
+import TimelinePage from "./pages/TimelinePage";
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
@@ -100,10 +103,13 @@ const AppRoutes = ({ showSplash }: { showSplash: boolean }) => {
             <Route path="/voice" element={<ProtectedRoute><VoiceAgent /></ProtectedRoute>} />
             <Route path="/imaging" element={<ProtectedRoute><ImagingAI /></ProtectedRoute>} />
             <Route path="/ocr" element={<ProtectedRoute><OCRReports /></ProtectedRoute>} />
+            <Route path="/drug-interactions" element={<ProtectedRoute><DrugInteractionPage /></ProtectedRoute>} />
+            <Route path="/voice/vernacular" element={<ProtectedRoute><SarvamVoicePage /></ProtectedRoute>} />
             <Route path="/patients" element={<ProtectedRoute requireRole="doctor"><Patients /></ProtectedRoute>} />
             <Route path="/patients/:id" element={<ProtectedRoute requireRole="doctor"><Patients /></ProtectedRoute>} />
             <Route path="/sessions" element={<ProtectedRoute requireRole="doctor"><Sessions /></ProtectedRoute>} />
             <Route path="/sessions/:id" element={<ProtectedRoute requireRole="doctor"><SessionDetail /></ProtectedRoute>} />
+            <Route path="/patients/:patientId/timeline" element={<ProtectedRoute requireRole="doctor"><TimelinePage /></ProtectedRoute>} />
             <Route path="/appointments" element={<ProtectedRoute requireRole="doctor"><Appointments /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

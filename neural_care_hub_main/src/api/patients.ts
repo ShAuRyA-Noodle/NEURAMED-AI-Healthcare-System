@@ -20,5 +20,18 @@ export const getPatients = (params?: PatientFilterParams) =>
 export const getPatient = (id: number) =>
   client.get<PatientDetail>(`/api/patients/${id}`).then(r => r.data)
 
-export const createPatient = (data: { age: number; gender: string }) =>
+export interface CreatePatientData {
+  first_name: string
+  last_name: string
+  age: number
+  gender: string
+  phone?: string
+  email?: string
+  blood_type?: string
+  emergency_contact?: string
+  allergies?: string
+  chronic_conditions?: string
+}
+
+export const createPatient = (data: CreatePatientData) =>
   client.post<Patient>('/api/patients', data).then(r => r.data)

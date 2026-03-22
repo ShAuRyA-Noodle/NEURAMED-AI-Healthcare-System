@@ -16,8 +16,8 @@ Pillow
 opencv-python
 scikit-image
 numpy
-reportlab
+reportlab==4.1.0
 aiofiles
 websockets
-
-reportlab==4.1.0
+PyMuPDF
+httpx
