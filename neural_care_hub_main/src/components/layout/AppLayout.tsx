@@ -4,12 +4,23 @@ import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import AmbientBackground from '../three/AmbientBackground';
+import PatientOnboarding from '../onboarding/PatientOnboarding';
+import { useAuth } from '../../context/AuthContext';
 
 const AppLayout = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
+  const { user } = useAuth();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
+
+  // Show onboarding for patients who haven't completed it
+  useEffect(() => {
+    if (user && user.role === 'patient' && !user.onboarding_completed) {
+      setShowOnboarding(true);
+    }
+  }, [user]);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', width: '100%', overflow: 'hidden' }}>
@@ -36,6 +47,9 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           </AnimatePresence>
         </main>
       </div>
+      {showOnboarding && (
+        <PatientOnboarding onComplete={() => setShowOnboarding(false)} />
+      )}
     </div>
   );
 };

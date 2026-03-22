@@ -16,11 +16,20 @@ async def analyze_image(
     scan_type: str = Form(...),
     patient_id: Optional[int] = Form(None),
     session_id: Optional[int] = Form(None),
+    body_region: str = Form("Chest"),
+    clinical_indication: str = Form(""),
+    patient_age: Optional[int] = Form(None),
+    patient_gender: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
     try:
         contents = await file.read()
-        res = imaging_agent.analyze(image_bytes=contents, scan_type=scan_type, patient_id=patient_id, session_id=session_id, db=db)
+        res = imaging_agent.analyze(
+            image_bytes=contents, scan_type=scan_type,
+            patient_id=patient_id, session_id=session_id, db=db,
+            body_region=body_region, clinical_indication=clinical_indication,
+            patient_age=patient_age, patient_gender=patient_gender
+        )
         
         from db.models import Patient
         patient = db.query(Patient).filter(Patient.id == patient_id).first() if patient_id else None
