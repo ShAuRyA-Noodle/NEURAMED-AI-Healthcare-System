@@ -47,12 +47,12 @@ export const CustomCursor: React.FC = () => {
         <>
             <div
                 ref={dotRef}
-                className="fixed top-0 left-0 w-[7px] h-[7px] bg-cyan-400 rounded-full pointer-events-none z-[9999] -ml-[3.5px] -mt-[3.5px]"
+                className="fixed top-0 left-0 w-[7px] h-[7px] bg-cyan-400 rounded-full pointer-events-none z-[99999] -ml-[3.5px] -mt-[3.5px]"
                 style={{ willChange: 'transform' }}
             />
             <div
                 ref={ringRef}
-                className="fixed top-0 left-0 w-[30px] h-[30px] border border-cyan-400/50 rounded-full pointer-events-none z-[9998] transition-transform duration-100 ease-out -ml-[15px] -mt-[15px]"
+                className="fixed top-0 left-0 w-[30px] h-[30px] border border-cyan-400/50 rounded-full pointer-events-none z-[99998] transition-transform duration-100 ease-out -ml-[15px] -mt-[15px]"
                 style={{ willChange: 'transform' }}
             />
         </>
