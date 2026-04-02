@@ -35,7 +35,7 @@ def _get_styles():
 
 
 def _add_header(story, session, title_style, normal_style):
-    patient_code = session.patient.patient_code if session.patient else f"PT-{session.patient_id}"
+    patient_code = session.patient.patient_code if session.patient else "WALK-IN"
     created_at_str = session.created_at.strftime("%Y-%m-%d %H:%M:%S") if session.created_at else "Unknown"
     agent_label = {"voice": "Voice Diagnosis", "imaging": "Imaging Analysis", "ocr": "OCR Report"}.get(session.agent_type, "Clinical Report")
 
