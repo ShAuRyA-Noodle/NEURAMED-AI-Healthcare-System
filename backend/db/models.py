@@ -30,7 +30,7 @@ class DiagnosisSession(Base):
     __tablename__ = "diagnosis_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("patients.id"))
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=True)
     agent_type = Column(String) # 'voice', 'imaging', 'ocr'
     input_summary = Column(String)
     result_json = Column(JSON)
@@ -112,7 +112,7 @@ class Appointment(Base):
     __tablename__ = "appointments"
 
     id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("patients.id"))
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=True)
     doctor_name = Column(String)
     specialty = Column(String)
     appointment_datetime = Column(DateTime)
