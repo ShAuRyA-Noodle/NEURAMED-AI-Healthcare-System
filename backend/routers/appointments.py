@@ -44,7 +44,7 @@ def create_appointment(app_req: AppointmentCreate, db: Session = Depends(get_db)
 
 def _format_appointment(a):
     p = a.patient
-    p_code = p.patient_code if p else f"PT-{a.patient_id}"
+    p_code = p.patient_code if p else "WALK-IN"
     p_name = ""
     if p:
         first = getattr(p, "first_name", "") or ""
