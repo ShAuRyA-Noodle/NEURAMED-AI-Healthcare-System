@@ -31,7 +31,7 @@ async def diagnose(request: DiagnoseRequest, db: Session = Depends(get_db)):
         # Load patient
         from db.models import Patient
         patient = db.query(Patient).filter(Patient.id == request.patient_id).first() if request.patient_id else None
-        p_code = patient.patient_code if patient else f"PT-{request.patient_id}"
+        p_code = patient.patient_code if patient else "WALK-IN"
 
         await broadcast_to_clients({
             "patient_code": p_code,

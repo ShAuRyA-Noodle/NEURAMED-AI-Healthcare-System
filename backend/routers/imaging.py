@@ -33,7 +33,7 @@ async def analyze_image(
         
         from db.models import Patient
         patient = db.query(Patient).filter(Patient.id == patient_id).first() if patient_id else None
-        p_code = patient.patient_code if patient else f"PT-{patient_id}"
+        p_code = patient.patient_code if patient else "WALK-IN"
 
         await broadcast_to_clients({
             "patient_code": p_code,

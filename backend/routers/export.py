@@ -99,7 +99,7 @@ def list_sessions(
 
     results = []
     for s in sessions:
-        p_code = s.patient.patient_code if s.patient else f"PT-{s.patient_id}"
+        p_code = s.patient.patient_code if s.patient else "WALK-IN"
         results.append({
             "id": s.id,
             "patient_code": p_code,
@@ -121,7 +121,7 @@ def get_session_detail(session_id: int, db: Session = Depends(get_db)):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    p_code = session.patient.patient_code if session.patient else f"PT-{session.patient_id}"
+    p_code = session.patient.patient_code if session.patient else "WALK-IN"
     result_json = session.result_json or {}
 
     recommendations = result_json.get("recommendations", [])
