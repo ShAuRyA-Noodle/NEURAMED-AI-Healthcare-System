@@ -28,16 +28,18 @@ from datetime import datetime
 from db.database import engine, Base
 from routers import voice, imaging, ocr, dashboard, patients, appointments, search, system, auth
 from routers import drug_interactions, second_opinion, timeline, sarvam
-from seed import seed_db
 
 # Create all tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="NEURAMED API")
 
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
+origins = ["*"] if ALLOWED_ORIGINS == "*" else [o.strip() for o in ALLOWED_ORIGINS.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -81,4 +83,4 @@ def health_check():
 
 @app.on_event("startup")
 def startup_event():
-    seed_db()
+    pass
