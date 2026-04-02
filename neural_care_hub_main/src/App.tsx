@@ -22,6 +22,7 @@ import SarvamVoicePage from "./pages/SarvamVoicePage";
 import TimelinePage from "./pages/TimelinePage";
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { useKeepAlive } from "./hooks/useKeepAlive";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,6 +48,7 @@ const App = () => {
 const AppRoutes = ({ showSplash }: { showSplash: boolean }) => {
   const location = useLocation();
   const { isAuthenticated, isLoading } = useAuth();
+  useKeepAlive();
 
   useEffect(() => {
     const pageName = location.pathname.split('/')[1];

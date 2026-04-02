@@ -10,7 +10,10 @@ export const useLiveWebSocket = () => {
         let timeoutId: number
 
         const connect = () => {
-            const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/live-feed'
+            const wsUrl = import.meta.env.VITE_WS_URL
+                || (import.meta.env.VITE_API_BASE_URL
+                    ? import.meta.env.VITE_API_BASE_URL.replace(/^http/, 'ws') + '/ws/live-feed'
+                    : 'ws://localhost:8000/ws/live-feed')
             const ws = new WebSocket(wsUrl)
             wsRef.current = ws
 
