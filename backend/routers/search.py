@@ -54,7 +54,7 @@ def global_search(q: str = Query("", min_length=1), db: Session = Depends(get_db
 
     appointments = [{
         "id": a.id,
-        "patient_code": a.patient.patient_code if a.patient else f"PT-{a.patient_id}",
+        "patient_code": a.patient.patient_code if a.patient else "WALK-IN",
         "doctor_name": a.doctor_name,
         "specialty": a.specialty,
         "appointment_datetime": a.appointment_datetime.isoformat() if a.appointment_datetime else None,
