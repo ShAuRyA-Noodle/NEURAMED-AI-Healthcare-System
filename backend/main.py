@@ -29,7 +29,9 @@ from db.database import engine, Base
 from routers import voice, imaging, ocr, dashboard, patients, appointments, search, system, auth
 from routers import drug_interactions, second_opinion, timeline, sarvam
 
-# Create all tables
+# Recreate tables with updated schema (nullable patient_id)
+# Remove drop_all after first successful deploy
+Base.metadata.drop_all(bind=engine)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="NEURAMED API")
