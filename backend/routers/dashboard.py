@@ -95,13 +95,6 @@ def get_stats(db: Session = Depends(get_db)):
         {"condition": k, "count": v}
         for k, v in sorted(condition_counts.items(), key=lambda x: x[1], reverse=True)[:10]
     ]
-    if not condition_distribution:
-        condition_distribution = [
-            {"condition": "Hypertension", "count": 25},
-            {"condition": "Diabetes Type 2", "count": 18},
-            {"condition": "Pneumonia", "count": 12}
-        ]
-
     return DashboardStats(
         total_diagnoses=total_diagnoses,
         active_sessions_today=active_sessions_today,
