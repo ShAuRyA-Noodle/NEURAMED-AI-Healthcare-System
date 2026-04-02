@@ -239,7 +239,7 @@ const VoicePage = () => {
       setTimeout(async () => {
         try {
           const ttsCode = LANGUAGES.find(l => l.code === language)?.ttsCode || 'en';
-          const res = await diagnose({ transcript: finalText, patient_id: user?.patient_code ? parseInt(user.patient_code.replace('PT-', '')) : 1, language: ttsCode });
+          const res = await diagnose({ transcript: finalText, patient_id: undefined, language: ttsCode });
           setResult(res);
         } catch {
           addToast('error', 'Voice diagnosis failed');
@@ -254,7 +254,7 @@ const VoicePage = () => {
     if (transcript.length < 10 || isPending) return;
     try {
       const ttsCode = LANGUAGES.find(l => l.code === language)?.ttsCode || 'en';
-      const res = await diagnose({ transcript, patient_id: user?.patient_code ? parseInt(user.patient_code.replace('PT-', '')) : 1, language: ttsCode });
+      const res = await diagnose({ transcript, patient_id: undefined, language: ttsCode });
       setResult(res);
     } catch {
       addToast('error', 'Text diagnosis failed');
