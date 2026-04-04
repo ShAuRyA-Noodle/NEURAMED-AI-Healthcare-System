@@ -7,14 +7,15 @@ from datetime import datetime, timedelta
 from io import BytesIO
 
 from db.database import get_db
-from db.models import DiagnosisSession
+from db.models import DiagnosisSession, User
 from utils.pdf_export import generate_session_pdf
+from utils.auth import require_user, require_doctor
 
 router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
 
 
 @router.get("/stats")
-def get_session_stats(db: Session = Depends(get_db)):
+def get_session_stats(db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     now = datetime.utcnow()
     today_start = datetime(now.year, now.month, now.day)
     week_start = today_start - timedelta(days=now.weekday())
@@ -77,6 +78,7 @@ def list_sessions(
     limit: int = 50,
     offset: int = 0,
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
 ):
     query = db.query(DiagnosisSession).filter(
         DiagnosisSession.is_deleted != True
@@ -116,7 +118,7 @@ def list_sessions(
 
 
 @router.get("/{session_id}")
-def get_session_detail(session_id: int, db: Session = Depends(get_db)):
+def get_session_detail(session_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     session = db.query(DiagnosisSession).filter(DiagnosisSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -171,7 +173,7 @@ def get_session_detail(session_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/{session_id}")
-def delete_session(session_id: int, db: Session = Depends(get_db)):
+def delete_session(session_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     session = db.query(DiagnosisSession).filter(DiagnosisSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -181,7 +183,7 @@ def delete_session(session_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{session_id}/export-pdf")
-def export_pdf(session_id: int, db: Session = Depends(get_db)):
+def export_pdf(session_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     session = db.query(DiagnosisSession).filter(DiagnosisSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")

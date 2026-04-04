@@ -266,7 +266,7 @@ class TTSRequest(BaseModel):
 
 
 @router.post("/tts")
-async def text_to_speech(req: TTSRequest):
+async def text_to_speech(req: TTSRequest, current_user: User = Depends(require_user)):
     """Convert text to speech using gTTS. Translates to target language first via Groq if needed."""
     from gtts import gTTS
     from fastapi.responses import StreamingResponse

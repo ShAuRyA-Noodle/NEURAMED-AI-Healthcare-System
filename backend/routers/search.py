@@ -2,13 +2,14 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, cast, String
 from db.database import get_db
-from db.models import Patient, DiagnosisSession, Appointment
+from db.models import Patient, DiagnosisSession, Appointment, User
+from utils.auth import require_user
 
 router = APIRouter(prefix="/api", tags=["Search"])
 
 
 @router.get("/search")
-def global_search(q: str = Query("", min_length=1), db: Session = Depends(get_db)):
+def global_search(q: str = Query("", min_length=1), db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     search_term = f"%{q}%"
 
     # Search patients

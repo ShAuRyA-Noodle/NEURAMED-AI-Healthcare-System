@@ -58,7 +58,8 @@ const AppRoutes = ({ showSplash }: { showSplash: boolean }) => {
     document.title = title;
   }, [location.pathname]);
 
-  if (showSplash) {
+  // Show splash while loading or verifying auth
+  if (showSplash || isLoading) {
     return (
       <>
         <CustomCursor />
@@ -73,26 +74,39 @@ const AppRoutes = ({ showSplash }: { showSplash: boolean }) => {
     );
   }
 
-  // Login page — no layout, no protection
-  if (location.pathname === '/login') {
-    if (!isLoading && isAuthenticated) {
+  // NOT authenticated — only allow /login, block everything else
+  if (!isAuthenticated) {
+    if (location.pathname === '/login') {
       return (
         <QueryClientProvider client={queryClient}>
           <Routes>
-            <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/login" element={<LoginPage />} />
           </Routes>
         </QueryClientProvider>
       );
     }
+    // Any other URL without auth → redirect to login
     return (
       <QueryClientProvider client={queryClient}>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </QueryClientProvider>
     );
   }
 
+  // Authenticated user visiting /login → send to dashboard
+  if (location.pathname === '/login') {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <Routes>
+          <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </QueryClientProvider>
+    );
+  }
+
+  // Authenticated — full app with layout
   return (
     <QueryClientProvider client={queryClient}>
       <CustomCursor />
@@ -101,12 +115,12 @@ const AppRoutes = ({ showSplash }: { showSplash: boolean }) => {
         <AppLayout>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/voice" element={<ProtectedRoute><VoiceAgent /></ProtectedRoute>} />
-            <Route path="/imaging" element={<ProtectedRoute><ImagingAI /></ProtectedRoute>} />
-            <Route path="/ocr" element={<ProtectedRoute><OCRReports /></ProtectedRoute>} />
-            <Route path="/drug-interactions" element={<ProtectedRoute><DrugInteractionPage /></ProtectedRoute>} />
-            <Route path="/voice/vernacular" element={<ProtectedRoute><SarvamVoicePage /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/voice" element={<VoiceAgent />} />
+            <Route path="/imaging" element={<ImagingAI />} />
+            <Route path="/ocr" element={<OCRReports />} />
+            <Route path="/drug-interactions" element={<DrugInteractionPage />} />
+            <Route path="/voice/vernacular" element={<SarvamVoicePage />} />
             <Route path="/patients" element={<ProtectedRoute requireRole="doctor"><Patients /></ProtectedRoute>} />
             <Route path="/patients/:id" element={<ProtectedRoute requireRole="doctor"><Patients /></ProtectedRoute>} />
             <Route path="/sessions" element={<ProtectedRoute requireRole="doctor"><Sessions /></ProtectedRoute>} />

@@ -22,12 +22,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const savedToken = localStorage.getItem('neuramed_token')
-    const savedUser = localStorage.getItem('neuramed_user')
-    if (savedToken && savedUser) {
-      setToken(savedToken)
-      try { setUser(JSON.parse(savedUser)) } catch { /* ignore */ }
-      // Verify token still valid
+    if (savedToken) {
+      // Don't trust localStorage user — verify token with server first
       getMe().then(u => {
+        setToken(savedToken)
         setUser(u)
         localStorage.setItem('neuramed_user', JSON.stringify(u))
       }).catch(() => {

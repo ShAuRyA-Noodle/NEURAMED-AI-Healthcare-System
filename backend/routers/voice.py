@@ -6,8 +6,9 @@ from pydantic import BaseModel
 from typing import Optional, List
 from db.database import get_db
 from agents import voice_agent
-from db.models import DiagnosisSession
+from db.models import DiagnosisSession, User
 from db.schemas import DiagnosisResult, DiagnosisSessionResponse
+from utils.auth import require_user
 
 router = APIRouter(prefix="/api/voice", tags=["Voice"])
 
@@ -18,7 +19,7 @@ class DiagnoseRequest(BaseModel):
     language: Optional[str] = "en"
 
 @router.post("/diagnose", response_model=DiagnosisResult)
-async def diagnose(request: DiagnoseRequest, db: Session = Depends(get_db)):
+async def diagnose(request: DiagnoseRequest, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     try:
         res = voice_agent.diagnose(
             transcript=request.transcript,
@@ -27,7 +28,7 @@ async def diagnose(request: DiagnoseRequest, db: Session = Depends(get_db)):
             language=request.language or "en",
             db=db
         )
-        
+
         # Load patient
         from db.models import Patient
         patient = db.query(Patient).filter(Patient.id == request.patient_id).first() if request.patient_id else None
@@ -46,12 +47,12 @@ async def diagnose(request: DiagnoseRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/sessions", response_model=List[DiagnosisSessionResponse])
-def get_sessions(limit: int = 20, offset: int = 0, db: Session = Depends(get_db)):
+def get_sessions(limit: int = 20, offset: int = 0, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     sessions = db.query(DiagnosisSession).filter(DiagnosisSession.agent_type == 'voice').offset(offset).limit(limit).all()
     return sessions
 
 @router.get("/sessions/{session_id}", response_model=DiagnosisSessionResponse)
-def get_session(session_id: int, db: Session = Depends(get_db)):
+def get_session(session_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     session = db.query(DiagnosisSession).filter(DiagnosisSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")

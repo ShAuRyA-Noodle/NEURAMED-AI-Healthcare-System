@@ -5,8 +5,9 @@ from datetime import datetime
 from typing import Optional, List
 from db.database import get_db
 from agents import imaging_agent
-from db.models import ScanResult
+from db.models import ScanResult, User
 from db.schemas import ScanAnalysisResult, ScanResultResponse
+from utils.auth import require_user
 
 router = APIRouter(prefix="/api/imaging", tags=["Imaging"])
 
@@ -20,7 +21,8 @@ async def analyze_image(
     clinical_indication: str = Form(""),
     patient_age: Optional[int] = Form(None),
     patient_gender: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user)
 ):
     try:
         contents = await file.read()
@@ -48,11 +50,11 @@ async def analyze_image(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/scans", response_model=List[ScanResultResponse])
-def get_scans(limit: int = 20, db: Session = Depends(get_db)):
+def get_scans(limit: int = 20, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     return db.query(ScanResult).limit(limit).all()
 
 @router.get("/scans/{scan_id}", response_model=ScanResultResponse)
-def get_scan(scan_id: int, db: Session = Depends(get_db)):
+def get_scan(scan_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     scan = db.query(ScanResult).filter(ScanResult.id == scan_id).first()
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
