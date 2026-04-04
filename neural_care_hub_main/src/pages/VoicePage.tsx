@@ -75,6 +75,7 @@ const VoicePage = () => {
   const [interimTranscript, setInterimTranscript] = useState('');
   const [duration, setDuration] = useState(0);
   const recognitionRef = useRef<any>(null);
+  const liveTranscriptRef = useRef('');
 
   // Waveform state
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -192,7 +193,9 @@ const VoicePage = () => {
             interim += event.results[i][0].transcript;
           }
         }
-        setLiveTranscript(final.trim());
+        const trimmed = final.trim();
+        liveTranscriptRef.current = trimmed;
+        setLiveTranscript(trimmed);
         setInterimTranscript(interim);
       };
 
@@ -204,7 +207,10 @@ const VoicePage = () => {
       };
 
       recognition.onend = () => {
-        // Will be handled by stopRecording
+        // Chrome auto-stops after silence — restart if still recording
+        if (recognitionRef.current) {
+          try { recognitionRef.current.start(); } catch { /* already stopped */ }
+        }
       };
 
       recognition.start();
@@ -220,9 +226,10 @@ const VoicePage = () => {
   };
 
   const stopRecording = async () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
+    const recognition = recognitionRef.current;
+    recognitionRef.current = null; // Nullify first so onend doesn't restart
+    if (recognition) {
+      recognition.stop();
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
@@ -233,10 +240,10 @@ const VoicePage = () => {
     setWaveData(Array(24).fill(4));
     setIsRecording(false);
 
-    // Auto-submit after 1s delay
-    const finalText = liveTranscript;
-    if (finalText && finalText.length >= 10) {
-      setTimeout(async () => {
+    // Auto-submit after 1s delay — read from ref to avoid stale closure
+    setTimeout(async () => {
+      const finalText = liveTranscriptRef.current;
+      if (finalText && finalText.length >= 10) {
         try {
           const ttsCode = LANGUAGES.find(l => l.code === language)?.ttsCode || 'en';
           const res = await diagnose({ transcript: finalText, patient_id: undefined, language: ttsCode });
@@ -244,8 +251,10 @@ const VoicePage = () => {
         } catch {
           addToast('error', 'Voice diagnosis failed');
         }
-      }, 1000);
-    }
+      } else if (finalText) {
+        addToast('error', 'Please speak a bit more — at least a few words about your symptoms.');
+      }
+    }, 1000);
   };
 
   const toggleRecording = () => isRecording ? stopRecording() : startRecording();
@@ -265,6 +274,7 @@ const VoicePage = () => {
     setResult(null);
     setTranscript('');
     setLiveTranscript('');
+    liveTranscriptRef.current = '';
     setInterimTranscript('');
     setDuration(0);
     setShowTranscript(false);
