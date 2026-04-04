@@ -5,7 +5,8 @@ from datetime import datetime
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from db.database import get_db
-from db.models import DiagnosisSession
+from db.models import DiagnosisSession, User
+from utils.auth import require_user
 
 router = APIRouter(prefix="/api/system", tags=["System"])
 
@@ -13,7 +14,7 @@ SERVER_START_TIME = datetime.utcnow()
 
 
 @router.get("/info")
-def get_system_info(db: Session = Depends(get_db)):
+def get_system_info(db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     now = datetime.utcnow()
     uptime = now - SERVER_START_TIME
     total_sessions = db.query(DiagnosisSession).count()
