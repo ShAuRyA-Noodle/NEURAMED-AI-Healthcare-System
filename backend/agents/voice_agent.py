@@ -221,6 +221,10 @@ def diagnose(transcript: str = None,
         else:
             transcript = "No symptoms provided"
 
+    # Guard against empty or too-short transcripts
+    if not transcript or len(transcript.strip()) < 3:
+        transcript = "No symptoms provided"
+
     # If non-English, translate transcript to English for the LLM
     if language and language != "en":
         transcript = _translate_to_english(transcript, language)
@@ -277,9 +281,14 @@ def diagnose(transcript: str = None,
         conditions_detected=condition_names,
         processing_time_ms=processing_time_ms
     )
-    db.add(session_record)
-    db.commit()
-    db.refresh(session_record)
+    try:
+        db.add(session_record)
+        db.commit()
+        db.refresh(session_record)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"DB commit failed: {e}")
+        raise
 
     # Translate results to target language if non-English
     urgency_val = result_json.get("urgency", "medium")

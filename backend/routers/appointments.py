@@ -6,8 +6,9 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel
 from db.database import get_db
 from agents import appointment_agent
-from db.models import Appointment, Patient
+from db.models import Appointment, Patient, User
 from db.schemas import AppointmentCreate, AppointmentResponse
+from utils.auth import require_user
 
 router = APIRouter(prefix="/api/appointments", tags=["Appointments"])
 
@@ -21,7 +22,7 @@ class NotesUpdate(BaseModel):
 
 
 @router.post("", response_model=AppointmentResponse)
-def create_appointment(app_req: AppointmentCreate, db: Session = Depends(get_db)):
+def create_appointment(app_req: AppointmentCreate, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     # Validate patient exists
     patient = db.query(Patient).filter(Patient.id == app_req.patient_id).first()
     if not patient:
@@ -74,7 +75,7 @@ def _format_appointment(a):
 
 
 @router.get("/stats")
-def get_appointment_stats(db: Session = Depends(get_db)):
+def get_appointment_stats(db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     total = db.query(Appointment).count()
     scheduled = db.query(Appointment).filter(Appointment.status == "scheduled").count()
     completed = db.query(Appointment).filter(Appointment.status == "completed").count()
@@ -109,7 +110,7 @@ def get_appointment_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/upcoming")
-def get_upcoming(db: Session = Depends(get_db)):
+def get_upcoming(db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     now = datetime.utcnow()
     week_ahead = now + timedelta(days=7)
     appointments = db.query(Appointment).filter(
@@ -121,7 +122,7 @@ def get_upcoming(db: Session = Depends(get_db)):
 
 
 @router.get("/today")
-def get_today_appointments(db: Session = Depends(get_db)):
+def get_today_appointments(db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     now = datetime.utcnow()
     today_start = datetime(now.year, now.month, now.day)
     today_end = today_start + timedelta(days=1)
@@ -139,7 +140,8 @@ def get_appointments(
     specialty: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user)
 ):
     query = db.query(Appointment)
     if patient_id:
@@ -157,7 +159,7 @@ def get_appointments(
 
 
 @router.patch("/{appointment_id}/status")
-def update_status(appointment_id: int, body: StatusUpdate, db: Session = Depends(get_db)):
+def update_status(appointment_id: int, body: StatusUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     valid_statuses = ["scheduled", "completed", "cancelled"]
     if body.status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
@@ -170,7 +172,7 @@ def update_status(appointment_id: int, body: StatusUpdate, db: Session = Depends
 
 
 @router.patch("/{appointment_id}/notes")
-def add_notes(appointment_id: int, body: NotesUpdate, db: Session = Depends(get_db)):
+def add_notes(appointment_id: int, body: NotesUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     app = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not app:
         raise HTTPException(status_code=404, detail="Appointment not found")

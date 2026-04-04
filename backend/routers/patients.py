@@ -3,8 +3,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 from typing import Optional, List
 from db.database import get_db
-from db.models import Patient, DiagnosisSession
+from db.models import Patient, DiagnosisSession, User
 from db.schemas import PatientCreate, PatientResponse
+from utils.auth import require_user, require_doctor
 
 router = APIRouter(prefix="/api/patients", tags=["Patients"])
 
@@ -15,7 +16,7 @@ def generate_patient_code(db: Session) -> str:
 
 
 @router.post("", response_model=PatientResponse)
-def create_patient(patient: PatientCreate, db: Session = Depends(get_db)):
+def create_patient(patient: PatientCreate, db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     code = generate_patient_code(db)
     db_patient = Patient(
         patient_code=code,
@@ -51,7 +52,8 @@ def get_patients(
     sort_by: Optional[str] = "created_at",
     limit: int = 50,
     offset: int = 0,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user)
 ):
     query = db.query(Patient)
     if search:
@@ -162,7 +164,7 @@ def get_patients(
 
 
 @router.get("/{patient_id}")
-def get_patient(patient_id: int, db: Session = Depends(get_db)):
+def get_patient(patient_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
