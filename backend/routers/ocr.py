@@ -5,8 +5,9 @@ from datetime import datetime
 from typing import Optional, List
 from db.database import get_db
 from agents import ocr_agent
-from db.models import Report
+from db.models import Report, User
 from db.schemas import ReportAnalysisResult, ReportResponse
+from utils.auth import require_user
 
 router = APIRouter(prefix="/api/ocr", tags=["OCR"])
 
@@ -14,7 +15,8 @@ router = APIRouter(prefix="/api/ocr", tags=["OCR"])
 async def analyze_report(
     file: UploadFile = File(...),
     patient_id: Optional[int] = Form(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user)
 ):
     try:
         contents = await file.read()
@@ -37,11 +39,11 @@ async def analyze_report(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/reports", response_model=List[ReportResponse])
-def get_reports(limit: int = 20, db: Session = Depends(get_db)):
+def get_reports(limit: int = 20, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     return db.query(Report).limit(limit).all()
 
 @router.get("/reports/{report_id}", response_model=ReportResponse)
-def get_report(report_id: int, db: Session = Depends(get_db)):
+def get_report(report_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     report = db.query(Report).filter(Report.id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
