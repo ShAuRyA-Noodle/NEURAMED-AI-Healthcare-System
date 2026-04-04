@@ -1,8 +1,11 @@
 import os
 import json
+import time
 import logging
 
 logger = logging.getLogger(__name__)
+
+GROQ_MODELS = ["llama-3.3-70b-versatile", "llama3-70b-8192", "llama3-8b-8192"]
 
 
 def call_llm(system_prompt: str, user_message: str, fallback_type: str = "voice") -> dict:
@@ -10,28 +13,41 @@ def call_llm(system_prompt: str, user_message: str, fallback_type: str = "voice"
     if not api_key:
         logger.error("GROQ_API_KEY missing — using fallback")
         return _fallback(fallback_type, user_message)
-    try:
-        from groq import Groq
-        client = Groq(api_key=api_key)
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ],
-            temperature=0.3,
-            max_tokens=1024,
-            response_format={"type": "json_object"}
-        )
-        raw = response.choices[0].message.content
-        logger.info(f"Groq response: {raw[:200]}")
-        return json.loads(raw)
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON parse failed: {e} — raw: {raw}")
-        return _fallback(fallback_type, user_message)
-    except Exception as e:
-        logger.error(f"Groq API error: {type(e).__name__}: {e}")
-        return _fallback(fallback_type, user_message)
+
+    from groq import Groq
+    client = Groq(api_key=api_key)
+
+    for model in GROQ_MODELS:
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message}
+                ],
+                temperature=0.3,
+                max_tokens=2048,
+                response_format={"type": "json_object"}
+            )
+            raw = response.choices[0].message.content
+            logger.info(f"Groq [{model}] response: {raw[:200]}")
+            return json.loads(raw)
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parse failed [{model}]: {e}")
+            continue
+        except Exception as e:
+            err_msg = str(e).lower()
+            logger.warning(f"Groq [{model}] failed: {type(e).__name__}: {e}")
+            if "rate_limit" in err_msg or "429" in err_msg:
+                logger.info(f"Rate limited on {model}, trying next model...")
+                time.sleep(1)
+                continue
+            if "model" in err_msg and "not found" in err_msg:
+                continue
+            break
+
+    logger.error("All Groq models failed — using fallback")
+    return _fallback(fallback_type, user_message)
 
 
 def _fallback(fallback_type: str, context: str = "") -> dict:
