@@ -5,9 +5,10 @@ from sqlalchemy import func
 from typing import List
 from datetime import datetime, timedelta
 from db.database import get_db
-from db.models import DiagnosisSession, Patient, Report, Appointment
+from db.models import DiagnosisSession, Patient, Report, Appointment, User
 from db.schemas import DashboardStats, ActivityFeedItem
 from utils.llm import call_llm
+from utils.auth import require_user
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 
@@ -16,7 +17,7 @@ _insights_cache: dict = {"data": None, "timestamp": 0}
 
 
 @router.get("/stats", response_model=DashboardStats)
-def get_stats(db: Session = Depends(get_db)):
+def get_stats(db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     total_diagnoses = db.query(DiagnosisSession).count()
 
     today = datetime.utcnow().date()
@@ -115,7 +116,7 @@ def get_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/activity-feed", response_model=List[ActivityFeedItem])
-def get_activity_feed(limit: int = 20, db: Session = Depends(get_db)):
+def get_activity_feed(limit: int = 20, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     sessions = db.query(DiagnosisSession).order_by(
         DiagnosisSession.created_at.desc()
     ).limit(limit).all()
@@ -137,7 +138,7 @@ def get_activity_feed(limit: int = 20, db: Session = Depends(get_db)):
 
 
 @router.get("/recent-sessions")
-def get_recent_sessions(limit: int = 10, db: Session = Depends(get_db)):
+def get_recent_sessions(limit: int = 10, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     sessions = db.query(DiagnosisSession).order_by(
         DiagnosisSession.created_at.desc()
     ).limit(limit).all()
@@ -156,7 +157,7 @@ def get_recent_sessions(limit: int = 10, db: Session = Depends(get_db)):
 
 
 @router.get("/quick-stats")
-def get_quick_stats(db: Session = Depends(get_db)):
+def get_quick_stats(db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     total_voice = db.query(DiagnosisSession).filter(DiagnosisSession.agent_type == "voice").count()
     total_imaging = db.query(DiagnosisSession).filter(DiagnosisSession.agent_type == "imaging").count()
     total_ocr = db.query(DiagnosisSession).filter(DiagnosisSession.agent_type == "ocr").count()
@@ -193,7 +194,7 @@ def get_quick_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/ai-insights")
-def get_ai_insights(db: Session = Depends(get_db)):
+def get_ai_insights(db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     global _insights_cache
 
     # Check cache (5 minute TTL)
@@ -244,7 +245,7 @@ Be specific and data-driven. Reference actual numbers from the data."""
 
 
 @router.get("/urgency-heatmap")
-def get_urgency_heatmap(db: Session = Depends(get_db)):
+def get_urgency_heatmap(db: Session = Depends(get_db), current_user: User = Depends(require_user)):
     # Last 28 days grouped by day_of_week + urgency
     now = datetime.utcnow()
     start = now - timedelta(days=28)
