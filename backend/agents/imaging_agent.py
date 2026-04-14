@@ -14,6 +14,13 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# Vision models to try in order — best first, smallest last
+VISION_MODELS = [
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "llama-3.2-90b-vision-preview",
+    "llama-3.2-11b-vision-preview",
+]
+
 
 # ── Examination protocols by scan type + body region ──
 
@@ -100,7 +107,7 @@ EXAMINATION_PROTOCOLS = {
 
 
 def get_examination_protocol(scan_type: str, body_region: str) -> str:
-    key = (scan_type.lower().replace("-", ""), body_region.lower())
+    key = (scan_type.lower().replace("-", "").replace(" ", ""), body_region.lower())
     if key in EXAMINATION_PROTOCOLS:
         return EXAMINATION_PROTOCOLS[key]
     # Try partial matches
@@ -134,31 +141,32 @@ REPORTING STANDARDS:
 - Density/signal in standardized terminology
 - Laterality always specified (right/left/bilateral)
 - Compare to expected normal for patient's age and gender
+- Be thorough and clinically precise — this is a real medical analysis
+- DO NOT give generic or placeholder responses — analyze what you actually see in the image
 
 Return ONLY this JSON structure:
 
 {{
-  "clinical_impression": "One sentence headline finding",
+  "clinical_impression": "One sentence headline finding based on what you actually observe",
   "acr_category": 1,
   "acr_category_meaning": "ACR category description",
   "overall_assessment": "normal | incidental_finding | clinically_significant | urgent | critical",
   "confidence_score": 0.85,
-  "confidence_reasoning": "Why this confidence level",
+  "confidence_reasoning": "Why this confidence level — what you can and cannot determine from this image",
   "systematic_findings": {{
     "finding_1": {{
       "name": "Anatomy name",
       "status": "normal | abnormal",
-      "finding": "Detailed description",
+      "finding": "Detailed description of what you observe",
       "significance": "Clinical meaning",
       "measurement": "if applicable in mm"
     }}
   }},
   "primary_finding": {{
-    "description": "Main abnormality found or Normal study",
+    "description": "Most significant finding in one clinical sentence",
     "location": "Location",
     "size_mm": [0, 0, 0],
-    "characteristics": ["characteristic1"],
-    "acr_lung_rads": "if applicable"
+    "characteristics": ["characteristic1"]
   }},
   "secondary_findings": [
     {{
@@ -225,7 +233,8 @@ def analyze_scan_with_vision(
     patient_age: Optional[int] = None,
     patient_gender: Optional[str] = None,
 ) -> dict:
-    """Send actual image pixels to Groq Vision for real radiological analysis."""
+    """Send actual image pixels to Groq Vision for real radiological analysis.
+    Tries multiple vision models with fallback chain."""
     api_key = os.getenv("GROQ_API_KEY", "").strip()
     if not api_key:
         logger.warning("No GROQ_API_KEY for vision analysis")
@@ -233,63 +242,114 @@ def analyze_scan_with_vision(
 
     try:
         from groq import Groq
-
-        image_b64 = base64.b64encode(image_bytes).decode("utf-8")
-
-        examination_protocol = get_examination_protocol(scan_type, body_region)
-        system_prompt = get_radiologist_system_prompt(
-            scan_type, body_region, examination_protocol,
-            patient_age, patient_gender, clinical_indication
-        )
-
         client = Groq(api_key=api_key)
-        response = client.chat.completions.create(
-            model="llama-3.2-11b-vision-preview",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{image_b64}"
-                            },
-                        },
-                        {
-                            "type": "text",
-                            "text": f"Analyze this {scan_type} of the {body_region}. Clinical indication: {clinical_indication}. Return your complete radiological report as JSON.",
-                        },
-                    ],
-                },
-            ],
-            max_tokens=4096,
-            temperature=0.1,
-        )
-
-        raw = response.choices[0].message.content or ""
-        # Try to parse JSON from response
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            # Try to extract JSON from markdown code blocks
-            import re
-            json_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw)
-            if json_match:
-                return json.loads(json_match.group(1))
-            # Try to find JSON object
-            json_match = re.search(r'\{[\s\S]*\}', raw)
-            if json_match:
-                return json.loads(json_match.group(0))
-            logger.error(f"Could not parse vision response as JSON: {raw[:200]}")
-            return {}
-
     except Exception as e:
-        logger.error(f"Groq Vision imaging analysis failed: {e}")
+        logger.error(f"Failed to initialize Groq client: {e}")
         return {}
 
+    image_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
-# ── Legacy OpenCV processing (kept for annotated image generation) ──
+    examination_protocol = get_examination_protocol(scan_type, body_region)
+    system_prompt = get_radiologist_system_prompt(
+        scan_type, body_region, examination_protocol,
+        patient_age, patient_gender, clinical_indication
+    )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{image_b64}"
+                    },
+                },
+                {
+                    "type": "text",
+                    "text": (
+                        f"Analyze this {scan_type} of the {body_region}. "
+                        f"Clinical indication: {clinical_indication}. "
+                        "Examine the image carefully and provide your complete radiological assessment as JSON. "
+                        "Be specific about what you observe — do not give generic placeholder responses."
+                    ),
+                },
+            ],
+        },
+    ]
+
+    last_error = None
+    for model in VISION_MODELS:
+        try:
+            logger.info(f"Imaging Vision: trying model {model}")
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=4096,
+                temperature=0.2,
+            )
+
+            raw = response.choices[0].message.content or ""
+            result = _parse_vision_json(raw)
+
+            if result and (result.get("clinical_impression") or result.get("findings") or result.get("impression")):
+                logger.info(f"Imaging Vision [{model}] returned valid analysis")
+                return result
+            else:
+                logger.warning(f"Imaging Vision [{model}] returned empty/incomplete result")
+                continue
+
+        except Exception as e:
+            last_error = e
+            err_msg = str(e).lower()
+            logger.warning(f"Imaging Vision [{model}] failed: {type(e).__name__}: {e}")
+
+            if "rate_limit" in err_msg or "429" in err_msg:
+                import time as _time
+                _time.sleep(1)
+                continue
+            if "model" in err_msg and ("not found" in err_msg or "not supported" in err_msg or "does not exist" in err_msg):
+                continue
+            continue
+
+    logger.error(f"All vision models failed for imaging. Last error: {last_error}")
+    return {}
+
+
+def _parse_vision_json(raw: str) -> dict:
+    """Robust JSON extraction from vision model response."""
+    import re
+    if not raw:
+        return {}
+
+    # Try direct parse
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+
+    # Try extracting from markdown code blocks
+    json_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw)
+    if json_match:
+        try:
+            return json.loads(json_match.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    # Try finding the outermost JSON object
+    json_match = re.search(r'\{[\s\S]*\}', raw)
+    if json_match:
+        try:
+            return json.loads(json_match.group(0))
+        except json.JSONDecodeError:
+            pass
+
+    logger.error(f"Could not parse vision response as JSON: {raw[:300]}")
+    return {}
+
+
+# ── OpenCV annotation pipeline ──
 
 def bytes_to_b64(img_bytes: bytes) -> str:
     return base64.b64encode(img_bytes).decode('utf-8')
@@ -327,26 +387,9 @@ def _extract_primary_finding_text(raw) -> str:
     return str(raw) if raw else ""
 
 
-def analyze(
-    image_bytes: bytes, scan_type: str,
-    patient_id: int | None, session_id: int | None, db: Session,
-    body_region: str = "Chest",
-    clinical_indication: str = "",
-    patient_age: Optional[int] = None,
-    patient_gender: Optional[str] = None,
-) -> ScanAnalysisResult:
-    start = time.time()
-
-    # Decode bytes to numpy array for OpenCV annotation
-    nparr = np.frombuffer(image_bytes, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    if img is None:
-        raise ValueError("Could not decode image")
-
-    original_b64 = bytes_to_b64(image_bytes)
-
-    # OpenCV anomaly detection pipeline (kept for annotated image)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+def _create_annotated_image(img, gray, scan_type: str) -> tuple:
+    """Create OpenCV annotated image with region detection.
+    Returns (annotated_bytes, regions, opencv_anomaly_detected)."""
     img_height, img_width = gray.shape[:2]
 
     scan_lower = scan_type.lower() if scan_type else ""
@@ -366,9 +409,9 @@ def analyze(
 
     annotated = img.copy()
     regions = []
-    anomaly_detected = False
+    opencv_anomaly = False
 
-    # Dynamic minimum area — at least 0.3% of image to reduce annotation noise
+    # Dynamic minimum area — at least 0.3% of image to reduce noise
     min_contour_area = max(800, int(img_height * img_width * 0.003))
 
     for i, cnt in enumerate(contours):
@@ -385,7 +428,7 @@ def analyze(
         confidence = min(0.95, (circularity * 0.5 + mean_intensity / 255 * 0.5))
 
         if is_anomaly:
-            anomaly_detected = True
+            opencv_anomaly = True
             color = (0, 0, 255)
         else:
             color = (0, 255, 255)
@@ -411,8 +454,32 @@ def analyze(
 
     _, buf = cv2.imencode('.jpg', annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
     annotated_bytes = buf.tobytes()
-    annotated_b64 = bytes_to_b64(annotated_bytes)
 
+    return annotated_bytes, regions, opencv_anomaly
+
+
+def analyze(
+    image_bytes: bytes, scan_type: str,
+    patient_id: int | None, session_id: int | None, db: Session,
+    body_region: str = "Chest",
+    clinical_indication: str = "",
+    patient_age: Optional[int] = None,
+    patient_gender: Optional[str] = None,
+) -> ScanAnalysisResult:
+    start = time.time()
+
+    # Decode bytes to numpy array for OpenCV annotation
+    nparr = np.frombuffer(image_bytes, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if img is None:
+        raise ValueError("Could not decode image")
+
+    original_b64 = bytes_to_b64(image_bytes)
+
+    # OpenCV annotation (for visual overlay — NOT for diagnosis)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    annotated_bytes, regions, opencv_anomaly = _create_annotated_image(img, gray, scan_type)
+    annotated_b64 = bytes_to_b64(annotated_bytes)
     overall_confidence = max([r["confidence"] for r in regions], default=0.1)
 
     # Save files
@@ -425,7 +492,7 @@ def analyze(
     with open(anno_path, "wb") as f:
         f.write(annotated_bytes)
 
-    # ── Primary: Groq Vision analysis (real image pixels) ──
+    # ── Primary: Groq Vision analysis (real image pixels, multi-model) ──
     vision_result = analyze_scan_with_vision(
         image_bytes, scan_type, body_region,
         clinical_indication or "general screening",
@@ -438,22 +505,28 @@ def analyze(
         Scan type: {scan_type}
         Body region: {body_region}
         Clinical indication: {clinical_indication}
+        Patient age: {patient_age or 'unknown'}
+        Patient gender: {patient_gender or 'unknown'}
         Regions analyzed: {len(regions)}
-        Anomalies detected: {sum(1 for r in regions if r['is_anomaly'])}
+        Anomalies detected by image processing: {sum(1 for r in regions if r['is_anomaly'])}
         Highest confidence region: {max([r['confidence'] for r in regions], default=0):.2%}
-        Region details: {regions[:3]}
+        Region details: {json.dumps(regions[:5])}
+
+        NOTE: You are analyzing computed statistics, NOT viewing the image directly.
+        Be honest about confidence limits. Do not fabricate findings you cannot verify.
         """
         vision_result = call_llm(IMAGING_PROMPT_FALLBACK, stats_summary, fallback_type="imaging")
 
     processing_ms = int((time.time() - start) * 1000)
 
-    # Use vision model confidence (check both field names; avoid falsy-zero trap)
+    # Use vision model confidence (check both field names)
     vision_conf = vision_result.get("confidence_score") or vision_result.get("confidence")
     if isinstance(vision_conf, (int, float)) and vision_conf > 0:
         overall_confidence = max(overall_confidence, float(vision_conf))
 
-    # CRITICAL FIX: Override OpenCV anomaly_detected with LLM's actual medical assessment
-    # OpenCV only detects round bright objects — completely misses brain damage, edema, etc.
+    # CRITICAL: Override OpenCV anomaly_detected with LLM's actual medical assessment
+    # OpenCV only detects round bright objects — meaningless for real radiology
+    anomaly_detected = opencv_anomaly  # Start with OpenCV as baseline
     llm_assessment = vision_result.get("overall_assessment", "").lower()
     llm_acr = vision_result.get("acr_category", 1)
     try:
@@ -463,44 +536,52 @@ def analyze(
     llm_red_flags = vision_result.get("red_flags", [])
     llm_urgency = vision_result.get("urgency", "routine").lower()
 
-    # LLM says anomaly if: ACR >= 3, or assessment is not normal, or red flags exist, or urgency is high
+    # LLM says anomaly if: ACR >= 3, or assessment is not normal, or red flags exist
     if llm_acr >= 3 or llm_assessment in ("clinically_significant", "urgent", "critical", "suspicious") \
             or llm_red_flags or llm_urgency in ("urgent", "emergent", "critical", "stat"):
         anomaly_detected = True
     elif llm_acr >= 2 and llm_assessment not in ("normal", ""):
         anomaly_detected = True
+    # LLM says normal — trust the LLM over OpenCV
+    elif llm_assessment == "normal" and llm_acr <= 1:
+        anomaly_detected = False
 
-    # Save to DB
-    if not session_id:
-        session_record = DiagnosisSession(
-            patient_id=patient_id,
-            agent_type='imaging',
-            input_summary=f"{scan_type} scan — {body_region}",
-            result_json=vision_result,
+    # Save to DB with rollback protection
+    try:
+        if not session_id:
+            session_record = DiagnosisSession(
+                patient_id=patient_id,
+                agent_type='imaging',
+                input_summary=f"{scan_type} scan — {body_region}",
+                result_json=vision_result,
+                confidence_score=overall_confidence,
+                urgency_level=vision_result.get("urgency", "routine"),
+                conditions_detected=[vision_result.get("clinical_impression", vision_result.get("impression", "Scan analyzed"))],
+                processing_time_ms=processing_ms
+            )
+            db.add(session_record)
+            db.commit()
+            db.refresh(session_record)
+            session_id = session_record.id
+
+        scan_result = ScanResult(
+            session_id=session_id,
+            scan_type=scan_type,
+            anomaly_detected=anomaly_detected,
+            anomaly_regions=regions,
             confidence_score=overall_confidence,
-            urgency_level=vision_result.get("urgency", "routine"),
-            conditions_detected=[vision_result.get("clinical_impression", vision_result.get("impression", "Scan analyzed"))],
-            processing_time_ms=processing_ms
+            model_findings=vision_result.get("findings", ""),
+            original_file_path=orig_path,
+            annotated_file_path=anno_path
         )
-        db.add(session_record)
+        db.add(scan_result)
         db.commit()
-        db.refresh(session_record)
-        session_id = session_record.id
+    except Exception as e:
+        db.rollback()
+        logger.error(f"DB commit failed in imaging: {e}")
+        raise
 
-    scan_result = ScanResult(
-        session_id=session_id,
-        scan_type=scan_type,
-        anomaly_detected=anomaly_detected,
-        anomaly_regions=regions,
-        confidence_score=overall_confidence,
-        model_findings=vision_result.get("findings", ""),
-        original_file_path=orig_path,
-        annotated_file_path=anno_path
-    )
-    db.add(scan_result)
-    db.commit()
-
-    # Extract differential diagnoses — handle both old format (list of strings) and new (list of dicts)
+    # Extract differential diagnoses
     raw_diffs = vision_result.get("differential_diagnoses", [])
     diff_list = []
     for d in raw_diffs:
@@ -531,7 +612,7 @@ def analyze(
         follow_up_imaging=vision_result.get("follow_up_imaging", ""),
         anomaly_type=vision_result.get("anomaly_type", ""),
         urgency=vision_result.get("urgency", "routine"),
-        # New rich fields
+        # Rich fields
         clinical_impression=vision_result.get("clinical_impression", ""),
         overall_assessment=vision_result.get("overall_assessment", ""),
         confidence_reasoning=vision_result.get("confidence_reasoning", ""),
@@ -547,10 +628,11 @@ def analyze(
     )
 
 
-# Fallback prompt when vision is unavailable — field names match primary vision prompt
+# Fallback prompt when vision is unavailable
 IMAGING_PROMPT_FALLBACK = """You are a board-certified radiologist AI assistant.
 Analyze the following medical scan region statistics and provide a comprehensive radiological report.
 NOTE: You are analyzing computed image statistics, NOT the image directly. Be honest about confidence limits.
+Do not fabricate findings — only report what can be reasonably inferred from the statistics provided.
 
 Return ONLY this exact JSON, no markdown:
 {
@@ -562,8 +644,8 @@ Return ONLY this exact JSON, no markdown:
   "anomaly_type": "nodule|mass|opacity|effusion|calcification|consolidation|normal|artifact",
   "acr_category": 1,
   "acr_category_meaning": "ACR category meaning",
-  "confidence_score": 0.7,
-  "confidence_reasoning": "Why this confidence level — note if based on statistics rather than direct visualization",
+  "confidence_score": 0.5,
+  "confidence_reasoning": "Note: analysis based on image statistics, not direct visualization",
   "measurements": "",
   "distribution": "Unilateral/bilateral, location description",
   "systematic_findings": {},
@@ -580,5 +662,6 @@ Return ONLY this exact JSON, no markdown:
   "report_text": "TECHNIQUE: ... FINDINGS: ... IMPRESSION: ...",
   "urgency": "routine|urgent|emergent",
   "follow_up": "Recommended next diagnostic step",
-  "comparison_note": ""
+  "comparison_note": "",
+  "secondary_findings": []
 }"""
