@@ -192,11 +192,12 @@ def _generate_imaging_pdf(session) -> bytes:
 
     # ACR Category
     acr = result_json.get("acr_category", "")
-    acr_desc = result_json.get("acr_description", "")
-    if acr:
-        story.append(Paragraph(f"<b>ACR CLASSIFICATION: {acr}</b>", ParagraphStyle(
+    acr_str = str(acr) if acr else ""
+    acr_desc = result_json.get("acr_description", result_json.get("acr_category_meaning", ""))
+    if acr_str:
+        story.append(Paragraph(f"<b>ACR CLASSIFICATION: {acr_str}</b>", ParagraphStyle(
             'ACR', parent=normal_style, fontSize=13,
-            textColor=HexColor('#CC0000') if '4' in acr or '5' in acr else HexColor('#006600')
+            textColor=HexColor('#CC0000') if '4' in acr_str or '5' in acr_str else HexColor('#006600')
         )))
         if acr_desc:
             story.append(Paragraph(acr_desc, small_style))
@@ -206,7 +207,11 @@ def _generate_imaging_pdf(session) -> bytes:
     primary = result_json.get("primary_finding", "")
     if primary:
         story.append(Paragraph("PRIMARY FINDING", heading_style))
-        story.append(Paragraph(primary, normal_style))
+        if isinstance(primary, dict):
+            primary_text = primary.get("description", "") or primary.get("finding", "") or str(primary)
+        else:
+            primary_text = str(primary)
+        story.append(Paragraph(primary_text, normal_style))
         story.append(Spacer(1, 12))
 
     # Findings
@@ -228,7 +233,17 @@ def _generate_imaging_pdf(session) -> bytes:
     if measurements or distribution:
         story.append(Paragraph("MEASUREMENTS & DISTRIBUTION", heading_style))
         if measurements:
-            story.append(Paragraph(f"<b>Size:</b> {measurements}", normal_style))
+            if isinstance(measurements, list):
+                for m in measurements:
+                    if isinstance(m, dict):
+                        struct = m.get("structure", "")
+                        dims = [str(m.get(k, "")) for k in ("dimension_1_mm", "dimension_2_mm", "dimension_3_mm") if m.get(k)]
+                        dim_str = " x ".join(dims) + " mm" if dims else ""
+                        story.append(Paragraph(f"<b>{struct}:</b> {dim_str}", normal_style))
+                    else:
+                        story.append(Paragraph(f"&bull; {m}", normal_style))
+            else:
+                story.append(Paragraph(f"<b>Size:</b> {measurements}", normal_style))
         if distribution:
             story.append(Paragraph(f"<b>Location:</b> {distribution}", normal_style))
         story.append(Spacer(1, 8))
@@ -245,7 +260,13 @@ def _generate_imaging_pdf(session) -> bytes:
     if diffs:
         story.append(Paragraph("DIFFERENTIAL DIAGNOSES", heading_style))
         for d in diffs:
-            story.append(Paragraph(f"&bull; {d}", normal_style))
+            if isinstance(d, dict):
+                diag = d.get("diagnosis", "")
+                prob = d.get("probability", "")
+                prob_str = f" ({round(float(prob)*100)}%)" if prob else ""
+                story.append(Paragraph(f"&bull; <b>{diag}</b>{prob_str}", normal_style))
+            else:
+                story.append(Paragraph(f"&bull; {d}", normal_style))
         story.append(Spacer(1, 8))
 
     # Recommendations
@@ -254,7 +275,7 @@ def _generate_imaging_pdf(session) -> bytes:
         story.append(Paragraph("RECOMMENDATIONS", heading_style))
         for r in recs:
             if isinstance(r, dict):
-                priority = r.get("priority", "routine").upper()
+                priority = str(r.get("priority", "routine")).upper()
                 action = r.get("action", "")
                 story.append(Paragraph(f"[{priority}] {action}", normal_style))
             else:
@@ -285,9 +306,10 @@ def _generate_ocr_pdf(session) -> bytes:
 
     # Health Score
     health_score = result_json.get("overall_health_score", "")
-    if health_score:
-        color = {"good": '#006600', "fair": '#996600', "poor": '#CC6600', "critical": '#CC0000'}.get(health_score.lower(), '#333333')
-        story.append(Paragraph(f"<b>OVERALL HEALTH ASSESSMENT: {health_score.upper()}</b>", ParagraphStyle(
+    health_score_str = str(health_score) if health_score else ""
+    if health_score_str:
+        color = {"good": '#006600', "fair": '#996600', "poor": '#CC6600', "critical": '#CC0000'}.get(health_score_str.lower(), '#333333')
+        story.append(Paragraph(f"<b>OVERALL HEALTH ASSESSMENT: {health_score_str.upper()}</b>", ParagraphStyle(
             'HealthScore', parent=normal_style, fontSize=13, textColor=HexColor(color)
         )))
         story.append(Spacer(1, 8))
@@ -297,7 +319,14 @@ def _generate_ocr_pdf(session) -> bytes:
     if alerts:
         story.append(Paragraph("CRITICAL ALERTS", heading_style))
         for a in alerts:
-            story.append(Paragraph(f"⚠ {a}", ParagraphStyle('Alert', parent=normal_style, textColor=HexColor('#CC0000'))))
+            if isinstance(a, dict):
+                param = a.get("parameter", "")
+                val = a.get("value", "")
+                reason = a.get("reason", "")
+                alert_text = f"{param}: {val} — {reason}" if param else str(a)
+            else:
+                alert_text = str(a)
+            story.append(Paragraph(f"WARNING: {alert_text}", ParagraphStyle('Alert', parent=normal_style, textColor=HexColor('#CC0000'))))
         story.append(Spacer(1, 12))
 
     # Summary
@@ -315,10 +344,10 @@ def _generate_ocr_pdf(session) -> bytes:
         for v in abnormal:
             if isinstance(v, dict):
                 table_data.append([
-                    v.get("test", ""),
-                    v.get("value", ""),
-                    v.get("normal_range", ""),
-                    v.get("severity", "").upper()
+                    v.get("parameter", v.get("test", "")),
+                    str(v.get("value", "")),
+                    v.get("reference_range", v.get("normal_range", "")),
+                    str(v.get("severity", "")).upper()
                 ])
         if len(table_data) > 1:
             t = Table(table_data, colWidths=[120, 80, 100, 70])
