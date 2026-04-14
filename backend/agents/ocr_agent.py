@@ -226,32 +226,37 @@ def analyze(file_bytes: bytes, filename: str, patient_id: int | None, db: Sessio
     if isinstance(health_score_num, int) and health_score_num > 0:
         ocr_confidence = max(ocr_confidence, min(0.95, health_score_num / 100))
 
-    # DB Save
-    session_record = DiagnosisSession(
-        patient_id=patient_id,
-        agent_type='ocr',
-        input_summary=f"Report: {filename[:100]}",
-        result_json=llm_result,
-        confidence_score=ocr_confidence,
-        urgency_level=llm_result.get("urgency", "low"),
-        conditions_detected=llm_result.get("conditions", []),
-        processing_time_ms=processing_ms
-    )
-    db.add(session_record)
-    db.commit()
-    db.refresh(session_record)
+    # DB Save with rollback protection
+    try:
+        session_record = DiagnosisSession(
+            patient_id=patient_id,
+            agent_type='ocr',
+            input_summary=f"Report: {filename[:100]}",
+            result_json=llm_result,
+            confidence_score=ocr_confidence,
+            urgency_level=llm_result.get("urgency", "low"),
+            conditions_detected=llm_result.get("conditions", []),
+            processing_time_ms=processing_ms
+        )
+        db.add(session_record)
+        db.commit()
+        db.refresh(session_record)
 
-    report_record = Report(
-        session_id=session_record.id,
-        extracted_text=extracted_text,
-        sections=sections,
-        key_findings=llm_result.get("key_findings", []),
-        abnormal_flags=llm_result.get("abnormal_flags", []),
-        medications=llm_result.get("medications_mentioned", llm_result.get("medications", [])),
-        summary=llm_result.get("executive_summary", llm_result.get("summary", ""))
-    )
-    db.add(report_record)
-    db.commit()
+        report_record = Report(
+            session_id=session_record.id,
+            extracted_text=extracted_text,
+            sections=sections,
+            key_findings=llm_result.get("key_findings", []),
+            abnormal_flags=llm_result.get("abnormal_flags", []),
+            medications=llm_result.get("medications_mentioned", llm_result.get("medications", [])),
+            summary=llm_result.get("executive_summary", llm_result.get("summary", ""))
+        )
+        db.add(report_record)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"DB commit failed in OCR: {e}")
+        raise
 
     # Handle key_findings — may be list of strings or list of dicts
     raw_findings = llm_result.get("key_findings", [])
