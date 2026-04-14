@@ -48,7 +48,6 @@ def _extract_pdf(file_bytes: bytes) -> dict:
         text = ""
         for page in doc:
             text += page.get_text()
-        page_count = len(doc)
         doc.close()
 
         if len(text.strip()) > 100:
@@ -108,6 +107,14 @@ def _extract_image_vision(file_bytes: bytes, media_type: str) -> dict:
             model="llama-3.2-11b-vision-preview",
             messages=[
                 {
+                    "role": "system",
+                    "content": (
+                        "You are a precise medical document OCR system. "
+                        "Output ONLY the raw text content from the document. "
+                        "No commentary, no headers like 'Here is the text:', no explanation."
+                    ),
+                },
+                {
                     "role": "user",
                     "content": [
                         {
@@ -122,7 +129,7 @@ def _extract_image_vision(file_bytes: bytes, media_type: str) -> dict:
                                 "Extract ALL text from this medical document exactly "
                                 "as it appears. Preserve all numbers, units, "
                                 "reference ranges, dates, and formatting. "
-                                "Return only the extracted text, nothing else."
+                                "Return ONLY the extracted text — no preamble, no commentary."
                             ),
                         },
                     ],
@@ -132,8 +139,21 @@ def _extract_image_vision(file_bytes: bytes, media_type: str) -> dict:
             temperature=0.1,
         )
         text = response.choices[0].message.content or ""
-        if text.strip():
-            return {"method": "groq_vision", "text": text.strip()}
+        # Strip common LLM preamble patterns
+        text = text.strip()
+        for prefix in [
+            "Here is the extracted text:",
+            "Here is the text from the document:",
+            "Here is the text:",
+            "The text in the image reads:",
+            "The document reads:",
+            "Extracted text:",
+        ]:
+            if text.lower().startswith(prefix.lower()):
+                text = text[len(prefix):].strip()
+                break
+        if text:
+            return {"method": "groq_vision", "text": text}
         logger.warning("Groq Vision returned empty text, falling back to Tesseract")
         return _extract_image_tesseract(file_bytes)
 

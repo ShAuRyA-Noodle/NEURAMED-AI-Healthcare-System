@@ -20,23 +20,30 @@ async def analyze_report(
 ):
     try:
         contents = await file.read()
+        if not contents:
+            raise HTTPException(status_code=400, detail="Empty file uploaded")
         res = ocr_agent.analyze(file_bytes=contents, filename=file.filename, patient_id=patient_id, db=db)
-        
+
         from db.models import Patient
         patient = db.query(Patient).filter(Patient.id == patient_id).first() if patient_id else None
         p_code = patient.patient_code if patient else "WALK-IN"
 
+        first_finding = res.key_findings[0] if res.key_findings else (res.summary[:60] if res.summary else "Report analyzed")
         await broadcast_to_clients({
             "patient_code": p_code,
             "agent_type": "ocr",
-            "condition": res.key_findings[0] if res.key_findings else "Unknown",
+            "condition": first_finding,
             "confidence": 1.0,
-            "urgency": "medium" if res.abnormal_flags else "low",
+            "urgency": res.urgency if res.urgency != "low" else ("medium" if res.abnormal_flags else "low"),
             "timestamp": datetime.utcnow().isoformat()
         })
         return res
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Report analysis failed: {str(e)}")
 
 @router.get("/reports", response_model=List[ReportResponse])
 def get_reports(limit: int = 20, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
