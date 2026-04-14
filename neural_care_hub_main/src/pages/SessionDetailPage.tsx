@@ -28,7 +28,10 @@ const SessionDetail = () => {
     const fetchSession = async () => {
       try {
         const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-        const res = await fetch(`${base}/api/sessions/${id}`);
+        const token = localStorage.getItem('neuramed_token');
+        const res = await fetch(`${base}/api/sessions/${id}`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        });
         if (!res.ok) throw new Error('Not found');
         setSession(await res.json());
       } catch {
@@ -44,7 +47,10 @@ const SessionDetail = () => {
     addToast('success', 'Generating PDF...');
     try {
       const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-      const response = await fetch(`${base}/api/sessions/${id}/export-pdf`);
+      const token = localStorage.getItem('neuramed_token');
+      const response = await fetch(`${base}/api/sessions/${id}/export-pdf`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      });
       if (!response.ok) throw new Error('Export failed');
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
