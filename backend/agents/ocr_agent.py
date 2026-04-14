@@ -164,6 +164,14 @@ def analyze(file_bytes: bytes, filename: str, patient_id: int | None, db: Sessio
 
     logger.info(f"OCR extraction method: {extraction_method}, text length: {len(extracted_text)}")
 
+    if not extracted_text or len(extracted_text.strip()) < 10:
+        logger.error(f"OCR extraction failed or returned too little text (method={extraction_method})")
+        raise ValueError(
+            f"Could not extract text from '{filename}'. "
+            "Ensure the file is a readable PDF or clear image of a medical document. "
+            f"Extraction method attempted: {extraction_method}"
+        )
+
     # Section parsing
     section_headers = [
         "Chief Complaint", "History of Present Illness",
@@ -193,8 +201,8 @@ def analyze(file_bytes: bytes, filename: str, patient_id: int | None, db: Sessio
     if not sections or (len(sections) == 1 and "General" in sections and not sections["General"].strip()):
         sections["Full Report"] = extracted_text[:1000]
 
-    # LLM interpretation with enhanced prompt
-    llm_input = f"Medical report text:\n{extracted_text[:3000]}"
+    # LLM interpretation with enhanced prompt — send up to 8000 chars for thorough analysis
+    llm_input = f"Medical report text:\n{extracted_text[:8000]}"
     llm_result = call_llm(OCR_PROMPT, llm_input, fallback_type="ocr")
 
     processing_ms = int((time.time() - start) * 1000)
@@ -213,13 +221,18 @@ def analyze(file_bytes: bytes, filename: str, patient_id: int | None, db: Sessio
     else:
         health_score_str = str(health_score_num) if health_score_num else ""
 
+    # Derive confidence from health score and extraction quality
+    ocr_confidence = 0.85 if extraction_method in ("pymupdf", "groq_vision") else 0.6
+    if isinstance(health_score_num, int) and health_score_num > 0:
+        ocr_confidence = max(ocr_confidence, min(0.95, health_score_num / 100))
+
     # DB Save
     session_record = DiagnosisSession(
         patient_id=patient_id,
         agent_type='ocr',
         input_summary=f"Report: {filename[:100]}",
         result_json=llm_result,
-        confidence_score=0.85,
+        confidence_score=ocr_confidence,
         urgency_level=llm_result.get("urgency", "low"),
         conditions_detected=llm_result.get("conditions", []),
         processing_time_ms=processing_ms

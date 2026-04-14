@@ -295,6 +295,38 @@ def bytes_to_b64(img_bytes: bytes) -> str:
     return base64.b64encode(img_bytes).decode('utf-8')
 
 
+def _format_measurements(raw) -> str:
+    """Convert measurements (list of dicts, string, or other) into readable text."""
+    if isinstance(raw, str):
+        return raw
+    if isinstance(raw, list):
+        parts = []
+        for m in raw:
+            if isinstance(m, dict):
+                struct = m.get("structure", "")
+                dims = [str(m[k]) for k in ("dimension_1_mm", "dimension_2_mm", "dimension_3_mm") if m.get(k)]
+                dim_str = (" x ".join(dims) + " mm") if dims else ""
+                method = m.get("measurement_method", "")
+                entry = f"{struct}: {dim_str}" if dim_str else struct
+                if method:
+                    entry += f" ({method})"
+                if entry.strip():
+                    parts.append(entry)
+            elif isinstance(m, str):
+                parts.append(m)
+        return "; ".join(parts) if parts else ""
+    return str(raw) if raw else ""
+
+
+def _extract_primary_finding_text(raw) -> str:
+    """Extract readable string from primary_finding (may be dict or string)."""
+    if isinstance(raw, str):
+        return raw
+    if isinstance(raw, dict):
+        return raw.get("description", "") or raw.get("finding", "") or ""
+    return str(raw) if raw else ""
+
+
 def analyze(
     image_bytes: bytes, scan_type: str,
     patient_id: int | None, session_id: int | None, db: Session,
@@ -336,9 +368,12 @@ def analyze(
     regions = []
     anomaly_detected = False
 
+    # Dynamic minimum area — at least 0.3% of image to reduce annotation noise
+    min_contour_area = max(800, int(img_height * img_width * 0.003))
+
     for i, cnt in enumerate(contours):
         area = cv2.contourArea(cnt)
-        if area < 500:
+        if area < min_contour_area:
             continue
         perimeter = cv2.arcLength(cnt, True)
         circularity = (4 * np.pi * area / (perimeter ** 2)) if perimeter > 0 else 0
@@ -412,9 +447,10 @@ def analyze(
 
     processing_ms = int((time.time() - start) * 1000)
 
-    # Use vision confidence if available
-    if vision_result.get("confidence_score"):
-        overall_confidence = max(overall_confidence, vision_result["confidence_score"])
+    # Use vision model confidence (check both field names; avoid falsy-zero trap)
+    vision_conf = vision_result.get("confidence_score") or vision_result.get("confidence")
+    if isinstance(vision_conf, (int, float)) and vision_conf > 0:
+        overall_confidence = max(overall_confidence, float(vision_conf))
 
     # CRITICAL FIX: Override OpenCV anomaly_detected with LLM's actual medical assessment
     # OpenCV only detects round bright objects — completely misses brain damage, edema, etc.
@@ -485,10 +521,10 @@ def analyze(
         impression=vision_result.get("impression", vision_result.get("clinical_impression", "")),
         recommendations=vision_result.get("recommendations", []),
         follow_up=vision_result.get("follow_up", ""),
-        primary_finding=vision_result.get("primary_finding", "") if isinstance(vision_result.get("primary_finding"), str) else json.dumps(vision_result.get("primary_finding", "")),
+        primary_finding=_extract_primary_finding_text(vision_result.get("primary_finding", "")),
         acr_category=str(vision_result.get("acr_category", "")),
         acr_description=vision_result.get("acr_category_meaning", vision_result.get("acr_description", "")),
-        measurements=vision_result.get("measurements", "") if isinstance(vision_result.get("measurements"), str) else json.dumps(vision_result.get("measurements", "")),
+        measurements=_format_measurements(vision_result.get("measurements", "")),
         distribution=vision_result.get("distribution", ""),
         differential_diagnoses=diff_list,
         clinical_correlation=vision_result.get("clinical_correlation", ""),
@@ -511,27 +547,38 @@ def analyze(
     )
 
 
-# Fallback prompt when vision is unavailable
+# Fallback prompt when vision is unavailable — field names match primary vision prompt
 IMAGING_PROMPT_FALLBACK = """You are a board-certified radiologist AI assistant.
 Analyze the following medical scan region statistics and provide a comprehensive radiological report.
+NOTE: You are analyzing computed image statistics, NOT the image directly. Be honest about confidence limits.
 
 Return ONLY this exact JSON, no markdown:
 {
-  "primary_finding": "Most significant finding in one clinical sentence",
+  "clinical_impression": "One sentence clinical headline finding",
+  "primary_finding": {"description": "Most significant finding in one clinical sentence", "location": "", "size_mm": [], "characteristics": []},
   "findings": "Detailed radiological findings paragraph (3-4 sentences, clinical language)",
   "impression": "Radiological impression — what this likely means clinically",
+  "overall_assessment": "normal | incidental_finding | clinically_significant | urgent | critical",
   "anomaly_type": "nodule|mass|opacity|effusion|calcification|consolidation|normal|artifact",
-  "acr_category": "ACR 1|ACR 2|ACR 3|ACR 4|ACR 5",
-  "acr_description": "What this ACR category means for the patient",
-  "measurements": "Estimated size/extent of primary finding if applicable",
+  "acr_category": 1,
+  "acr_category_meaning": "ACR category meaning",
+  "confidence_score": 0.7,
+  "confidence_reasoning": "Why this confidence level — note if based on statistics rather than direct visualization",
+  "measurements": "",
   "distribution": "Unilateral/bilateral, location description",
+  "systematic_findings": {},
   "recommendations": [
-    {"priority": "immediate|routine|optional", "action": "specific recommendation"}
+    {"priority": 1, "action": "specific recommendation", "timeframe": "when", "rationale": "why", "guideline_reference": ""}
   ],
   "follow_up_imaging": "Specific follow-up scan recommended and timeframe",
   "clinical_correlation": "How findings should be correlated with patient symptoms",
-  "differential_diagnoses": ["diagnosis1", "diagnosis2", "diagnosis3"],
+  "differential_diagnoses": [
+    {"diagnosis": "diagnosis1", "probability": 0.5, "icd10": "", "supporting_features": [], "against_features": [], "next_step": ""}
+  ],
+  "red_flags": [],
+  "icd10_codes": [{"code": "", "description": ""}],
+  "report_text": "TECHNIQUE: ... FINDINGS: ... IMPRESSION: ...",
   "urgency": "routine|urgent|emergent",
-  "confidence": 0.81,
-  "follow_up": "Recommended next diagnostic step"
+  "follow_up": "Recommended next diagnostic step",
+  "comparison_note": ""
 }"""
