@@ -141,7 +141,10 @@ const OCRReports = () => {
     addToast('success', 'Generating PDF...');
     try {
       const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-      const response = await fetch(`${base}/api/sessions/${sessionId}/export-pdf`);
+      const token = localStorage.getItem('neuramed_token');
+      const response = await fetch(`${base}/api/sessions/${sessionId}/export-pdf`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      });
       if (!response.ok) throw new Error('Export failed');
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
