@@ -1,13 +1,23 @@
 """
 Smart OCR extraction engine — eliminates hard Tesseract dependency.
-Routes: PyMuPDF (PDF text) → Groq Vision (images/scanned PDFs) → Tesseract (fallback)
+Routes: PyMuPDF (PDF text) → Groq Vision (images/scanned PDFs) → Tesseract (optional fallback)
+
+Vision model fallback chain ensures extraction works even when one model is down.
 """
 import os
 import io
 import base64
+import time
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Vision models to try in order — best first, smallest last
+VISION_MODELS = [
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "llama-3.2-90b-vision-preview",
+    "llama-3.2-11b-vision-preview",
+]
 
 
 def extract_text_from_file(file_path: str, file_bytes: bytes, content_type: str) -> dict:
@@ -91,7 +101,7 @@ def _extract_pdf_tesseract(file_bytes: bytes) -> dict:
 
 
 def _extract_image_vision(file_bytes: bytes, media_type: str) -> dict:
-    """Send image to Groq Vision API for OCR."""
+    """Send image to Groq Vision API for OCR. Tries multiple models."""
     api_key = os.getenv("GROQ_API_KEY", "").strip()
     if not api_key:
         logger.warning("No GROQ_API_KEY — falling back to Tesseract for image OCR")
@@ -99,67 +109,110 @@ def _extract_image_vision(file_bytes: bytes, media_type: str) -> dict:
 
     try:
         from groq import Groq
-
-        image_b64 = base64.b64encode(file_bytes).decode("utf-8")
         client = Groq(api_key=api_key)
+    except Exception as e:
+        logger.error(f"Failed to initialize Groq client: {e}")
+        return _extract_image_tesseract(file_bytes)
 
-        response = client.chat.completions.create(
-            model="llama-3.2-11b-vision-preview",
-            messages=[
+    image_b64 = base64.b64encode(file_bytes).decode("utf-8")
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
                 {
-                    "role": "system",
-                    "content": (
-                        "You are a precise medical document OCR system. "
-                        "Output ONLY the raw text content from the document. "
-                        "No commentary, no headers like 'Here is the text:', no explanation."
-                    ),
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{media_type};base64,{image_b64}"
+                    },
                 },
                 {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:{media_type};base64,{image_b64}"
-                            },
-                        },
-                        {
-                            "type": "text",
-                            "text": (
-                                "Extract ALL text from this medical document exactly "
-                                "as it appears. Preserve all numbers, units, "
-                                "reference ranges, dates, and formatting. "
-                                "Return ONLY the extracted text — no preamble, no commentary."
-                            ),
-                        },
-                    ],
-                }
+                    "type": "text",
+                    "text": (
+                        "You are a precise medical document OCR system. "
+                        "Extract ALL text from this medical document exactly "
+                        "as it appears. Preserve all numbers, units, "
+                        "reference ranges, dates, formatting, headers, and table structures. "
+                        "If this is a lab report, preserve the parameter names, values, units, and reference ranges in a clear format. "
+                        "If this is a prescription or letter, preserve the full text. "
+                        "Return ONLY the extracted text — no preamble, no commentary, no 'Here is the text:' prefix."
+                    ),
+                },
             ],
-            max_tokens=4096,
-            temperature=0.1,
-        )
-        text = response.choices[0].message.content or ""
-        # Strip common LLM preamble patterns
-        text = text.strip()
-        for prefix in [
-            "Here is the extracted text:",
-            "Here is the text from the document:",
-            "Here is the text:",
-            "The text in the image reads:",
-            "The document reads:",
-            "Extracted text:",
-        ]:
-            if text.lower().startswith(prefix.lower()):
-                text = text[len(prefix):].strip()
-                break
-        if text:
-            return {"method": "groq_vision", "text": text}
-        logger.warning("Groq Vision returned empty text, falling back to Tesseract")
-        return _extract_image_tesseract(file_bytes)
+        }
+    ]
 
-    except Exception as e:
-        logger.error(f"Groq Vision OCR failed: {e}")
-        return _extract_image_tesseract(file_bytes)
+    last_error = None
+    for model in VISION_MODELS:
+        try:
+            logger.info(f"OCR Vision: trying model {model}")
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=4096,
+                temperature=0.1,
+            )
+            text = response.choices[0].message.content or ""
+            text = _clean_vision_output(text)
+
+            if text and len(text.strip()) > 15:
+                logger.info(f"OCR Vision [{model}] extracted {len(text)} chars")
+                return {"method": "groq_vision", "text": text}
+            else:
+                logger.warning(f"OCR Vision [{model}] returned too little text ({len(text)} chars)")
+                continue
+
+        except Exception as e:
+            last_error = e
+            err_msg = str(e).lower()
+            logger.warning(f"OCR Vision [{model}] failed: {type(e).__name__}: {e}")
+
+            # Rate limited — wait and try next model
+            if "rate_limit" in err_msg or "429" in err_msg:
+                time.sleep(1)
+                continue
+            # Model not found — try next
+            if "model" in err_msg and ("not found" in err_msg or "not supported" in err_msg or "does not exist" in err_msg):
+                continue
+            # Other error — try next model anyway
+            continue
+
+    logger.error(f"All vision models failed for OCR. Last error: {last_error}")
+    return _extract_image_tesseract(file_bytes)
+
+
+def _clean_vision_output(text: str) -> str:
+    """Strip common LLM preamble patterns from vision OCR output."""
+    text = text.strip()
+    # Remove common prefixes
+    prefixes = [
+        "Here is the extracted text:",
+        "Here is the text from the document:",
+        "Here is the text from the image:",
+        "Here is the text:",
+        "The text in the image reads:",
+        "The document reads:",
+        "The image contains the following text:",
+        "Extracted text:",
+        "The text reads:",
+        "Here's the extracted text:",
+        "The medical document reads:",
+        "The report reads:",
+    ]
+    lower_text = text.lower()
+    for prefix in prefixes:
+        if lower_text.startswith(prefix.lower()):
+            text = text[len(prefix):].strip()
+            break
+
+    # Remove leading/trailing markdown code fences
+    if text.startswith("```") and text.endswith("```"):
+        text = text[3:]
+        if text.startswith("\n"):
+            text = text[1:]
+        text = text[:-3].strip()
+
+    return text
 
 
 def _extract_image_tesseract(file_bytes: bytes) -> dict:
@@ -172,9 +225,15 @@ def _extract_image_tesseract(file_bytes: bytes) -> dict:
             "TESSERACT_CMD", r"C:\Program Files\Tesseract-OCR\tesseract.exe"
         )
         img = Image.open(io.BytesIO(file_bytes))
-        text = pytesseract.image_to_string(img, config="--psm 6")
-        if text.strip():
-            return {"method": "tesseract", "text": text.strip()}
+
+        # Enhance image for better OCR
+        img = img.convert("L")  # Grayscale
+        # Try with different PSM modes for better results
+        for psm in ["6", "3", "4"]:
+            text = pytesseract.image_to_string(img, config=f"--psm {psm}")
+            if text and len(text.strip()) > 20:
+                return {"method": "tesseract", "text": text.strip()}
+
     except Exception as e:
         logger.warning(f"Tesseract image fallback failed: {e}")
     return {"method": "failed", "text": ""}
