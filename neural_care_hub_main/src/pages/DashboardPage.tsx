@@ -5,7 +5,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from 'recharts';
-import { TrendingUp, Activity, Target, FileText, AlertTriangle, Clock, RefreshCw } from 'lucide-react';
+import { TrendingUp, Activity, Target, FileText, AlertTriangle, Clock, RefreshCw, Mic, Brain, Calendar, Stethoscope, HeartPulse, type LucideIcon } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useAuth } from '../context/AuthContext';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
@@ -21,7 +21,7 @@ import { UrgencyBadge } from '@/components/shared/UrgencyBadge';
 import { ConfidenceMeter } from '@/components/shared/ConfidenceMeter';
 import DashboardHero from '@/components/three/DashboardHero';
 
-const PIE_COLORS = ['#00E5FF', '#00FF9D', '#FF9500', '#FF3B5C', '#8B5CF6', '#EC4899'];
+const PIE_COLORS = ['#FF6B5B', '#3FA86C', '#E89B3F', '#5B7BFF', '#A491D3', '#D78B6E'];
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload) return null;
@@ -104,60 +104,91 @@ const StatCard = ({ label, value, icon, sparkData, trendColor, accentColor }: {
   </div>
 );
 
-/* ── Quick Action Card ── */
-const QuickActionCard = ({ emoji, title, desc, stat, statLabel, cta, to, bgGrad, accentColor }: {
-  emoji: string; title: string; desc: string; stat: number; statLabel: string; cta: string; to: string; bgGrad: string; accentColor: string
+/* ── Quick Action Card ── soft-skill: tinted icon tile + restrained CTA */
+const QuickActionCard = ({ Icon, title, desc, stat, statLabel, cta, to, accentColor }: {
+  Icon: LucideIcon; title: string; desc: string; stat: number; statLabel: string; cta: string; to: string; accentColor: string;
 }) => {
   const navigate = useNavigate();
   return (
-    <motion.div
-      whileHover={{ y: -6 }}
-      style={{
-        background: bgGrad, border: '1px solid var(--border)', borderRadius: 16,
-        padding: 28, cursor: 'pointer', transition: 'all 250ms cubic-bezier(0.16, 1, 0.3, 1)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12,
-        position: 'relative', overflow: 'hidden',
-      }}
+    <motion.button
+      type="button"
+      whileHover={{ y: -3 }}
+      transition={{ type: 'spring', stiffness: 240, damping: 22 }}
       onClick={() => navigate(to)}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-glow)'; e.currentTarget.style.boxShadow = `0 16px 48px rgba(0,0,0,0.3), 0 0 0 1px ${accentColor}15`; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none'; }}
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 18,
+        padding: 22,
+        cursor: 'pointer',
+        textAlign: 'left',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 14,
+        position: 'relative',
+        overflow: 'hidden',
+        transition: 'border-color 220ms var(--spring), box-shadow 220ms var(--spring)',
+        boxShadow: 'var(--shadow-z1)',
+        color: 'inherit',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.borderColor = 'var(--border-strong)';
+        e.currentTarget.style.boxShadow = 'var(--shadow-z2)';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.borderColor = 'var(--border)';
+        e.currentTarget.style.boxShadow = 'var(--shadow-z1)';
+      }}
     >
-      {/* Top edge gradient line */}
-      <div style={{
-        position: 'absolute', top: 0, left: '20%', right: '20%', height: 1,
-        background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)`,
-        opacity: 0, transition: 'opacity 300ms',
-      }}
-        className="card-top-edge"
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: `radial-gradient(120% 80% at 100% 0%, ${accentColor}12, transparent 55%)`,
+          pointerEvents: 'none',
+        }}
       />
-      {/* Background orb */}
-      <div style={{
-        position: 'absolute', top: -20, right: -20, width: 100, height: 100,
-        background: `radial-gradient(circle, ${accentColor}0A, transparent 70%)`,
-        transition: 'all 400ms cubic-bezier(0.16, 1, 0.3, 1)',
-        pointerEvents: 'none',
-      }} />
-      <motion.div style={{
-        fontSize: 52, filter: `drop-shadow(0 0 12px ${accentColor}40)`,
-      }}
-        whileHover={{ scale: 1.1, y: -6 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+      <div
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: 12,
+          background: `${accentColor}14`,
+          color: accentColor,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: `1px solid ${accentColor}28`,
+        }}
       >
-        {emoji}
-      </motion.div>
-      <span className="font-heading" style={{ fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
-      <span className="font-body" style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>{desc}</span>
-      <span className="font-number" style={{ fontSize: 13, color: accentColor }}>
-        <CountUpNumber value={stat} /> {statLabel}
-      </span>
-      <div className="btn-primary" style={{
-        marginTop: 8, padding: '8px 24px', borderRadius: 8,
-        background: `rgba(0,229,255,0.08)`, border: `1px solid ${accentColor}25`,
-        color: accentColor, fontFamily: 'Syne, sans-serif', fontSize: 13, fontWeight: 600,
-      }}>
-        {cta.replace(' →', '')} <span style={{ display: 'inline-block', transition: 'transform 200ms var(--spring)' }}>→</span>
+        <Icon size={22} strokeWidth={1.75} />
       </div>
-    </motion.div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span className="font-heading" style={{ fontSize: 15.5, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+          {title}
+        </span>
+        <span style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.55 }}>{desc}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
+        <span className="font-mono" style={{ fontSize: 11.5, color: 'var(--muted)', fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ color: 'var(--text)', fontWeight: 600 }}><CountUpNumber value={stat} /></span> {statLabel}
+        </span>
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: 500,
+            color: accentColor,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          {cta.replace(' →', '')}
+          <span aria-hidden style={{ display: 'inline-block' }}>→</span>
+        </span>
+      </div>
+    </motion.button>
   );
 };
 
@@ -204,50 +235,120 @@ const Dashboard = () => {
             height: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             padding: '32px 40px', flexWrap: 'wrap', gap: 24,
           }}>
-            <div style={{ position: 'relative', zIndex: 2 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
-                <span style={{ fontSize: 42, filter: 'drop-shadow(0 0 12px rgba(0,229,255,0.3))' }}>{isPatient ? '👋' : '🏥'}</span>
-                <span className="font-number" style={{
-                  fontSize: 30, fontWeight: 700,
-                  background: 'linear-gradient(135deg, #00E5FF 0%, #00FF9D 100%)',
-                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                }}>
-                  {isPatient ? `Welcome, ${user?.full_name?.split(' ')[0]}` : 'NEURAMED'}
+            <div style={{ position: 'relative', zIndex: 2, maxWidth: 520 }}>
+              <span
+                className="eyebrow"
+                style={{ fontSize: 10.5, color: 'var(--accent)', display: 'inline-block', marginBottom: 10 }}
+              >
+                {isPatient ? 'Patient portal' : 'Clinical platform'}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                <div
+                  aria-hidden
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 11,
+                    background: 'var(--accent-soft)',
+                    border: '1px solid rgba(255, 107, 91, 0.25)',
+                    color: 'var(--accent)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {isPatient ? <HeartPulse size={20} strokeWidth={1.75} /> : <Stethoscope size={20} strokeWidth={1.75} />}
+                </div>
+                <span
+                  className="font-heading"
+                  style={{
+                    fontSize: 28,
+                    fontWeight: 600,
+                    letterSpacing: '-0.025em',
+                    color: 'var(--text)',
+                  }}
+                >
+                  {isPatient ? `Welcome, ${user?.full_name?.split(' ')[0]}` : 'Neuramed'}
                 </span>
               </div>
-              <div className="font-heading" style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', marginBottom: 14 }}>
-                {isPatient ? 'Your AI health assistant is ready' : 'Clinical AI Diagnostic Intelligence Platform'}
-              </div>
+              <p style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.55, maxWidth: 460 }}>
+                {isPatient ? 'Your AI health assistant is ready.' : 'Clinical AI for voice, imaging, and report diagnostics.'}
+              </p>
               {isPatient && user?.patient_code && (
-                <span className="font-number" style={{ fontSize: 12, color: 'var(--cyan)', background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.15)', padding: '4px 12px', borderRadius: 20, marginBottom: 12, display: 'inline-block' }}>
-                  ID: {user.patient_code}
+                <span
+                  className="font-mono"
+                  style={{
+                    fontSize: 11.5,
+                    color: 'var(--accent)',
+                    background: 'var(--accent-soft)',
+                    border: '1px solid rgba(255, 107, 91, 0.22)',
+                    padding: '4px 10px',
+                    borderRadius: 999,
+                    marginBottom: 12,
+                    display: 'inline-block',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  ID · {user.patient_code}
                 </span>
               )}
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {['🎤 Voice Diagnosis', '🧠 Imaging AI', '📄 OCR Reports'].map(pill => (
-                  <span key={pill} className="font-body" style={{
-                    fontSize: 11, padding: '5px 14px', borderRadius: 20,
-                    background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
-                    border: '1px solid rgba(0,229,255,0.1)', color: 'var(--text)',
-                  }}>{pill}</span>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                {[
+                  { Icon: Mic, label: 'Voice' },
+                  { Icon: Brain, label: 'Imaging' },
+                  { Icon: FileText, label: 'Reports' },
+                ].map(p => (
+                  <span
+                    key={p.label}
+                    style={{
+                      fontSize: 11.5,
+                      padding: '5px 11px 5px 9px',
+                      borderRadius: 999,
+                      background: 'var(--elevated)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <p.Icon size={12} strokeWidth={1.75} style={{ color: 'var(--muted)' }} />
+                    {p.label}
+                  </span>
                 ))}
               </div>
             </div>
 
-            <div style={{
-              display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end',
-              background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(16px)',
-              border: '1px solid rgba(0,229,255,0.1)', borderRadius: 12,
-              padding: '16px 20px', position: 'relative', zIndex: 2,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green)', animation: 'pulse-dot 2s infinite', boxShadow: '0 0 8px rgba(0,255,157,0.4)' }} />
-                <span className="font-body" style={{ fontSize: 11, color: 'var(--green)', letterSpacing: '0.1em' }}>SYSTEM ONLINE</span>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+                alignItems: 'flex-end',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 14,
+                padding: '14px 18px',
+                position: 'relative',
+                zIndex: 2,
+                boxShadow: 'var(--shadow-z2)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: 'var(--green)',
+                    boxShadow: '0 0 0 3px rgba(63, 168, 108, 0.18)',
+                  }}
+                />
+                <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 500, letterSpacing: '-0.005em' }}>System online</span>
               </div>
-              <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>
-                {format(now, 'MMM d, yyyy')} — {format(now, 'HH:mm:ss')}
+              <span className="font-mono" style={{ fontSize: 11, color: 'var(--muted)', fontVariantNumeric: 'tabular-nums' }}>
+                {format(now, 'MMM d')} · {format(now, 'HH:mm:ss')}
               </span>
-              <span className="font-body" style={{ fontSize: 10, color: 'var(--dim)' }}>LLaMA 3 70B · Groq Inference</span>
               {sysInfo && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Clock size={11} style={{ color: 'var(--dim)' }} />
@@ -264,18 +365,14 @@ const Dashboard = () => {
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.05 }}
         style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16 }}
       >
-        <QuickActionCard emoji="🎤" title="Voice Diagnosis" desc="Speak or type symptoms. Get AI differential diagnosis in seconds."
-          stat={quickStats?.total_voice ?? 0} statLabel="diagnoses run" cta="Start Diagnosis →" to="/voice"
-          bgGrad="linear-gradient(135deg, #020608 0%, rgba(0,229,255,0.04) 100%)" accentColor="#00E5FF" />
-        <QuickActionCard emoji="🧠" title="Imaging AI" desc="Upload CT, MRI, X-Ray. OpenCV + LLaMA detects anomalies automatically."
-          stat={quickStats?.total_imaging ?? 0} statLabel="scans analyzed" cta="Analyze Scan →" to="/imaging"
-          bgGrad="linear-gradient(135deg, #020608 0%, rgba(0,255,157,0.04) 100%)" accentColor="#00FF9D" />
-        <QuickActionCard emoji="📄" title="OCR Reports" desc="Upload any medical PDF. AI extracts findings, flags, medications instantly."
-          stat={quickStats?.total_ocr ?? 0} statLabel="reports processed" cta="Process Report →" to="/ocr"
-          bgGrad="linear-gradient(135deg, #020608 0%, rgba(255,149,0,0.04) 100%)" accentColor="#FF9500" />
-        <QuickActionCard emoji="📅" title="Appointments" desc="Manage patient appointments. Track status and upcoming schedules."
-          stat={quickStats?.upcoming_appointments ?? 0} statLabel="upcoming" cta="View Schedule →" to="/appointments"
-          bgGrad="linear-gradient(135deg, #020608 0%, rgba(139,92,246,0.04) 100%)" accentColor="#8B5CF6" />
+        <QuickActionCard Icon={Mic} title="Voice diagnosis" desc="Speak or type symptoms. AI differential diagnosis in seconds."
+          stat={quickStats?.total_voice ?? 0} statLabel="run" cta="Start" to="/voice" accentColor="#FF6B5B" />
+        <QuickActionCard Icon={Brain} title="Imaging AI" desc="CT, MRI, X-Ray. Anomalies detected automatically."
+          stat={quickStats?.total_imaging ?? 0} statLabel="analyzed" cta="Analyze" to="/imaging" accentColor="#3FA86C" />
+        <QuickActionCard Icon={FileText} title="OCR reports" desc="Upload any medical PDF. AI extracts findings & medications."
+          stat={quickStats?.total_ocr ?? 0} statLabel="processed" cta="Process" to="/ocr" accentColor="#E89B3F" />
+        <QuickActionCard Icon={Calendar} title="Appointments" desc="Manage patient appointments and upcoming schedules."
+          stat={quickStats?.upcoming_appointments ?? 0} statLabel="upcoming" cta="Open" to="/appointments" accentColor="#5B7BFF" />
       </motion.div>
 
       {/* ═══════ 1C. METRICS ROW ═══════ */}

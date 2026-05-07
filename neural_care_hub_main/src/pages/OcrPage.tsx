@@ -230,7 +230,7 @@ const OCRReports = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Page Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div style={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>📄</div>
+        <div style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 12, background: 'rgba(232, 155, 63, 0.10)', border: '1px solid rgba(232, 155, 63, 0.22)', color: '#E89B3F' }}><FileText size={20} strokeWidth={1.75} /></div>
         <div>
           <h1 className="font-heading" style={{ fontSize: 24, color: 'var(--text)', margin: 0 }}>OCR Reports</h1>
           <p className="font-body" style={{ fontSize: 13, color: 'var(--muted)', margin: 0 }}>Extract and analyze medical documents with AI-powered OCR</p>

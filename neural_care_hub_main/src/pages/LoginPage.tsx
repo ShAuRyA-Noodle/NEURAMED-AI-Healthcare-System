@@ -2,9 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as THREE from 'three';
+import { ShieldCheck, Stethoscope, Mic, Brain, FileText, Pill, Globe, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { login as apiLogin, register as apiRegister } from '../api/auth';
-import LoginCursor from '../components/cursor/LoginCursor';
 
 // ─── PASSWORD STRENGTH ───
 const STRENGTH_LABELS = [
@@ -187,7 +187,7 @@ const DoctorCredentialsStep = ({ credentials, setCredentials, onBack, onSubmit }
   return (
     <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
-        <div style={{ fontSize: 28 }}>🩺</div>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--accent-soft)', border: '1px solid rgba(255,107,91,0.22)', color: 'var(--accent)', margin: '0 auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><ShieldCheck size={20} strokeWidth={1.75} /></div>
         <h3 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 18, color: '#EEF2F7', marginTop: 6, marginBottom: 4 }}>
           Verify your medical credentials
         </h3>
@@ -525,7 +525,6 @@ const LoginPage = () => {
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
-      <LoginCursor />
       <canvas ref={canvasRef} style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 }} />
 
       <div style={{
@@ -535,39 +534,84 @@ const LoginPage = () => {
       }}>
         {/* LEFT — Branding */}
         <div className="login-branding" style={{ pointerEvents: 'none', maxWidth: 480 }}>
-          <div style={{ fontSize: 72, marginBottom: 8, animation: 'float 3s ease-in-out infinite' }}>🏥</div>
-          <h1 style={{
-            fontFamily: 'Orbitron, sans-serif', fontWeight: 900, fontSize: 64,
-            background: 'linear-gradient(135deg, #00E5FF 0%, #00FF9D 50%, #00E5FF 100%)',
-            backgroundSize: '200% 200%',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            animation: 'gradientShift 3s ease infinite', lineHeight: 1.1, margin: 0,
-          }}>NEURAMED</h1>
-          <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 400, fontSize: 22, color: 'rgba(255,255,255,0.7)', marginTop: 8 }}>Clinical AI Diagnostic</p>
-          <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 28, color: '#EEF2F7', margin: 0 }}>Intelligence Platform</p>
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 18,
+              background: 'linear-gradient(135deg, var(--accent) 0%, #FF8576 100%)',
+              boxShadow: '0 16px 40px -12px rgba(255, 107, 91, 0.50), inset 0 1px 0 rgba(255,255,255,0.20)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 18,
+            }}
+          >
+            <Stethoscope size={30} color="#FFFFFF" strokeWidth={1.75} />
+          </div>
+          <h1
+            className="font-heading"
+            style={{
+              fontWeight: 600,
+              fontSize: 60,
+              color: 'var(--text)',
+              letterSpacing: '-0.04em',
+              lineHeight: 1.04,
+              margin: 0,
+            }}
+          >
+            Neuramed.
+          </h1>
+          <p style={{ fontSize: 17, color: 'var(--muted)', marginTop: 10, maxWidth: 420, lineHeight: 1.5 }}>
+            Clinical AI for voice, imaging and report diagnostics — built for clinicians.
+          </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 32 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 32 }}>
             {[
-              ['🎤', 'Voice Diagnosis — LLaMA 3 70B'],
-              ['🧠', 'Imaging AI — Groq Vision + ACR'],
-              ['📄', 'OCR Reports — Document Intelligence'],
-              ['💊', 'Drug Interactions — RxNorm AI'],
-              ['🗣️', 'Indian Languages — Sarvam AI'],
-            ].map(([emoji, text], i) => (
-              <motion.div key={i}
-                initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 + i * 0.12, duration: 0.5 }}
+              { Icon: Mic,      text: 'Voice diagnosis — LLaMA 3 70B' },
+              { Icon: Brain,    text: 'Imaging AI — Groq vision + ACR' },
+              { Icon: FileText, text: 'OCR reports — Document intelligence' },
+              { Icon: Pill,     text: 'Drug interactions — RxNorm AI' },
+              { Icon: Globe,    text: 'Indian languages — Sarvam AI' },
+            ].map(({ Icon, text }, i) => (
+              <motion.div
+                key={text}
+                initial={{ opacity: 0, x: -16 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.25 + i * 0.07, duration: 0.45, ease: [0.32, 0.72, 0, 1] }}
                 style={{
-                  background: 'rgba(0,229,255,0.06)', border: '1px solid rgba(0,229,255,0.15)',
-                  borderRadius: 24, padding: '10px 20px',
-                  fontFamily: '"DM Mono", monospace', fontSize: 13, color: '#00E5FF',
-                  backdropFilter: 'blur(10px)', display: 'inline-flex', alignItems: 'center', gap: 8,
-                }}>
-                <span>{emoji}</span> {text}
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 12,
+                  padding: '10px 14px 10px 12px',
+                  fontSize: 13,
+                  color: 'var(--text)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  width: 'max-content',
+                  boxShadow: 'var(--shadow-z1)',
+                }}
+              >
+                <span
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 8,
+                    background: 'var(--accent-soft)',
+                    color: 'var(--accent)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Icon size={14} strokeWidth={1.75} />
+                </span>
+                {text}
               </motion.div>
             ))}
           </div>
-          <p style={{ fontFamily: '"DM Mono", monospace', fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 48 }}>
+          <p style={{ fontSize: 12.5, color: 'var(--dim)', marginTop: 44 }}>
             Trusted by clinicians. Powered by AI.
           </p>
         </div>
@@ -641,9 +685,20 @@ const LoginPage = () => {
                         onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                         onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
                         onKeyDown={e => e.key === 'Enter' && handleLogin()} />
-                      <button onClick={() => setShowPassword(!showPassword)} style={{
-                        position: 'absolute', right: 12, top: 32, background: 'transparent', border: 'none', color: '#445566', cursor: 'pointer', fontSize: 16,
-                      }}>{showPassword ? '🙈' : '👁️'}</button>
+                      <button
+                        type="button"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: 'absolute', right: 10, top: 30,
+                          width: 28, height: 28, borderRadius: 8,
+                          background: 'transparent', border: 'none',
+                          color: 'var(--muted)', cursor: 'pointer',
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        }}
+                      >
+                        {showPassword ? <EyeOff size={15} strokeWidth={1.75} /> : <Eye size={15} strokeWidth={1.75} />}
+                      </button>
                     </div>
                     <button onClick={handleLogin} disabled={loading} style={{
                       width: '100%', height: 52, borderRadius: 12, border: 'none',
