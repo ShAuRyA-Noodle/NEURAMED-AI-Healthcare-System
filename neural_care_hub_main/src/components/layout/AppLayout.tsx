@@ -31,7 +31,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
         <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 90 }} />
       )}
-      <div className="main-content" style={{ marginLeft: 240, flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div className="main-content" style={{ marginLeft: 240, flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, position: 'relative', zIndex: 1 }}>
         <TopBar onMenuClick={() => setSidebarOpen(prev => !prev)} />
         <main style={{ flex: 1, padding: '28px 32px 56px', overflowY: 'auto', position: 'relative' }}>
           <AnimatePresence mode="wait">
