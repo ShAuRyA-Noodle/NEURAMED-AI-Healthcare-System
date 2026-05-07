@@ -2,8 +2,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { ReactLenis } from "lenis/react";
 import AppLayout from "./components/layout/AppLayout";
-import { CustomCursor } from "./components/cursor/CustomCursor";
 import { Toast } from "./components/shared/Toast";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { useAuth } from "./context/AuthContext";
@@ -30,6 +30,67 @@ const queryClient = new QueryClient({
   },
 });
 
+// Apple-tier smooth scroll easing — exponential ease-out
+const lenisOptions = {
+  duration: 1.15,
+  easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+  smoothWheel: true,
+  syncTouch: false,
+  wheelMultiplier: 1,
+  lerp: 0.1,
+} as const;
+
+const Splash = () => (
+  <div
+    style={{
+      height: "100vh",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "var(--bg)",
+      gap: 20,
+    }}
+  >
+    <div
+      style={{
+        width: 56,
+        height: 56,
+        borderRadius: 16,
+        background:
+          "linear-gradient(135deg, var(--accent) 0%, #FF8576 100%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        boxShadow:
+          "0 12px 32px -8px rgba(255, 107, 91, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.20)",
+      }}
+    >
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2v4" />
+        <path d="M12 18v4" />
+        <path d="M4.93 4.93l2.83 2.83" />
+        <path d="M16.24 16.24l2.83 2.83" />
+        <path d="M2 12h4" />
+        <path d="M18 12h4" />
+        <path d="M4.93 19.07l2.83-2.83" />
+        <path d="M16.24 7.76l2.83-2.83" />
+      </svg>
+    </div>
+    <span
+      className="font-heading"
+      style={{
+        color: "var(--text)",
+        fontSize: 17,
+        letterSpacing: "-0.01em",
+        fontWeight: 600,
+      }}
+    >
+      Neuramed
+    </span>
+  </div>
+);
+
 const App = () => {
   const [showSplash, setShowSplash] = useState(true);
 
@@ -39,9 +100,11 @@ const App = () => {
   }, []);
 
   return (
-    <BrowserRouter>
-      <AppRoutes showSplash={showSplash} />
-    </BrowserRouter>
+    <ReactLenis root options={lenisOptions}>
+      <BrowserRouter>
+        <AppRoutes showSplash={showSplash} />
+      </BrowserRouter>
+    </ReactLenis>
   );
 };
 
@@ -51,32 +114,17 @@ const AppRoutes = ({ showSplash }: { showSplash: boolean }) => {
   useKeepAlive();
 
   useEffect(() => {
-    const pageName = location.pathname.split('/')[1];
+    const pageName = location.pathname.split("/")[1];
     const title = pageName
-      ? `NEURAMED — ${pageName.charAt(0).toUpperCase() + pageName.slice(1).replace('-', ' ')}`
-      : 'NEURAMED — Dashboard';
+      ? `Neuramed — ${pageName.charAt(0).toUpperCase() + pageName.slice(1).replace("-", " ")}`
+      : "Neuramed — Overview";
     document.title = title;
   }, [location.pathname]);
 
-  // Show splash while loading or verifying auth
-  if (showSplash || isLoading) {
-    return (
-      <>
-        <CustomCursor />
-        <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', gap: 24 }}>
-          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" strokeWidth="1.5">
-            <polygon points="12 2 22 7 22 17 12 22 2 17 2 7 12 2" />
-            <polyline points="6 12 10 12 12 6 14 18 16 12 18 12" stroke="var(--cyan)" strokeWidth="1.5" strokeLinejoin="round" />
-          </svg>
-          <span className="font-heading" style={{ color: 'var(--text)', fontSize: 24, letterSpacing: '0.2em', fontWeight: 700 }}>NEURAMED</span>
-        </div>
-      </>
-    );
-  }
+  if (showSplash || isLoading) return <Splash />;
 
-  // NOT authenticated — only allow /login, block everything else
   if (!isAuthenticated) {
-    if (location.pathname === '/login') {
+    if (location.pathname === "/login") {
       return (
         <QueryClientProvider client={queryClient}>
           <Routes>
@@ -85,7 +133,6 @@ const AppRoutes = ({ showSplash }: { showSplash: boolean }) => {
         </QueryClientProvider>
       );
     }
-    // Any other URL without auth → redirect to login
     return (
       <QueryClientProvider client={queryClient}>
         <Routes>
@@ -95,8 +142,7 @@ const AppRoutes = ({ showSplash }: { showSplash: boolean }) => {
     );
   }
 
-  // Authenticated user visiting /login → send to dashboard
-  if (location.pathname === '/login') {
+  if (location.pathname === "/login") {
     return (
       <QueryClientProvider client={queryClient}>
         <Routes>
@@ -106,10 +152,8 @@ const AppRoutes = ({ showSplash }: { showSplash: boolean }) => {
     );
   }
 
-  // Authenticated — full app with layout
   return (
     <QueryClientProvider client={queryClient}>
-      <CustomCursor />
       <TooltipProvider>
         <Sonner />
         <AppLayout>

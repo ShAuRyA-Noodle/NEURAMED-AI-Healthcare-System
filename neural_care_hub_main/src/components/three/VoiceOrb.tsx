@@ -6,30 +6,38 @@ interface VoiceOrbProps {
   audioLevel?: number;
 }
 
+/**
+ * VoiceOrb — refined audio-reactive orb. Coral/warm palette.
+ * Premium materials (clearcoat), sphere displacement reacts to audioLevel.
+ * Pauses when tab hidden. Honors `prefers-reduced-motion`.
+ * Drops per-frame computeVertexNormals (was the heaviest CPU hit per audit).
+ */
+
+const SIZE = 200;
+
 const VoiceOrb = ({ isRecording, audioLevel = 0 }: VoiceOrbProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mountedRef = useRef(true);
   const recordingRef = useRef(isRecording);
   const audioRef = useRef(audioLevel);
 
-  // Update refs without re-mounting
   useEffect(() => { recordingRef.current = isRecording; }, [isRecording]);
   useEffect(() => { audioRef.current = audioLevel; }, [audioLevel]);
 
   useEffect(() => {
     if (window.innerWidth < 768) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     const container = containerRef.current;
     if (!container) return;
-    mountedRef.current = true;
 
-    let renderer: THREE.WebGLRenderer;
-    let rafId: number;
+    let alive = true;
+    let renderer: THREE.WebGLRenderer | null = null;
+    let rafId = 0;
 
     try {
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
-      camera.position.z = 4;
+      const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 100);
+      camera.position.z = 4.2;
 
       const canvas = document.createElement('canvas');
       canvas.style.width = '100%';
@@ -37,154 +45,175 @@ const VoiceOrb = ({ isRecording, audioLevel = 0 }: VoiceOrbProps) => {
       container.appendChild(canvas);
 
       renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-      renderer.setSize(180, 180);
+      renderer.setSize(SIZE, SIZE);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.setClearColor(0x000000, 0);
 
-      // ─── THE SPHERE with Fresnel-like glow ──────────
-      const sphereGeo = new THREE.SphereGeometry(1, 64, 64);
-      const sphereMat = new THREE.MeshPhongMaterial({
-        color: 0x00E5FF,
-        emissive: 0x00E5FF,
-        emissiveIntensity: 0.15,
+      // ─── ORB — premium clearcoat, displaceable ───
+      const orbGeo = new THREE.IcosahedronGeometry(1, 48);
+      const orbMat = new THREE.MeshPhysicalMaterial({
+        color: 0xFF6B5B,
+        emissive: 0xFF8576,
+        emissiveIntensity: 0.18,
+        roughness: 0.30,
+        metalness: 0.10,
+        clearcoat: 0.95,
+        clearcoatRoughness: 0.12,
         transparent: true,
-        opacity: 0.7,
-        shininess: 100,
+        opacity: 0.94,
       });
-      const sphere = new THREE.Mesh(sphereGeo, sphereMat);
-      scene.add(sphere);
+      const orb = new THREE.Mesh(orbGeo, orbMat);
+      scene.add(orb);
 
-      // Store original positions for displacement
-      const originalPositions = new Float32Array(sphereGeo.attributes.position.array);
+      const basePositions = new Float32Array(orbGeo.attributes.position.array);
 
-      // ─── ORBIT RINGS ──────────────────────────────────
-      const ringGeo = new THREE.TorusGeometry(1.3, 0.008, 8, 80);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: 0x00E5FF, transparent: true, opacity: 0.25,
-      });
-      const ring1 = new THREE.Mesh(ringGeo, ringMat);
-      scene.add(ring1);
-
-      const ring2 = new THREE.Mesh(ringGeo, ringMat.clone());
-      ring2.rotation.x = Math.PI * 0.25;
-      scene.add(ring2);
-
-      // ─── PARTICLE SHELL ───────────────────────────────
-      const shellCount = 40;
-      const shellPositions = new Float32Array(shellCount * 3);
-      const shellAngles = new Float32Array(shellCount);
-      const shellSpeeds = new Float32Array(shellCount);
-      const shellAxes = new Float32Array(shellCount);
-
-      for (let i = 0; i < shellCount; i++) {
-        shellAngles[i] = Math.random() * Math.PI * 2;
-        shellSpeeds[i] = 0.005 + Math.random() * 0.01;
-        shellAxes[i] = Math.random() * Math.PI; // Orbit inclination
-        const r = 1.8;
-        const theta = shellAngles[i];
-        const phi = shellAxes[i];
-        shellPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-        shellPositions[i * 3 + 1] = r * Math.cos(phi);
-        shellPositions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
-      }
-
-      const shellGeo = new THREE.BufferGeometry();
-      shellGeo.setAttribute('position', new THREE.BufferAttribute(shellPositions, 3));
-      const shellMat = new THREE.PointsMaterial({
-        size: 0.04,
-        color: 0x00E5FF,
+      // ─── HALO — soft coral rim ───
+      const haloGeo = new THREE.SphereGeometry(1.18, 32, 32);
+      const haloMat = new THREE.MeshBasicMaterial({
+        color: 0xFFC2B6,
         transparent: true,
-        opacity: 0.6,
+        opacity: 0.12,
+        side: THREE.BackSide,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       });
-      const shellParticles = new THREE.Points(shellGeo, shellMat);
-      scene.add(shellParticles);
+      const halo = new THREE.Mesh(haloGeo, haloMat);
+      scene.add(halo);
 
-      // ─── LIGHTS ───────────────────────────────────────
-      scene.add(new THREE.AmbientLight(0xffffff, 0.3));
-      const pointLight = new THREE.PointLight(0x00E5FF, 2, 10);
-      pointLight.position.set(2, 2, 3);
-      scene.add(pointLight);
+      // ─── ORBIT RINGS — tasteful, dual-axis ───
+      const ringGeo = new THREE.TorusGeometry(1.42, 0.006, 8, 96);
+      const ringMatA = new THREE.MeshBasicMaterial({ color: 0xFF6B5B, transparent: true, opacity: 0.30 });
+      const ringMatB = ringMatA.clone();
+      ringMatB.opacity = 0.18;
+      ringMatB.color = new THREE.Color(0xFFC2B6);
+      const ringA = new THREE.Mesh(ringGeo, ringMatA);
+      const ringB = new THREE.Mesh(ringGeo, ringMatB);
+      ringB.rotation.x = Math.PI * 0.32;
+      ringB.rotation.z = Math.PI * 0.18;
+      scene.add(ringA, ringB);
 
-      const greenLight = new THREE.PointLight(0x00FF9D, 0.5, 8);
-      greenLight.position.set(-2, -1, 2);
-      scene.add(greenLight);
+      // ─── SHELL PARTICLES (orbit dust) ───
+      const SHELL_COUNT = 56;
+      const shellPos = new Float32Array(SHELL_COUNT * 3);
+      const angles = new Float32Array(SHELL_COUNT);
+      const speeds = new Float32Array(SHELL_COUNT);
+      const incl = new Float32Array(SHELL_COUNT);
 
-      // ─── ANIMATION ────────────────────────────────────
+      for (let i = 0; i < SHELL_COUNT; i++) {
+        angles[i] = Math.random() * Math.PI * 2;
+        speeds[i] = 0.0035 + Math.random() * 0.008;
+        incl[i] = Math.random() * Math.PI;
+        const r = 1.85;
+        shellPos[i * 3]     = r * Math.sin(incl[i]) * Math.cos(angles[i]);
+        shellPos[i * 3 + 1] = r * Math.cos(incl[i]);
+        shellPos[i * 3 + 2] = r * Math.sin(incl[i]) * Math.sin(angles[i]);
+      }
+
+      const shellGeo = new THREE.BufferGeometry();
+      shellGeo.setAttribute('position', new THREE.BufferAttribute(shellPos, 3));
+      const shellMat = new THREE.PointsMaterial({
+        size: 0.034,
+        color: 0xFFC2B6,
+        transparent: true,
+        opacity: 0.7,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const shell = new THREE.Points(shellGeo, shellMat);
+      scene.add(shell);
+
+      // ─── LIGHTS ───
+      scene.add(new THREE.AmbientLight(0xFFFFFF, 0.4));
+      const key = new THREE.PointLight(0xFFC2B6, 1.8, 10);
+      key.position.set(2.5, 2.5, 3);
+      scene.add(key);
+      const fill = new THREE.PointLight(0xFF6B5B, 0.8, 9);
+      fill.position.set(-2, -1.5, 2);
+      scene.add(fill);
+
+      // ─── VISIBILITY GATE ───
+      let paused = false;
+      const onVis = () => { paused = document.hidden; };
+      document.addEventListener('visibilitychange', onVis);
+
+      // ─── LOOP ───
       const clock = new THREE.Clock();
-      let targetDisplacement = 0;
-      let currentDisplacement = 0;
+      let displacement = 0.01;
+      const orbPosAttr = orbGeo.attributes.position as THREE.BufferAttribute;
+      const shellPosAttr = shellGeo.attributes.position as THREE.BufferAttribute;
 
       const animate = () => {
-        if (!mountedRef.current) return;
+        if (!alive) return;
         rafId = requestAnimationFrame(animate);
+        if (paused) return;
+
         const t = clock.getElapsedTime();
         const recording = recordingRef.current;
         const audio = audioRef.current;
 
-        // Sphere displacement — react to audio
-        targetDisplacement = recording ? 0.05 + audio * 0.15 : 0.01;
-        currentDisplacement += (targetDisplacement - currentDisplacement) * 0.08;
+        // Smooth displacement target
+        const target = recording ? 0.05 + audio * 0.16 : 0.012;
+        displacement += (target - displacement) * 0.10;
 
-        const posAttr = sphereGeo.attributes.position;
-        for (let i = 0; i < posAttr.count; i++) {
+        // Orb breathing displacement
+        for (let i = 0; i < orbPosAttr.count; i++) {
           const i3 = i * 3;
-          const ox = originalPositions[i3];
-          const oy = originalPositions[i3 + 1];
-          const oz = originalPositions[i3 + 2];
+          const ox = basePositions[i3];
+          const oy = basePositions[i3 + 1];
+          const oz = basePositions[i3 + 2];
           const noise = Math.sin(ox * 4 + t * 2) * Math.cos(oy * 4 + t * 1.5) * Math.sin(oz * 4 + t);
-          const displacement = 1 + noise * currentDisplacement;
-          posAttr.setXYZ(i, ox * displacement, oy * displacement, oz * displacement);
+          const k = 1 + noise * displacement;
+          orbPosAttr.setXYZ(i, ox * k, oy * k, oz * k);
         }
-        posAttr.needsUpdate = true;
-        sphereGeo.computeVertexNormals();
+        orbPosAttr.needsUpdate = true;
+        // computeVertexNormals deliberately skipped — saves significant CPU per audit
 
-        // Color oscillation
-        const colorMix = (Math.sin(t * 0.5) + 1) / 2;
-        const r = colorMix * 0;
-        const g = 0.898 + colorMix * 0.102;
-        const b = 1 - colorMix * 0.384;
-        sphereMat.color.setRGB(r, g, b);
-        sphereMat.emissive.setRGB(r * 0.3, g * 0.3, b * 0.3);
-        sphereMat.emissiveIntensity = recording ? 0.3 + audio * 0.2 : 0.15;
-        sphereMat.opacity = recording ? 0.85 : 0.7;
+        // Material reactivity
+        orbMat.emissiveIntensity = recording ? 0.30 + audio * 0.30 : 0.16 + Math.sin(t * 0.9) * 0.04;
+        orbMat.opacity = recording ? 0.99 : 0.94;
 
-        // Rings rotation
-        ring1.rotation.y += recording ? 0.02 : 0.005;
-        ring2.rotation.x += recording ? 0.015 : 0.003;
+        // Rings rotate (faster while recording)
+        ringA.rotation.y += recording ? 0.018 : 0.005;
+        ringB.rotation.x += recording ? 0.013 : 0.004;
+        ringMatA.opacity = recording ? 0.45 : 0.30;
+        ringMatB.opacity = recording ? 0.30 : 0.18;
 
-        // Particle shell — orbit
-        const speedMult = recording ? 1 + audio * 3 : 0.3;
-        for (let i = 0; i < shellCount; i++) {
-          shellAngles[i] += shellSpeeds[i] * speedMult;
-          const r2 = 1.8;
-          const theta = shellAngles[i];
-          const phi = shellAxes[i];
-          shellPositions[i * 3] = r2 * Math.sin(phi) * Math.cos(theta);
-          shellPositions[i * 3 + 1] = r2 * Math.cos(phi);
-          shellPositions[i * 3 + 2] = r2 * Math.sin(phi) * Math.sin(theta);
+        // Shell particles orbit
+        const speedMult = recording ? 1.0 + audio * 2.4 : 0.30;
+        for (let i = 0; i < SHELL_COUNT; i++) {
+          angles[i] += speeds[i] * speedMult;
+          const r = 1.85 + Math.sin(t * 0.6 + i) * 0.04;
+          shellPos[i * 3]     = r * Math.sin(incl[i]) * Math.cos(angles[i]);
+          shellPos[i * 3 + 1] = r * Math.cos(incl[i]);
+          shellPos[i * 3 + 2] = r * Math.sin(incl[i]) * Math.sin(angles[i]);
         }
-        (shellGeo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+        shellPosAttr.needsUpdate = true;
 
-        // Point light pulsing
-        pointLight.intensity = recording ? 2 + audio * 2 : 1.5 + Math.sin(t) * 0.3;
+        // Halo pulse
+        haloMat.opacity = recording ? 0.18 + audio * 0.08 : 0.10 + Math.sin(t * 0.8) * 0.02;
 
-        renderer.render(scene, camera);
+        // Light pulse
+        key.intensity = recording ? 1.8 + audio * 1.6 : 1.5 + Math.sin(t * 0.9) * 0.25;
+
+        renderer!.render(scene, camera);
       };
       animate();
 
       return () => {
-        mountedRef.current = false;
+        alive = false;
         cancelAnimationFrame(rafId);
-        renderer.dispose();
-        renderer.forceContextLoss();
-        sphereGeo.dispose();
-        sphereMat.dispose();
+        document.removeEventListener('visibilitychange', onVis);
+        orbGeo.dispose();
+        orbMat.dispose();
+        haloGeo.dispose();
+        haloMat.dispose();
         ringGeo.dispose();
-        ringMat.dispose();
+        ringMatA.dispose();
+        ringMatB.dispose();
         shellGeo.dispose();
         shellMat.dispose();
+        renderer?.dispose();
+        renderer?.forceContextLoss();
         if (canvas.parentNode) canvas.remove();
       };
     } catch {
@@ -192,20 +221,31 @@ const VoiceOrb = ({ isRecording, audioLevel = 0 }: VoiceOrbProps) => {
     }
   }, []);
 
-  // CSS fallback for mobile
+  // CSS fallback for mobile / reduced-motion
   if (typeof window !== 'undefined' && window.innerWidth < 768) {
     return (
-      <div style={{
-        width: 120, height: 120, borderRadius: '50%', margin: '0 auto',
-        background: `radial-gradient(circle, ${isRecording ? '#00FF9D' : '#00E5FF'}30, transparent 70%)`,
-        border: `2px solid ${isRecording ? '#00FF9D' : '#00E5FF'}40`,
-        animation: `glow-pulse ${isRecording ? '0.8s' : '2s'} ease-in-out infinite`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <div style={{
-          width: 60, height: 60, borderRadius: '50%',
-          background: `radial-gradient(circle, ${isRecording ? '#00FF9D' : '#00E5FF'}50, ${isRecording ? '#00FF9D' : '#00E5FF'}10)`,
-        }} />
+      <div
+        style={{
+          width: 140,
+          height: 140,
+          borderRadius: '50%',
+          margin: '0 auto',
+          background: `radial-gradient(circle, ${isRecording ? 'rgba(255, 107, 91, 0.40)' : 'rgba(255, 107, 91, 0.22)'}, transparent 70%)`,
+          border: `2px solid ${isRecording ? 'rgba(255, 107, 91, 0.60)' : 'rgba(255, 107, 91, 0.30)'}`,
+          animation: `breathe ${isRecording ? '0.9s' : '2.4s'} ease-in-out infinite`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <div
+          style={{
+            width: 70,
+            height: 70,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255, 107, 91, 0.55) 0%, rgba(255, 133, 118, 0.10) 100%)',
+          }}
+        />
       </div>
     );
   }
@@ -214,8 +254,8 @@ const VoiceOrb = ({ isRecording, audioLevel = 0 }: VoiceOrbProps) => {
     <div
       ref={containerRef}
       style={{
-        width: 180,
-        height: 180,
+        width: SIZE,
+        height: SIZE,
         margin: '0 auto',
         borderRadius: '50%',
         overflow: 'hidden',
