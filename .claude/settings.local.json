@@ -3,7 +3,14 @@
     "allow": [
       "Bash(ls \"c:/Users/Dell/Desktop/Project01/frontend/.env\"*)",
       "Bash(ls \"c:/Users/Dell/Desktop/Project01/neural-care-hub-main/.env\"*)",
-      "Bash(curl -s http://localhost:8000/api/sarvam/health)"
+      "Bash(curl -s http://localhost:8000/api/sarvam/health)",
+      "Bash(mkdir -p \"c:/Users/Dell/Desktop/Google_Drive/AI Agent Healthcare/.claude/_temp\")",
+      "Bash(git clone *)",
+      "Bash(mkdir -p \"c:/Users/Dell/Desktop/Google_Drive/AI Agent Healthcare/.claude/skills\")",
+      "Bash(cp -r \"c:/Users/Dell/Desktop/Google_Drive/AI Agent Healthcare/.claude/_temp/taste-skill/skills/taste-skill\" \"c:/Users/Dell/Desktop/Google_Drive/AI Agent Healthcare/.claude/skills/\")",
+      "Bash(cp -r \"c:/Users/Dell/Desktop/Google_Drive/AI Agent Healthcare/.claude/_temp/taste-skill/skills/redesign-skill\" \"c:/Users/Dell/Desktop/Google_Drive/AI Agent Healthcare/.claude/skills/\")",
+      "Bash(cp -r \"c:/Users/Dell/Desktop/Google_Drive/AI Agent Healthcare/.claude/_temp/taste-skill/skills/soft-skill\" \"c:/Users/Dell/Desktop/Google_Drive/AI Agent Healthcare/.claude/skills/\")",
+      "Bash(cp -r \"c:/Users/Dell/Desktop/Google_Drive/AI Agent Healthcare/.claude/_temp/taste-skill/skills/minimalist-skill\" \"c:/Users/Dell/Desktop/Google_Drive/AI Agent Healthcare/.claude/skills/\")"
     ]
   }
 }
