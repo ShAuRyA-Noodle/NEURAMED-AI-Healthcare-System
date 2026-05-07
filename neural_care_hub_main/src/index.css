@@ -75,9 +75,10 @@
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'DM Mono', monospace;
+  font-family: 'Geist', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.005em;
 }
 
 h1,
@@ -86,19 +87,42 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: 'Syne', sans-serif;
+  font-family: 'Geist', system-ui, sans-serif;
+  letter-spacing: -0.025em;
 }
 
 .font-heading {
-  font-family: 'Syne', sans-serif;
+  font-family: 'Geist', system-ui, sans-serif;
+  letter-spacing: -0.02em;
 }
 
 .font-body {
-  font-family: 'DM Mono', monospace;
+  font-family: 'Geist', system-ui, sans-serif;
 }
 
 .font-number {
-  font-family: 'Orbitron', sans-serif;
+  font-family: 'Geist Mono', 'JetBrains Mono', ui-monospace, monospace;
+  font-feature-settings: 'tnum', 'zero';
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   FONT FAMILY OVERRIDES — old code references "DM Mono", "Orbitron",
+   "Syne" inline via fontFamily strings. Catch them via attribute
+   selectors and remap to the Geist family without touching JSX.
+   ────────────────────────────────────────────────────────────────── */
+[style*="DM Mono"],
+[style*="Orbitron"],
+[class*="font-orbitron"],
+[class*="font-mono"] {
+  font-family: 'Geist Mono', 'JetBrains Mono', ui-monospace, monospace !important;
+  font-feature-settings: 'tnum', 'zero';
+}
+
+[style*="Syne"],
+[class*="font-syne"],
+[class*="font-heading"] {
+  font-family: 'Geist', system-ui, sans-serif !important;
+  letter-spacing: -0.02em;
 }
 
 @keyframes shimmer {
