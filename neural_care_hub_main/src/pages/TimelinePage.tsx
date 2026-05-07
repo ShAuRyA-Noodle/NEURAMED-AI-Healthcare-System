@@ -5,27 +5,33 @@ import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, TrendingUp, TrendingDown, AlertTriangle, Activity,
   Clock, Heart, Stethoscope, ChevronDown, ChevronUp, Minus,
+  Mic, Brain, FileText, FlaskConical, type LucideIcon,
 } from 'lucide-react';
 import { getPatientTimeline } from '@/api/timeline';
 import type { TimelineEntry, TrendAnalysis } from '@/types';
 
-// ─── COLORS ───
+// ─── COLORS — coral palette aligned ───
 const urgencyColor = (u: string) => {
   const l = u?.toLowerCase();
-  return l === 'critical' ? '#FF3B5C' : l === 'high' ? '#FF9500' : l === 'medium' ? '#00E5FF' : '#445566';
+  return l === 'critical' ? '#DC4D4D' : l === 'high' ? '#E89B3F' : l === 'medium' ? '#FF6B5B' : '#6B6B70';
 };
 
 const trajectoryColor = (t: string) => {
   const l = t?.toLowerCase();
-  return l === 'improving' ? '#00FF9D' : l === 'worsening' ? '#FF3B5C' : l === 'stable' ? '#00E5FF' : '#445566';
+  return l === 'improving' ? '#3FA86C' : l === 'worsening' ? '#DC4D4D' : l === 'stable' ? '#FF6B5B' : '#6B6B70';
+};
+
+const agentIconComponent = (type: string): LucideIcon => {
+  const l = type?.toLowerCase();
+  if (l === 'voice') return Mic;
+  if (l === 'imaging') return Brain;
+  if (l === 'ocr') return FileText;
+  return FlaskConical;
 };
 
 const agentIcon = (type: string) => {
-  const l = type?.toLowerCase();
-  if (l === 'voice') return '🎤';
-  if (l === 'imaging') return '🧠';
-  if (l === 'ocr') return '📄';
-  return '🔬';
+  const Icon = agentIconComponent(type);
+  return <Icon size={14} strokeWidth={1.75} style={{ display: 'inline-block', verticalAlign: '-2px' }} />;
 };
 
 // ─── MINI SPARKLINE SVG ───

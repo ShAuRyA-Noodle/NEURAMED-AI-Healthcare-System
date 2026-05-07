@@ -1,5 +1,7 @@
 [phases.setup]
-nixPkgs = ["python311", "tesseract"]
+# poppler is required by pdf2image (provides pdftoppm)
+# tesseract is required by pytesseract OCR fallback
+nixPkgs = ["python311", "tesseract", "poppler_utils"]
 
 [phases.install]
 cmds = ["pip install -r backend/requirements.txt"]
