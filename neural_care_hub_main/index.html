@@ -1,21 +1,25 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0A0A0B" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#FBFAF7" media="(prefers-color-scheme: light)" />
+    <meta name="color-scheme" content="dark light" />
     <title>NEURAMED — Clinical AI Platform</title>
     <meta name="description" content="AI-powered clinical diagnostic platform with voice diagnosis, medical imaging, and OCR report intelligence." />
     <meta name="author" content="ShAuRyA Punj" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Orbitron:wght@500;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+    <!-- Geist + Geist Mono — soft-skill / taste-skill approved typography stack -->
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
     <meta property="og:title" content="NEURAMED — Clinical AI Platform" />
     <meta property="og:description" content="AI-powered clinical diagnostics — voice, imaging, OCR" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
   </head>
 
-  <body style="background:#020608;margin:0">
+  <body style="background:#0A0A0B;margin:0">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
