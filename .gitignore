@@ -28,6 +28,9 @@ frontend/node_modules/
 *.swp
 *.swo
 
+# Claude transient
+.claude/_temp/
+
 # OS
 .DS_Store
 Thumbs.db
