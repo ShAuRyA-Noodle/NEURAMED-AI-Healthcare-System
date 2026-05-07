@@ -1,0 +1,82 @@
+# Google Drive sync ignore — keep heavy/regenerable junk out of cloud sync
+# Format mirrors .gitignore. Add to Drive client's exclusion list if not auto-honored.
+
+# ── Node / frontend ───────────────────────────────────────────────
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+build/
+**/build/
+.vite/
+**/.vite/
+.next/
+.turbo/
+.cache/
+.parcel-cache/
+*.tsbuildinfo
+bun.lockb
+package-lock.json
+
+# ── Python / backend ──────────────────────────────────────────────
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Secrets / env ─────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.env.local
+*.pem
+*.key
+
+# ── DB / data / uploads (heavy + regenerable) ─────────────────────
+*.db
+*.db.backup
+*.sqlite
+*.sqlite3
+uploads/
+**/uploads/
+neuramed.db*
+
+# ── Build output / generated artifacts ────────────────────────────
+*.log
+logs/
+coverage/
+.nyc_output/
+test_output.pdf
+
+# ── Editor / OS ───────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Git internals (Drive should never sync these) ─────────────────
+.git/
+**/.git/
+
+# ── Claude / agent caches ─────────────────────────────────────────
+.claude/
+**/.claude/
+memory/
+
+# ── Misc large / temporary ────────────────────────────────────────
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.rar
+tmp/
+temp/

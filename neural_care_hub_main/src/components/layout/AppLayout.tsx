@@ -31,16 +31,16 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
         <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 90 }} />
       )}
-      <div className="main-content" style={{ marginLeft: 220, flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div className="main-content" style={{ marginLeft: 240, flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <TopBar onMenuClick={() => setSidebarOpen(prev => !prev)} />
-        <main style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
+        <main style={{ flex: 1, padding: '28px 32px 56px', overflowY: 'auto', position: 'relative' }}>
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
             >
               {children}
             </motion.div>

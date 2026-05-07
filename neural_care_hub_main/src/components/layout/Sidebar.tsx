@@ -1,17 +1,38 @@
 import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Mic, ScanLine, FileSearch, Users, Calendar, Activity, Power, Pill, Globe } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Mic,
+  ScanLine,
+  FileSearch,
+  Users,
+  Calendar,
+  Activity,
+  Power,
+  Pill,
+  Globe,
+  Stethoscope,
+  UserRound,
+} from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/api/client';
 import { useAuth } from '../../context/AuthContext';
 
-const ALL_NAV_ITEMS = [
+type NavItem = {
+  path: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  roles: ('doctor' | 'patient')[];
+  badge?: boolean;
+};
+
+const ALL_NAV_ITEMS: NavItem[] = [
   { path: '/dashboard', label: 'Overview', icon: LayoutDashboard, roles: ['doctor', 'patient'] },
-  { path: '/voice', label: 'Voice Agent', icon: Mic, roles: ['doctor', 'patient'] },
-  { path: '/voice/vernacular', label: 'Indian Languages', icon: Globe, roles: ['doctor', 'patient'] },
+  { path: '/voice', label: 'Voice agent', icon: Mic, roles: ['doctor', 'patient'] },
+  { path: '/voice/vernacular', label: 'Indian languages', icon: Globe, roles: ['doctor', 'patient'] },
   { path: '/imaging', label: 'Imaging AI', icon: ScanLine, roles: ['doctor', 'patient'] },
-  { path: '/ocr', label: 'OCR Reports', icon: FileSearch, roles: ['doctor', 'patient'] },
-  { path: '/drug-interactions', label: 'Drug Interactions', icon: Pill, roles: ['doctor', 'patient'] },
+  { path: '/ocr', label: 'OCR reports', icon: FileSearch, roles: ['doctor', 'patient'] },
+  { path: '/drug-interactions', label: 'Drug interactions', icon: Pill, roles: ['doctor', 'patient'] },
   { path: '/patients', label: 'Patients', icon: Users, roles: ['doctor'] },
   { path: '/appointments', label: 'Appointments', icon: Calendar, roles: ['doctor'] },
   { path: '/sessions', label: 'Sessions', icon: Activity, roles: ['doctor'], badge: true },
@@ -21,7 +42,6 @@ const Sidebar = ({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }
   const location = useLocation();
   const { user, logout, isDoctor } = useAuth();
 
-  // Session count badge
   useEffect(() => {
     if (location.pathname.startsWith('/sessions')) {
       localStorage.setItem('neuramed-last-sessions-visit', new Date().toISOString());
@@ -40,21 +60,36 @@ const Sidebar = ({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }
   const commonItems = navItems.filter(item => item.roles.includes('patient'));
   const doctorItems = navItems.filter(item => !item.roles.includes('patient'));
 
-  const renderNavItem = (item: typeof ALL_NAV_ITEMS[0]) => {
-    const isActive = item.path === '/dashboard' ? location.pathname === '/dashboard' : location.pathname.startsWith(item.path);
+  const renderNavItem = (item: NavItem) => {
+    const isActive = item.path === '/dashboard'
+      ? location.pathname === '/dashboard'
+      : location.pathname.startsWith(item.path);
     const Icon = item.icon;
     return (
-      <Link key={item.path} to={item.path} onClick={onClose} data-cursor="hover"
+      <Link
+        key={item.path}
+        to={item.path}
+        onClick={onClose}
         style={{
-          height: 42, padding: '0 12px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 12,
-          fontFamily: '"DM Mono", monospace', fontSize: 13, transition: 'all 250ms cubic-bezier(0.16, 1, 0.3, 1)',
-          textDecoration: 'none', position: 'relative', overflow: 'hidden',
+          height: 38,
+          padding: '0 12px',
+          borderRadius: 10,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          fontFamily: 'inherit',
+          fontSize: 13.5,
+          fontWeight: isActive ? 500 : 400,
+          letterSpacing: '-0.005em',
+          textDecoration: 'none',
+          position: 'relative',
           color: isActive ? 'var(--text)' : 'var(--muted)',
-          background: isActive ? 'linear-gradient(90deg, rgba(0,229,255,0.1) 0%, rgba(0,229,255,0.02) 100%)' : 'transparent',
+          background: isActive ? 'var(--accent-soft)' : 'transparent',
+          transition: 'background 200ms var(--spring), color 200ms var(--spring)',
         }}
         onMouseEnter={e => {
           if (!isActive) {
-            e.currentTarget.style.background = 'rgba(255,255,255,0.025)';
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.035)';
             e.currentTarget.style.color = 'var(--text)';
           }
         }}
@@ -65,47 +100,42 @@ const Sidebar = ({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }
           }
         }}
       >
-        {/* Active left edge glow */}
-        <div style={{
-          position: 'absolute', left: 0, top: '15%', bottom: '15%', width: 2, borderRadius: 2,
-          background: isActive ? 'var(--cyan)' : 'transparent',
-          boxShadow: isActive ? '0 0 8px rgba(0,229,255,0.5)' : 'none',
-          transition: 'all 250ms cubic-bezier(0.16, 1, 0.3, 1)',
-        }} />
-
-        {/* Active shimmer sweep */}
+        {/* Active accent rail — coral 2px stripe */}
         {isActive && (
-          <div style={{
-            position: 'absolute', inset: 0,
-            background: 'linear-gradient(90deg, transparent 0%, rgba(0,229,255,0.04) 50%, transparent 100%)',
-            animation: 'shimmer-sweep 3s ease-in-out infinite',
-            pointerEvents: 'none',
-          }} />
+          <span
+            aria-hidden
+            style={{
+              position: 'absolute',
+              left: -2,
+              top: 8,
+              bottom: 8,
+              width: 2,
+              borderRadius: 2,
+              background: 'var(--accent)',
+            }}
+          />
         )}
-
-        <Icon size={16} strokeWidth={1.5} style={{
-          color: isActive ? 'var(--cyan)' : 'currentColor',
-          filter: isActive ? 'drop-shadow(0 0 4px rgba(0,229,255,0.4))' : 'none',
-          transition: 'all 250ms',
-        }} />
+        <Icon size={16} strokeWidth={1.75} style={{ color: isActive ? 'var(--accent)' : 'currentColor', flexShrink: 0 }} />
         <span style={{ flex: 1 }}>{item.label}</span>
-
-        {/* Active pulsing dot */}
-        {isActive && (
-          <div style={{
-            width: 4, height: 4, borderRadius: '50%', background: 'var(--cyan)',
-            animation: 'glow-pulse 2s ease-in-out infinite',
-            boxShadow: '0 0 6px rgba(0,229,255,0.5)',
-          }} />
-        )}
-
-        {item.badge && sessionBadge > 0 && !isActive && (
-          <span style={{
-            minWidth: 18, height: 18, borderRadius: 9, background: 'var(--red)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'Orbitron, sans-serif', fontSize: 10, color: '#fff', padding: '0 4px',
-            boxShadow: '0 0 8px rgba(255,59,92,0.3)',
-          }}>
+        {item.badge && sessionBadge > 0 && (
+          <span
+            style={{
+              minWidth: 20,
+              height: 18,
+              padding: '0 6px',
+              borderRadius: 999,
+              background: isActive ? 'var(--accent)' : 'var(--elevated)',
+              color: isActive ? 'var(--accent-on)' : 'var(--text)',
+              border: isActive ? 'none' : '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontFamily: 'var(--font-mono, "Geist Mono"), monospace',
+              fontSize: 10,
+              fontWeight: 600,
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
             {sessionBadge > 99 ? '99+' : sessionBadge}
           </span>
         )}
@@ -114,146 +144,156 @@ const Sidebar = ({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }
   };
 
   return (
-    <div className={`sidebar-container ${isOpen ? 'open' : ''}`} style={{
-      width: 220,
-      background: 'linear-gradient(180deg, rgba(11,16,21,0.95) 0%, rgba(6,10,14,0.98) 100%)',
-      backdropFilter: 'blur(20px) saturate(150%)',
-      height: '100vh', position: 'fixed', display: 'flex', flexDirection: 'column', zIndex: 100,
-      transition: 'transform 300ms cubic-bezier(0.16, 1, 0.3, 1)',
-    }}>
-      {/* Right edge gradient glow line */}
-      <div style={{
-        position: 'absolute', right: 0, top: 0, bottom: 0, width: 1,
-        background: 'linear-gradient(180deg, transparent 5%, rgba(0,229,255,0.15) 50%, transparent 95%)',
-        animation: 'glow-pulse 3s ease-in-out infinite',
-      }} />
-
-      {/* Data stream dots on left edge */}
-      {[0, 1, 2, 3, 4].map(i => (
-        <div key={i} style={{
-          position: 'absolute', left: 0, top: 0, width: 2, height: 2, borderRadius: '50%',
-          background: 'rgba(0,229,255,0.6)',
-          animation: `data-stream ${3 + i * 0.7}s linear ${i * 0.6}s infinite`,
-          zIndex: 1,
-        }} />
-      ))}
-
+    <aside
+      className={`sidebar-container ${isOpen ? 'open' : ''}`}
+      style={{
+        width: 240,
+        background: 'var(--canvas)',
+        borderRight: '1px solid var(--border)',
+        height: '100vh',
+        position: 'fixed',
+        display: 'flex',
+        flexDirection: 'column',
+        zIndex: 100,
+        transition: 'transform 320ms var(--spring)',
+      }}
+    >
       {/* Logo */}
       <div style={{ height: 64, padding: '0 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" strokeWidth="1.5"
-          style={{ animation: 'breathe-hex 4s ease-in-out infinite' }}>
-          <polygon points="12 2 22 7 22 17 12 22 2 17 2 7 12 2" />
-          <polyline points="6 12 10 12 12 6 14 18 16 12 18 12" stroke="var(--cyan)" strokeWidth="1.5" strokeLinejoin="round" />
-        </svg>
-        <div>
-          <span className="font-heading" style={{
-            fontWeight: 700, fontSize: 14, letterSpacing: '0.12em',
-            background: 'linear-gradient(135deg, #00E5FF 0%, #00FF9D 100%)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          }}>NEURAMED</span>
-          <div style={{
-            fontFamily: '"DM Mono", monospace', fontSize: 8, color: 'var(--dim)',
-            letterSpacing: '0.25em', marginTop: 1,
-          }}>AI CLINICAL</div>
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 10,
+            background: 'linear-gradient(135deg, var(--accent) 0%, #FF8576 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 12px -4px rgba(255, 107, 91, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.20)',
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12h4l3-9 4 18 3-9h4" />
+          </svg>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <span className="font-heading" style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--text)' }}>
+            Neuramed
+          </span>
+          <span style={{ fontSize: 10.5, color: 'var(--dim)', letterSpacing: '-0.01em' }}>Clinical AI</span>
         </div>
       </div>
 
       {/* Nav */}
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '0 12px', marginTop: 24, flex: 1 }}>
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '4px 12px', flex: 1, overflowY: 'auto' }}>
         {commonItems.map(renderNavItem)}
-
         {isDoctor && doctorItems.length > 0 && (
           <>
-            {/* Section separator with gradient */}
-            <div style={{ margin: '14px 0 6px', position: 'relative' }}>
-              <div style={{
-                height: 1,
-                background: 'linear-gradient(90deg, transparent, rgba(0,229,255,0.15), transparent)',
-              }} />
-              <span style={{
-                fontFamily: '"DM Mono", monospace', fontSize: 8, color: 'var(--dim)',
-                letterSpacing: '0.18em', display: 'block', marginTop: 8, paddingLeft: 12,
-              }}>
-                CLINICAL MANAGEMENT
-              </span>
+            <div style={{ padding: '14px 12px 6px' }}>
+              <span className="eyebrow" style={{ fontSize: 10 }}>Clinical</span>
             </div>
             {doctorItems.map(renderNavItem)}
           </>
         )}
       </nav>
 
-      {/* Bottom — User card */}
-      <div style={{
-        borderTop: 'none',
-        background: 'linear-gradient(180deg, transparent, rgba(0,229,255,0.02))',
-      }}>
-        {/* Full-width gradient separator */}
-        <div style={{
-          height: 1,
-          background: 'linear-gradient(90deg, transparent 5%, rgba(0,229,255,0.2) 50%, transparent 95%)',
-        }} />
-
+      {/* User card / status */}
+      <div style={{ borderTop: '1px solid var(--border)', padding: 12 }}>
         {user ? (
-          <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            {/* Avatar with conic-gradient ring */}
-            <div style={{
-              width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
-              background: `conic-gradient(from 0deg, ${user.role === 'doctor' ? 'var(--green)' : 'var(--cyan)'} 0%, ${user.role === 'doctor' ? 'var(--green)' : 'var(--cyan)'} 70%, rgba(255,255,255,0.05) 70%, rgba(255,255,255,0.05) 100%)`,
-              padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: `0 0 12px ${user.role === 'doctor' ? 'rgba(0,255,157,0.15)' : 'rgba(0,229,255,0.15)'}`,
-            }}>
-              <div style={{
-                width: '100%', height: '100%', borderRadius: '50%',
-                background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 16,
-              }}>
-                {user.avatar_emoji || user.full_name.charAt(0)}
-              </div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '8px 10px',
+              borderRadius: 12,
+              background: 'var(--elevated)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            <div
+              aria-hidden
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background:
+                  user.role === 'doctor'
+                    ? 'linear-gradient(135deg, var(--accent) 0%, #FF8576 100%)'
+                    : 'linear-gradient(135deg, #4B5563 0%, #6B7280 100%)',
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)',
+              }}
+            >
+              {user.role === 'doctor' ? <Stethoscope size={15} strokeWidth={2} /> : <UserRound size={15} strokeWidth={2} />}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="font-heading" style={{
-                fontSize: 13, color: 'var(--text)', fontWeight: 600,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 110,
-              }}>
+              <div
+                style={{
+                  fontSize: 12.5,
+                  fontWeight: 500,
+                  color: 'var(--text)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  letterSpacing: '-0.005em',
+                }}
+              >
                 {user.full_name}
               </div>
-              <span style={{
-                fontFamily: '"DM Mono", monospace', fontSize: 9, padding: '2px 8px', borderRadius: 10,
-                background: user.role === 'doctor' ? 'rgba(0,255,157,0.08)' : 'rgba(0,229,255,0.08)',
-                color: user.role === 'doctor' ? 'var(--green)' : 'var(--cyan)',
-                border: `1px solid ${user.role === 'doctor' ? 'rgba(0,255,157,0.2)' : 'rgba(0,229,255,0.2)'}`,
-              }}>
-                {user.role === 'doctor' ? '👨‍⚕️ Doctor' : '🧑‍🦽 Patient'}
-              </span>
+              <div style={{ fontSize: 10.5, color: 'var(--muted)', textTransform: 'capitalize' }}>{user.role}</div>
             </div>
-            <button onClick={logout} title="Sign out" data-cursor="hover" style={{
-              width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none',
-              color: 'rgba(255,255,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 200ms cubic-bezier(0.16, 1, 0.3, 1)', flexShrink: 0,
-            }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,59,92,0.12)'; e.currentTarget.style.color = 'var(--red)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
+            <button
+              onClick={logout}
+              title="Sign out"
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 8,
+                background: 'transparent',
+                border: '1px solid transparent',
+                color: 'var(--muted)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                transition: 'all 180ms var(--spring)',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'rgba(220, 77, 77, 0.10)';
+                e.currentTarget.style.color = 'var(--red)';
+                e.currentTarget.style.borderColor = 'rgba(220, 77, 77, 0.20)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.color = 'var(--muted)';
+                e.currentTarget.style.borderColor = 'transparent';
+              }}
             >
-              <Power size={14} />
+              <Power size={13} strokeWidth={2} />
             </button>
           </div>
         ) : (
-          <div style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green)', animation: 'pulse-dot 2s infinite' }} />
-            <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.1em' }}>ALL SYSTEMS ONLINE</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px' }}>
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: 'var(--green)',
+                boxShadow: '0 0 0 3px rgba(63, 168, 108, 0.18)',
+              }}
+            />
+            <span style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '-0.005em' }}>All systems online</span>
           </div>
         )}
       </div>
-
-      {/* Hex breathe keyframe — injected once */}
-      <style>{`
-        @keyframes breathe-hex {
-          0%, 100% { transform: rotate(0deg); }
-          25% { transform: rotate(2deg); }
-          75% { transform: rotate(-2deg); }
-        }
-      `}</style>
-    </div>
+    </aside>
   );
 };
 
