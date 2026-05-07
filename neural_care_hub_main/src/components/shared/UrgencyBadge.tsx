@@ -1,7 +1,9 @@
 import React from 'react';
 import type { UrgencyLevel } from '../../types';
 
-const URGENCY_TOKENS: Record<UrgencyLevel, { label: string; bg: string; border: string; color: string; dot: string }> = {
+type Token = { label: string; bg: string; border: string; color: string; dot: string };
+
+const URGENCY_TOKENS: Record<string, Token> = {
   critical: {
     label: 'Critical',
     bg: 'rgba(220, 77, 77, 0.10)',
@@ -32,8 +34,17 @@ const URGENCY_TOKENS: Record<UrgencyLevel, { label: string; bg: string; border: 
   },
 };
 
-export const UrgencyBadge: React.FC<{ urgency: UrgencyLevel }> = ({ urgency }) => {
-  const t = URGENCY_TOKENS[urgency];
+const FALLBACK: Token = {
+  label: 'Unknown',
+  bg: 'rgba(255, 255, 255, 0.04)',
+  border: 'rgba(255, 255, 255, 0.10)',
+  color: '#A1A1A8',
+  dot: '#A1A1A8',
+};
+
+export const UrgencyBadge: React.FC<{ urgency: UrgencyLevel | string | null | undefined }> = ({ urgency }) => {
+  const key = (urgency || '').toString().toLowerCase();
+  const t = URGENCY_TOKENS[key] || { ...FALLBACK, label: urgency ? String(urgency) : 'Unknown' };
   return (
     <span
       style={{

@@ -2,7 +2,6 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { ReactLenis } from "lenis/react";
 import AppLayout from "./components/layout/AppLayout";
 import { Toast } from "./components/shared/Toast";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -29,16 +28,6 @@ const queryClient = new QueryClient({
     queries: { staleTime: 20000, retry: 1 },
   },
 });
-
-// Apple-tier smooth scroll easing — exponential ease-out
-const lenisOptions = {
-  duration: 1.15,
-  easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-  smoothWheel: true,
-  syncTouch: false,
-  wheelMultiplier: 1,
-  lerp: 0.1,
-} as const;
 
 const Splash = () => (
   <div
@@ -100,11 +89,9 @@ const App = () => {
   }, []);
 
   return (
-    <ReactLenis root options={lenisOptions}>
-      <BrowserRouter>
-        <AppRoutes showSplash={showSplash} />
-      </BrowserRouter>
-    </ReactLenis>
+    <BrowserRouter>
+      <AppRoutes showSplash={showSplash} />
+    </BrowserRouter>
   );
 };
 

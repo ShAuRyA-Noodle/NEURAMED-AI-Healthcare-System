@@ -1,7 +1,9 @@
 import React from 'react';
 import type { AgentType } from '../../types';
 
-const AGENT_TOKENS: Record<AgentType, { label: string; bg: string; border: string; color: string }> = {
+type Token = { label: string; bg: string; border: string; color: string };
+
+const AGENT_TOKENS: Record<string, Token> = {
   voice: {
     label: 'Voice',
     bg: 'rgba(255, 107, 91, 0.10)',
@@ -22,8 +24,16 @@ const AGENT_TOKENS: Record<AgentType, { label: string; bg: string; border: strin
   },
 };
 
-export const AgentBadge: React.FC<{ agent: AgentType }> = ({ agent }) => {
-  const t = AGENT_TOKENS[agent];
+const FALLBACK: Token = {
+  label: 'Agent',
+  bg: 'rgba(255, 255, 255, 0.04)',
+  border: 'rgba(255, 255, 255, 0.10)',
+  color: '#A1A1A8',
+};
+
+export const AgentBadge: React.FC<{ agent: AgentType | string | null | undefined }> = ({ agent }) => {
+  const key = (agent || '').toString().toLowerCase();
+  const t = AGENT_TOKENS[key] || { ...FALLBACK, label: agent ? String(agent).toUpperCase() : 'AGENT' };
   return (
     <span
       style={{
