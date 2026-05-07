@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ClipboardList, Settings2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/client';
 
@@ -121,7 +122,7 @@ const PatientOnboarding = ({ onComplete }: { onComplete: () => void }) => {
     () => (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ textAlign: 'center', marginBottom: 8 }}>
-          <div style={{ fontSize: 32 }}>📋</div>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--accent-soft)', border: '1px solid rgba(255,107,91,0.22)', color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}><ClipboardList size={20} strokeWidth={1.75} /></div>
           <h3 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 18, color: '#EEF2F7', margin: '8px 0 2px' }}>Medical History</h3>
           <p style={{ fontFamily: '"DM Mono", monospace', fontSize: 11, color: '#445566' }}>This helps AI provide better diagnostics</p>
         </div>
@@ -158,7 +159,7 @@ const PatientOnboarding = ({ onComplete }: { onComplete: () => void }) => {
     () => (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ textAlign: 'center', marginBottom: 8 }}>
-          <div style={{ fontSize: 32 }}>⚙️</div>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--accent-soft)', border: '1px solid rgba(255,107,91,0.22)', color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}><Settings2 size={20} strokeWidth={1.75} /></div>
           <h3 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 18, color: '#EEF2F7', margin: '8px 0 2px' }}>Preferences</h3>
           <p style={{ fontFamily: '"DM Mono", monospace', fontSize: 11, color: '#445566' }}>Customize your NEURAMED experience</p>
         </div>

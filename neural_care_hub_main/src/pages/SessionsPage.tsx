@@ -110,7 +110,7 @@ const Sessions = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div style={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>🔬</div>
+        <div style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 12, background: 'var(--accent-soft)', border: '1px solid rgba(255, 107, 91, 0.22)', color: 'var(--accent)' }}><Activity size={20} strokeWidth={1.75} /></div>
         <div>
           <h1 className="font-heading" style={{ fontSize: 24, color: 'var(--text)', margin: 0 }}>Diagnosis Sessions</h1>
           <p className="font-body" style={{ fontSize: 13, color: 'var(--muted)', margin: 0 }}>{total} total sessions</p>

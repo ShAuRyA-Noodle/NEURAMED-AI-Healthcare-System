@@ -86,9 +86,17 @@ def _extract_pdf_tesseract(file_bytes: bytes) -> dict:
         from pdf2image import convert_from_bytes
         import pytesseract
 
-        pytesseract.pytesseract.tesseract_cmd = os.getenv(
-            "TESSERACT_CMD", r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-        )
+        # Cross-platform tesseract resolution: explicit env var > $PATH > Windows default.
+        import shutil
+        explicit = os.getenv("TESSERACT_CMD")
+        on_path = shutil.which("tesseract")
+        if explicit:
+            pytesseract.pytesseract.tesseract_cmd = explicit
+        elif on_path:
+            pytesseract.pytesseract.tesseract_cmd = on_path
+        elif os.name == "nt":
+            pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        # else: leave as default — Linux containers expect /usr/bin/tesseract on PATH
         images = convert_from_bytes(file_bytes, dpi=200)
         text = ""
         for img in images:
@@ -221,9 +229,15 @@ def _extract_image_tesseract(file_bytes: bytes) -> dict:
         import pytesseract
         from PIL import Image
 
-        pytesseract.pytesseract.tesseract_cmd = os.getenv(
-            "TESSERACT_CMD", r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-        )
+        import shutil
+        explicit = os.getenv("TESSERACT_CMD")
+        on_path = shutil.which("tesseract")
+        if explicit:
+            pytesseract.pytesseract.tesseract_cmd = explicit
+        elif on_path:
+            pytesseract.pytesseract.tesseract_cmd = on_path
+        elif os.name == "nt":
+            pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
         img = Image.open(io.BytesIO(file_bytes))
 
         # Enhance image for better OCR

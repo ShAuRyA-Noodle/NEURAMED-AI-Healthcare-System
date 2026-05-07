@@ -1,21 +1,59 @@
 import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 
 const NotFound = () => {
   const navigate = useNavigate();
 
   return (
-    <div style={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
-      <span className="font-heading" style={{ fontSize: 48, color: 'var(--text)', textAlign: 'center', fontWeight: 800, textShadow: '0 0 20px rgba(0,229,255,0.2)' }}>
-        404 — PAGE NOT FOUND
-      </span>
-      <span className="font-body" style={{ fontSize: 14, color: 'var(--muted)', textAlign: 'center', maxWidth: 400 }}>
-        The terminal route you specified does not exist in the mainframe.
-      </span>
-      <button data-cursor="hover" onClick={() => navigate('/dashboard')} style={{
-        height: 44, padding: '0 24px', borderRadius: 8, background: 'var(--cyan)', color: '#000', border: 'none',
-        fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 14, marginTop: 16
-      }}>
-        Return to Dashboard
+    <div
+      style={{
+        minHeight: 'calc(100vh - 160px)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 18,
+        padding: 40,
+      }}
+    >
+      <span className="eyebrow" style={{ fontSize: 11 }}>Error 404</span>
+      <h1
+        className="font-heading"
+        style={{
+          fontSize: 56,
+          fontWeight: 600,
+          color: 'var(--text)',
+          margin: 0,
+          letterSpacing: '-0.04em',
+        }}
+      >
+        Page not found.
+      </h1>
+      <p
+        style={{
+          fontSize: 14,
+          color: 'var(--muted)',
+          textAlign: 'center',
+          maxWidth: 460,
+          lineHeight: 1.55,
+          margin: 0,
+        }}
+      >
+        The route you are looking for has moved, been renamed, or never existed.
+      </p>
+      <button
+        onClick={() => navigate('/dashboard')}
+        className="btn-primary"
+        style={{
+          marginTop: 8,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 8,
+          cursor: 'pointer',
+        }}
+      >
+        <ArrowLeft size={14} strokeWidth={2} />
+        Back to dashboard
       </button>
     </div>
   );
