@@ -225,12 +225,12 @@ IMPORTANT RULES:
             "error": "Failed to parse AI response"
         }
     except Exception as e:
-        logger.error(f"Drug interaction Groq API error: {type(e).__name__}: {e}")
+        logger.exception("Drug interaction Groq API error")
         return {
             "overall_risk": "unknown",
             "interaction_count": {"contraindicated": 0, "major": 0, "moderate": 0, "minor": 0, "none": 0},
             "interactions": [],
             "safe_pairs": [],
-            "overall_recommendations": [f"Analysis failed: {type(e).__name__}. Please try again."],
-            "error": str(e)
+            "overall_recommendations": ["Analysis failed. Please try again."],
+            "error": "internal_error"
         }
