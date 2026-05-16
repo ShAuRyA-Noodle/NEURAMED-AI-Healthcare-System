@@ -11,6 +11,12 @@ from utils.auth import require_user
 
 router = APIRouter(prefix="/api/ocr", tags=["OCR"])
 
+_MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
+_ALLOWED_MIME = {
+    "image/jpeg", "image/png", "image/tiff", "image/bmp", "image/webp",
+    "application/pdf",
+}
+
 @router.post("/analyze-report", response_model=ReportAnalysisResult)
 async def analyze_report(
     file: UploadFile = File(...),
@@ -18,8 +24,12 @@ async def analyze_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_user)
 ):
+    if file.content_type not in _ALLOWED_MIME:
+        raise HTTPException(status_code=415, detail=f"Unsupported file type: {file.content_type}")
     try:
-        contents = await file.read()
+        contents = await file.read(_MAX_UPLOAD_BYTES + 1)
+        if len(contents) > _MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="File exceeds 20 MB limit")
         if not contents:
             raise HTTPException(status_code=400, detail="Empty file uploaded")
         res = ocr_agent.analyze(file_bytes=contents, filename=file.filename, patient_id=patient_id, db=db)

@@ -11,6 +11,9 @@ from utils.auth import require_user
 
 router = APIRouter(prefix="/api/imaging", tags=["Imaging"])
 
+_MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
+_ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp", "image/tiff", "image/bmp", "image/gif"}
+
 @router.post("/analyze", response_model=ScanAnalysisResult)
 async def analyze_image(
     file: UploadFile = File(...),
@@ -24,8 +27,12 @@ async def analyze_image(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_user)
 ):
+    if file.content_type not in _ALLOWED_MIME:
+        raise HTTPException(status_code=415, detail=f"Unsupported file type: {file.content_type}")
     try:
-        contents = await file.read()
+        contents = await file.read(_MAX_UPLOAD_BYTES + 1)
+        if len(contents) > _MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="File exceeds 20 MB limit")
         if not contents:
             raise HTTPException(status_code=400, detail="Empty file uploaded")
         res = imaging_agent.analyze(
