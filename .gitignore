@@ -13,14 +13,26 @@ node_modules/
 frontend/dist/
 frontend/node_modules/
 
-# Environment
+# Environment — never commit secrets
 .env
 .env.local
+.env.production
+.env.staging
+.env.development.local
+.env.test.local
+.env.production.local
 *.env.local
 
-# Database
+# Database files — never commit SQLite databases or backups
 *.db
 *.sqlite3
+*.db.backup
+*.sqlite.backup
+
+# Firebase credentials
+firebase-admin-credentials.json
+*-firebase-adminsdk-*.json
+serviceAccountKey.json
 
 # IDE
 .vscode/

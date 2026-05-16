@@ -5,7 +5,7 @@ from typing import Optional, List
 from db.database import get_db
 from db.models import Patient, DiagnosisSession, User
 from db.schemas import PatientCreate, PatientResponse
-from utils.auth import require_user, require_doctor
+from utils.auth import require_doctor
 
 router = APIRouter(prefix="/api/patients", tags=["Patients"])
 
@@ -53,7 +53,7 @@ def get_patients(
     limit: int = 50,
     offset: int = 0,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_user)
+    current_user: User = Depends(require_doctor)
 ):
     query = db.query(Patient)
     if search:
@@ -164,7 +164,7 @@ def get_patients(
 
 
 @router.get("/{patient_id}")
-def get_patient(patient_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def get_patient(patient_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
