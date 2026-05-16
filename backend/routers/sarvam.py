@@ -11,6 +11,12 @@ from utils.llm import call_llm
 
 logger = logging.getLogger(__name__)
 
+
+def _safe_log(value) -> str:
+    """Strip CR/LF and cap length so user-controlled values can't forge log lines."""
+    return str(value).replace("\r", "").replace("\n", "").replace("\t", " ")[:64]
+
+
 router = APIRouter(prefix="/api/sarvam", tags=["Sarvam"])
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
@@ -71,7 +77,7 @@ async def sarvam_diagnose(
     # then separately request native language response text via Sarvam/Ollama if available.
 
     api_key = os.getenv("GROQ_API_KEY", "").strip()
-    logger.info(f"Sarvam: GROQ_API_KEY present={bool(api_key)}, language={language}")
+    logger.info("Sarvam: GROQ_API_KEY present=%s, language=%s", bool(api_key), _safe_log(language))
 
     if api_key:
         try:

@@ -8,6 +8,11 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
+
+def _safe_log(value) -> str:
+    """Strip CR/LF and cap length so user-controlled values can't forge log lines."""
+    return str(value).replace("\r", "").replace("\n", "").replace("\t", " ")[:64]
+
 LANGUAGE_CONFIG = {
     "hi": {"name": "Hindi", "script": "Devanagari"},
     "ta": {"name": "Tamil", "script": "Tamil"},
@@ -49,7 +54,7 @@ def _translate_via_groq(text: str, target_lang: str) -> str:
         if translated and len(translated) > 5:
             return translated
     except Exception as e:
-        logger.warning(f"Translation to {target_lang} failed: {e}")
+        logger.warning("Translation to %s failed: %s", _safe_log(target_lang), _safe_log(e))
     return text
 
 
@@ -131,7 +136,7 @@ def _translate_to_english(text: str, source_lang: str) -> str:
             logger.info(f"Translated {lang['name']} transcript to English")
             return translated
     except Exception as e:
-        logger.warning(f"Translation from {source_lang} to English failed: {e}")
+        logger.warning("Translation from %s to English failed: %s", _safe_log(source_lang), _safe_log(e))
     return text
 
 SYSTEM_PROMPT = """You are Dr. NEURAMED, an expert clinical AI diagnostic assistant trained on medical literature. Analyze the patient's reported symptoms with the thoroughness of a senior physician.
@@ -301,7 +306,7 @@ def diagnose(transcript: str = None,
     er_text = result_json.get("when_to_go_to_er", "")
 
     if language and language != "en":
-        logger.info(f"Translating diagnosis results to {language}")
+        logger.info("Translating diagnosis results to %s", _safe_log(language))
         # Collect ALL translatable text into one batch for speed
         all_texts = [
             urgency_reasoning, follow_up_text, diff_summary, er_text,
