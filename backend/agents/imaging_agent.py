@@ -474,6 +474,12 @@ def analyze(
     if img is None:
         raise ValueError("Could not decode image")
 
+    # Guard against decompression bombs: reject absurd pixel dimensions that a
+    # small compressed file could expand into. ~50 MP is generous for real scans.
+    _h, _w = img.shape[:2]
+    if _h * _w > 50_000_000:
+        raise ValueError("Image dimensions exceed the 50 megapixel limit")
+
     original_b64 = bytes_to_b64(image_bytes)
 
     # OpenCV annotation (for visual overlay — NOT for diagnosis)

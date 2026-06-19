@@ -6,6 +6,11 @@ pydantic[email]>=2.10.0
 python-multipart>=0.0.28
 groq>=1.2.0
 python-dotenv>=1.2.2
+# SECURITY: python-jose 3.3.0 is the latest PyPI release and still carries
+# CVE-2024-33663 (algorithm confusion) and CVE-2024-33664 (JWT-bomb DoS).
+# No patched release exists. Mitigation in code: tokens are decoded with an
+# explicit algorithms=["HS256"] allowlist (see utils/auth.py). Recommended
+# follow-up: migrate JWT handling to PyJWT (pyjwt>=2.10.1). Tracked for human review.
 python-jose[cryptography]>=3.3.0
 slowapi>=0.1.9
 elevenlabs>=1.12.0
