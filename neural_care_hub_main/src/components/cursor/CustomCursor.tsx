@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react'
+import { useFinePointer } from '../../hooks/useFinePointer'
 
 export const CustomCursor: React.FC = () => {
+    const fine = useFinePointer()
     const dotRef = useRef<HTMLDivElement>(null)
     const ringRef = useRef<HTMLDivElement>(null)
 
@@ -9,7 +11,13 @@ export const CustomCursor: React.FC = () => {
     const isHovering = useRef(false)
 
     useEffect(() => {
-        document.body.style.cursor = 'none'
+        // Never hide the native cursor / run rAF on touch devices.
+        if (!fine) return
+
+        // Only hide the native cursor while the custom cursor is active. Scoped
+        // to fine-pointer devices via CSS so touch keeps its normal affordances,
+        // and if this JS ever throws the class is dropped and the cursor returns.
+        document.body.classList.add('custom-cursor-active')
 
         const onMouseMove = (e: MouseEvent) => {
             mouse.current = { x: e.clientX, y: e.clientY }
@@ -37,11 +45,14 @@ export const CustomCursor: React.FC = () => {
         const renderId = requestAnimationFrame(animate)
 
         return () => {
-            document.body.style.cursor = 'auto'
+            document.body.classList.remove('custom-cursor-active')
             window.removeEventListener('mousemove', onMouseMove)
             cancelAnimationFrame(renderId)
         }
-    }, [])
+    }, [fine])
+
+    // Touch devices: render nothing so no static cyan artifacts remain.
+    if (!fine) return null
 
     return (
         <>

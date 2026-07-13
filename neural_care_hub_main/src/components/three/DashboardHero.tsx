@@ -1,5 +1,6 @@
 import { useEffect, useRef, ReactNode } from 'react';
 import * as THREE from 'three';
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 
 interface DashboardHeroProps {
   children?: ReactNode;
@@ -8,10 +9,11 @@ interface DashboardHeroProps {
 const DashboardHero = ({ children }: DashboardHeroProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
+  const reducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
-    // Skip on mobile — CSS fallback handles it
-    if (window.innerWidth < 768) return;
+    // Skip on mobile or when reduced motion is requested — CSS fallback handles it
+    if (window.innerWidth < 768 || reducedMotion) return;
 
     const container = containerRef.current;
     if (!container) return;
@@ -172,7 +174,7 @@ const DashboardHero = ({ children }: DashboardHeroProps) => {
     } catch {
       return;
     }
-  }, []);
+  }, [reducedMotion]);
 
   return (
     <div
