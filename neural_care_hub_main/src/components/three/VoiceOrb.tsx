@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 
 interface VoiceOrbProps {
   isRecording: boolean;
@@ -11,13 +12,14 @@ const VoiceOrb = ({ isRecording, audioLevel = 0 }: VoiceOrbProps) => {
   const mountedRef = useRef(true);
   const recordingRef = useRef(isRecording);
   const audioRef = useRef(audioLevel);
+  const reducedMotion = usePrefersReducedMotion();
 
   // Update refs without re-mounting
   useEffect(() => { recordingRef.current = isRecording; }, [isRecording]);
   useEffect(() => { audioRef.current = audioLevel; }, [audioLevel]);
 
   useEffect(() => {
-    if (window.innerWidth < 768) return;
+    if (window.innerWidth < 768 || reducedMotion) return;
 
     const container = containerRef.current;
     if (!container) return;
@@ -190,10 +192,10 @@ const VoiceOrb = ({ isRecording, audioLevel = 0 }: VoiceOrbProps) => {
     } catch {
       return;
     }
-  }, []);
+  }, [reducedMotion]);
 
-  // CSS fallback for mobile
-  if (typeof window !== 'undefined' && window.innerWidth < 768) {
+  // CSS fallback for mobile or reduced-motion — the static glowing orb
+  if (reducedMotion || (typeof window !== 'undefined' && window.innerWidth < 768)) {
     return (
       <div style={{
         width: 120, height: 120, borderRadius: '50%', margin: '0 auto',

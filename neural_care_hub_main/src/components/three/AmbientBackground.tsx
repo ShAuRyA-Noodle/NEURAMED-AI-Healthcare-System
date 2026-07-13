@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 
 const PARTICLE_COUNT = 300;
 const NODE_COUNT = 25;
@@ -8,10 +9,11 @@ const CONNECTION_DISTANCE = 2.5;
 const AmbientBackground = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
+  const reducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
-    // Skip on mobile
-    if (window.innerWidth < 768) return;
+    // Skip on mobile or when the user requested reduced motion — CSS fallback handles it
+    if (window.innerWidth < 768 || reducedMotion) return;
 
     const container = containerRef.current;
     if (!container) return;
@@ -253,7 +255,7 @@ const AmbientBackground = () => {
       // WebGL not available — fail silently, CSS fallback handles it
       return;
     }
-  }, []);
+  }, [reducedMotion]);
 
   return (
     <div

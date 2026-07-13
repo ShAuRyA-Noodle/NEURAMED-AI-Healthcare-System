@@ -1,11 +1,19 @@
 import { useState, useEffect } from 'react'
+import { usePrefersReducedMotion } from './usePrefersReducedMotion'
 
 const easeOutQuart = (t: number) => 1 - Math.pow(1 - t, 4)
 
 export const useCountUp = (target: number, duration: number = 1400, startOnMount: boolean = true) => {
-    const [count, setCount] = useState(0)
+    const reducedMotion = usePrefersReducedMotion()
+    const [count, setCount] = useState(reducedMotion ? target : 0)
 
     useEffect(() => {
+        // Reduced motion: jump straight to the final value, no rAF tween.
+        if (reducedMotion) {
+            setCount(target)
+            return
+        }
+
         if (target === 0 && !startOnMount) return
 
         let startTime: number | null = null
@@ -29,7 +37,7 @@ export const useCountUp = (target: number, duration: number = 1400, startOnMount
         animationFrame = requestAnimationFrame(step)
 
         return () => cancelAnimationFrame(animationFrame)
-    }, [target, duration, startOnMount])
+    }, [target, duration, startOnMount, reducedMotion])
 
     return count
 }
