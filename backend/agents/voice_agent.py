@@ -177,32 +177,66 @@ Rules:
 - when_to_go_to_er: only include genuine ER indicators"""
 
 
-def transcribe_audio_fallback(audio_bytes: bytes) -> str:
-    import speech_recognition as sr
-    import io
-    recognizer = sr.Recognizer()
+def _get_groq_client(api_key: str):
+    """Seam for testing — monkeypatch this, not the groq package."""
+    from groq import Groq
+    return Groq(api_key=api_key)
+
+
+def transcribe_with_whisper(audio_bytes: bytes, language: str = None) -> str:
+    """Transcribe audio via Groq's Whisper (whisper-large-v3).
+
+    Uses the OpenAI-compatible Groq audio API. Raises InferenceUnavailable on
+    any failure — a failed transcription must NEVER be returned as if it were
+    real patient speech.
+    """
+    from core.exceptions import InferenceUnavailable
+    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    if not api_key:
+        raise InferenceUnavailable(
+            "GROQ_API_KEY not configured for speech-to-text.", vendor="groq")
+    client = _get_groq_client(api_key)
     try:
-        with sr.AudioFile(io.BytesIO(audio_bytes)) as source:
-            audio = recognizer.record(source)
-        return recognizer.recognize_google(audio)
+        resp = client.audio.transcriptions.create(
+            file=("audio.wav", audio_bytes),
+            model="whisper-large-v3",
+            language=language,            # None => auto-detect
+            response_format="verbose_json",
+            temperature=0.0,
+        )
+        text = (getattr(resp, "text", "") or "").strip()
     except Exception as e:
-        logger.error(f"SpeechRecognition failed: {e}")
-        return "Audio transcription failed. Please use text input."
+        raise InferenceUnavailable(
+            f"Whisper transcription failed: {type(e).__name__}: {e}",
+            vendor="groq")
+    if not text:
+        raise InferenceUnavailable("Whisper returned empty transcript.", vendor="groq")
+    return text
 
 
-def transcribe_audio(audio_bytes: bytes) -> str:
-    api_key = os.getenv("ELEVENLABS_API_KEY", "").strip()
-    if api_key:
+def transcribe_audio(audio_bytes: bytes, language: str = None) -> str:
+    """Transcribe audio to text.
+
+    Primary path is Groq Whisper. ElevenLabs is tried ONLY when its API key is
+    set; on any ElevenLabs failure we fall through to Whisper. If every path
+    fails, InferenceUnavailable propagates — we never return a placeholder
+    string that could be diagnosed as symptoms.
+    """
+    eleven_key = os.getenv("ELEVENLABS_API_KEY", "").strip()
+    if eleven_key:
         try:
             from elevenlabs.client import ElevenLabs
-            client = ElevenLabs(api_key=api_key)
+            client = ElevenLabs(api_key=eleven_key)
             result = client.speech_to_text.convert(
                 file=audio_bytes, model_id="scribe_v1"
             )
-            return result.text
+            text = (getattr(result, "text", "") or "").strip()
+            if text:
+                return text
+            logger.warning("ElevenLabs returned empty transcript; falling back to Whisper.")
         except Exception as e:
-            logger.error(f"ElevenLabs failed: {e}")
-    return transcribe_audio_fallback(audio_bytes)
+            logger.error(f"ElevenLabs failed, falling back to Whisper: {e}")
+    return transcribe_with_whisper(audio_bytes, language=language)
 
 
 def diagnose(transcript: str = None,
@@ -218,7 +252,10 @@ def diagnose(transcript: str = None,
             import base64
             audio_bytes = base64.b64decode(audio_base64)
         if audio_bytes:
-            transcript = transcribe_audio(audio_bytes)
+            # May raise InferenceUnavailable — let it propagate. A failed
+            # transcription must never be fed to the diagnostic LLM as symptoms.
+            stt_lang = language if language and language != "en" else None
+            transcript = transcribe_audio(audio_bytes, language=stt_lang)
         else:
             transcript = "No symptoms provided"
 
