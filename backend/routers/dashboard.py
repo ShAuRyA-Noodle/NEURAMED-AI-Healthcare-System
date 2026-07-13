@@ -1,9 +1,11 @@
+import os
 import time as _time
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, text
 from typing import List
 from datetime import datetime, timedelta
+from ws_manager import manager
 from db.database import get_db
 from db.models import DiagnosisSession, Patient, Report, Appointment, User
 from db.schemas import DashboardStats, ActivityFeedItem
@@ -80,7 +82,6 @@ def get_stats(db: Session = Depends(get_db), current_user: User = Depends(requir
         speed_score = max(0, min(100, 100 - (avg_speed / 50)))
         agent_performance.append({
             "agent": agent_type,
-            "accuracy": round(min(99, avg_agent_conf * 1.05), 1),
             "speed_score": round(speed_score, 1),
             "volume": volume,
             "confidence": round(avg_agent_conf, 1)
@@ -97,6 +98,17 @@ def get_stats(db: Session = Depends(get_db), current_user: User = Depends(requir
         {"condition": k, "count": v}
         for k, v in sorted(condition_counts.items(), key=lambda x: x[1], reverse=True)[:10]
     ]
+
+    # Measured system health only — no fabricated telemetry
+    _t0 = _time.perf_counter()
+    db.execute(text("SELECT 1"))
+    db_latency_ms = round((_time.perf_counter() - _t0) * 1000, 2)
+
+    system_health = {
+        "db_latency_ms": db_latency_ms,
+        "groq_configured": bool(os.getenv("GROQ_API_KEY")),
+        "active_ws_clients": len(manager.active_connections),
+    }
     return DashboardStats(
         total_diagnoses=total_diagnoses,
         active_sessions_today=active_sessions_today,
@@ -106,13 +118,7 @@ def get_stats(db: Session = Depends(get_db), current_user: User = Depends(requir
         agent_performance=agent_performance,
         condition_distribution=condition_distribution,
         urgency_breakdown=urgency_breakdown,
-        system_health={
-            "api_latency_ms": 42,
-            "model_uptime_pct": 99.98,
-            "queue_depth": 0,
-            "gpu_utilization_pct": 45,
-            "memory_pct": 62
-        }
+        system_health=system_health
     )
 
 
