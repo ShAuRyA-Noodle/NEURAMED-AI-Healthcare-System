@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -9,6 +10,8 @@ from agents import appointment_agent
 from db.models import Appointment, Patient, User
 from db.schemas import AppointmentCreate, AppointmentResponse
 from utils.auth import require_user
+
+logger = logging.getLogger("neuramed.appointments")
 
 router = APIRouter(prefix="/api/appointments", tags=["Appointments"])
 
@@ -41,8 +44,11 @@ def create_appointment(app_req: AppointmentCreate, db: Session = Depends(get_db)
         )
     except appointment_agent.SchedulingConflictError as e:
         raise HTTPException(status_code=409, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Appointment creation failed")
+        raise HTTPException(status_code=500, detail="Internal error processing request")
 
 
 def _format_appointment(a):
