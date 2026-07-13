@@ -8,6 +8,7 @@ from db.database import get_db
 from db.models import DiagnosisSession, Patient, Report, Appointment, User
 from db.schemas import DashboardStats, ActivityFeedItem
 from utils.llm import call_llm
+from core.exceptions import InferenceUnavailable
 from utils.auth import require_user
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
@@ -233,8 +234,11 @@ Return JSON: {"insights": [{"title": "short title", "description": "1-2 sentence
 Be specific and data-driven. Reference actual numbers from the data."""
 
     try:
-        llm_result = call_llm(insights_prompt, summary, fallback_type="insights")
+        llm_result, _model_used = call_llm(insights_prompt, summary)
         result = {"insights": llm_result.get("insights", [])}
+    except InferenceUnavailable:
+        # Inference failure is an error, not a result — let it become a 503.
+        raise
     except Exception:
         result = {"insights": [
             {"title": "Insights Processing", "description": "AI insights are being generated. Try refreshing.", "icon_emoji": "⏳", "severity": "low"}

@@ -8,6 +8,7 @@ from agents import imaging_agent
 from db.models import ScanResult, User
 from db.schemas import ScanAnalysisResult, ScanResultResponse
 from utils.auth import require_user
+from core.exceptions import InferenceUnavailable
 
 router = APIRouter(prefix="/api/imaging", tags=["Imaging"])
 
@@ -52,6 +53,8 @@ async def analyze_image(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
+        raise
+    except InferenceUnavailable:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Imaging analysis failed: {str(e)}")
