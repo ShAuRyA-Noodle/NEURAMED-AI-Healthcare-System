@@ -8,7 +8,7 @@ from db.database import get_db
 from agents import ocr_agent
 from db.models import Report, User
 from db.schemas import ReportAnalysisResult, ReportResponse
-from utils.auth import require_user
+from utils.auth import require_user, require_doctor
 from utils.file_handling import check_upload_size, validate_ocr_file, clamp_pagination
 from core.exceptions import InferenceUnavailable
 
@@ -57,12 +57,12 @@ async def analyze_report(
         raise HTTPException(status_code=500, detail="Internal error processing request")
 
 @router.get("/reports", response_model=List[ReportResponse])
-def get_reports(limit: int = 20, offset: int = 0, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def get_reports(limit: int = 20, offset: int = 0, db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     limit, offset = clamp_pagination(limit, offset)
     return db.query(Report).offset(offset).limit(limit).all()
 
 @router.get("/reports/{report_id}", response_model=ReportResponse)
-def get_report(report_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def get_report(report_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     report = db.query(Report).filter(Report.id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")

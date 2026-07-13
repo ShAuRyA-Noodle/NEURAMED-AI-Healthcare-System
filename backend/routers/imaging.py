@@ -8,7 +8,7 @@ from db.database import get_db
 from agents import imaging_agent
 from db.models import ScanResult, User
 from db.schemas import ScanAnalysisResult, ScanResultResponse
-from utils.auth import require_user
+from utils.auth import require_user, require_doctor
 from utils.file_handling import check_upload_size, validate_imaging_file, clamp_pagination
 from core.exceptions import InferenceUnavailable
 
@@ -67,12 +67,12 @@ async def analyze_image(
         raise HTTPException(status_code=500, detail="Internal error processing request")
 
 @router.get("/scans", response_model=List[ScanResultResponse])
-def get_scans(limit: int = 20, offset: int = 0, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def get_scans(limit: int = 20, offset: int = 0, db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     limit, offset = clamp_pagination(limit, offset)
     return db.query(ScanResult).offset(offset).limit(limit).all()
 
 @router.get("/scans/{scan_id}", response_model=ScanResultResponse)
-def get_scan(scan_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def get_scan(scan_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     scan = db.query(ScanResult).filter(ScanResult.id == scan_id).first()
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from db.database import get_db
 from db.models import User, DiagnosisSession, Patient
-from utils.auth import require_user
+from utils.auth import require_doctor
 from utils.llm import call_llm
 from core.provenance import Provenance, InferenceStatus, wrap_result
 
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/patients", tags=["Timeline"])
 @router.get("/{patient_id}/timeline")
 def get_patient_timeline(
     patient_id: int,
-    current_user: User = Depends(require_user),
+    current_user: User = Depends(require_doctor),
     db: Session = Depends(get_db),
 ):
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
