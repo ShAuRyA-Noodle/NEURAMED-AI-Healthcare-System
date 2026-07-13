@@ -1,5 +1,7 @@
 import logging
+import os
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from ws_manager import broadcast_to_clients
 from datetime import datetime
@@ -77,3 +79,41 @@ def get_scan(scan_id: int, db: Session = Depends(get_db), current_user: User = D
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
     return scan
+
+
+# H1 — the uploads directory (absolute, resolved once) that raw images live under.
+_UPLOADS_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
+
+
+@router.get("/file/{scan_id}/{kind}")
+def get_scan_file(
+    scan_id: int,
+    kind: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_doctor),
+):
+    """Authorized serving of raw/annotated medical images (clinicians only).
+
+    Replaces the removed public /uploads static mount. Guards against path
+    traversal by resolving the stored path and confirming it stays inside the
+    uploads directory before returning it.
+    """
+    if kind not in ("original", "annotated"):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    scan = db.query(ScanResult).filter(ScanResult.id == scan_id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    stored_path = scan.original_file_path if kind == "original" else scan.annotated_file_path
+    if not stored_path:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # Resolve to an absolute real path and ensure it is contained within uploads/.
+    abs_path = os.path.realpath(os.path.join(_UPLOADS_DIR, os.path.basename(stored_path)))
+    if os.path.commonpath([abs_path, _UPLOADS_DIR]) != _UPLOADS_DIR:
+        raise HTTPException(status_code=404, detail="File not found")
+    if not os.path.isfile(abs_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(abs_path, media_type="image/png")
