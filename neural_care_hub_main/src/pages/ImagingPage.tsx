@@ -225,7 +225,7 @@ const ImagingAI = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '5fr 7fr', gap: 24 }}>
+      <div className="split-workspace">
         {/* LEFT */}
         <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column' }}>
           {/* Drop zone */}

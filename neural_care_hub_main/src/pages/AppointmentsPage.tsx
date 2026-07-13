@@ -112,7 +112,7 @@ const Appointments = () => {
       </div>
 
       {/* Stats from API */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+      <div className="grid-auto">
         <StatCard label="TOTAL" value={stats?.total ?? appts?.length ?? 0} icon={Calendar} />
         <StatCard label="SCHEDULED" value={stats?.scheduled ?? appts?.filter(a => a.status === 'scheduled').length ?? 0} icon={Clock} color="var(--cyan)" />
         <StatCard label="COMPLETED" value={stats?.completed ?? appts?.filter(a => a.status === 'completed').length ?? 0} icon={CheckCircle} color="var(--green)" />
@@ -299,7 +299,7 @@ const Appointments = () => {
 
                 {modalStep === 2 && (
                   <>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div className="form-grid-2" style={{ gap: 16 }}>
                       <div>
                         <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>DOCTOR NAME</label>
                         <input required value={formData.doctor_name} onChange={e => setFormData({ ...formData, doctor_name: e.target.value })} style={inputStyle} />
@@ -317,7 +317,7 @@ const Appointments = () => {
                       <input required type="datetime-local" value={formData.appointment_date} onChange={e => setFormData({ ...formData, appointment_date: e.target.value })}
                         style={{ ...inputStyle, colorScheme: 'dark' }} />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+                    <div className="form-grid-3" style={{ gap: 16 }}>
                       <div>
                         <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>TYPE</label>
                         <select value={formData.appointment_type} onChange={e => setFormData({ ...formData, appointment_type: e.target.value })} style={{ ...inputStyle, cursor: 'pointer' }}>
