@@ -482,30 +482,17 @@ const Dashboard = () => {
         <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}>
           <span className="font-heading" style={{ fontSize: 16, color: 'var(--text)', fontWeight: 600, display: 'block', marginBottom: 20 }}>System Health</span>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Real, measured values only — no fabricated GPU/uptime telemetry. */}
             {[
-              { label: 'API Latency', value: stats.system_health.api_latency_ms, unit: 'ms', threshold1: 100, threshold2: 300 },
-              { label: 'Model Uptime', value: stats.system_health.model_uptime_pct, unit: '%', threshold1: 99, threshold2: 95, invert: true },
-              { label: 'Queue Depth', value: stats.system_health.queue_depth, unit: '', threshold1: 5, threshold2: 15 },
-              { label: 'GPU Usage', value: stats.system_health.gpu_utilization_pct, unit: '%', threshold1: 70, threshold2: 90 },
-              { label: 'Memory', value: stats.system_health.memory_pct, unit: '%', threshold1: 75, threshold2: 90 },
-            ].map(m => {
-              const pct = m.invert ? m.value : (m.value / (m.threshold2 * 1.5)) * 100;
-              let color = 'var(--green)';
-              if (m.invert) { color = m.value < m.threshold2 ? 'var(--red)' : m.value < m.threshold1 ? 'var(--amber)' : 'var(--green)'; }
-              else { color = m.value > m.threshold2 ? 'var(--red)' : m.value > m.threshold1 ? 'var(--amber)' : 'var(--green)'; }
-              return (
-                <div key={m.label}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <span className="font-body" style={{ fontSize: 12, color: 'var(--muted)' }}>{m.label}</span>
-                    <span className="font-number" style={{ fontSize: 13, color: 'var(--text)' }}>{m.value}{m.unit}</span>
-                  </div>
-                  <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' }}>
-                    <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(Math.max(pct, 5), 100)}%` }} transition={{ duration: 0.8 }}
-                      style={{ height: '100%', background: color, borderRadius: 2 }} />
-                  </div>
-                </div>
-              );
-            })}
+              { label: 'DB Latency', value: stats.system_health?.db_latency_ms != null ? `${stats.system_health.db_latency_ms} ms` : '—', ok: (stats.system_health?.db_latency_ms ?? 999) < 50 },
+              { label: 'Groq API', value: stats.system_health?.groq_configured ? 'Configured' : 'Not configured', ok: !!stats.system_health?.groq_configured },
+              { label: 'Live Connections', value: `${stats.system_health?.active_ws_clients ?? 0}`, ok: true },
+            ].map(m => (
+              <div key={m.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span className="font-body" style={{ fontSize: 12, color: 'var(--muted)' }}>{m.label}</span>
+                <span className="font-number" style={{ fontSize: 13, color: m.ok ? 'var(--green)' : 'var(--amber)' }}>{m.value}</span>
+              </div>
+            ))}
           </div>
         </div>
       </motion.div>

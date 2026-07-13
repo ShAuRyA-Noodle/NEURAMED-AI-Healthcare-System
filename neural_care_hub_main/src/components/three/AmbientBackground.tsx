@@ -263,7 +263,7 @@ const AmbientBackground = () => {
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 0,
+        zIndex: -1,          // sit BEHIND all content (was 0 → painted on top, dimming the app)
         pointerEvents: 'none',
         opacity: 0.55,
       }}
