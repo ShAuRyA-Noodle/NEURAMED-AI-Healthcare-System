@@ -2,7 +2,7 @@
   "name": "neuramed",
   "private": true,
   "version": "1.0.0",
-  "description": "Clinical AI diagnostic platform — built by ShAuRyA",
+  "description": "Clinical AI diagnostic platform \u00e2\u20ac\u201d built by ShAuRyA",
   "author": "ShAuRyA Punj <shauryapunj404@gmail.com>",
   "type": "module",
   "scripts": {
@@ -104,6 +104,7 @@
     "js-yaml": "^4.1.1",
     "form-data": "^4.0.6",
     "react-router": "^6.30.4",
-    "react-router-dom": "^6.30.4"
+    "react-router-dom": "^6.30.4",
+    "esbuild": "^0.28.1"
   }
 }
