@@ -8,7 +8,6 @@ groq
 python-dotenv
 elevenlabs
 gTTS
-SpeechRecognition
 python-jose[cryptography]
 
 pytesseract
