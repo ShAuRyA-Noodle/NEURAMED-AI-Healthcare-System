@@ -30,11 +30,12 @@ async def analyze_report(
         p_code = patient.patient_code if patient else "WALK-IN"
 
         first_finding = res.key_findings[0] if res.key_findings else (res.summary[:60] if res.summary else "Report analyzed")
+        # No confidence key: ReportAnalysisResult exposes no measured confidence,
+        # so we omit it rather than broadcast a fabricated 1.0.
         await broadcast_to_clients({
             "patient_code": p_code,
             "agent_type": "ocr",
             "condition": first_finding,
-            "confidence": 1.0,
             "urgency": res.urgency if res.urgency != "low" else ("medium" if res.abnormal_flags else "low"),
             "timestamp": datetime.utcnow().isoformat()
         })
