@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from ws_manager import broadcast_to_clients
@@ -8,7 +9,10 @@ from agents import ocr_agent
 from db.models import Report, User
 from db.schemas import ReportAnalysisResult, ReportResponse
 from utils.auth import require_user
+from utils.file_handling import check_upload_size, validate_ocr_file, clamp_pagination
 from core.exceptions import InferenceUnavailable
+
+logger = logging.getLogger("neuramed.ocr")
 
 router = APIRouter(prefix="/api/ocr", tags=["OCR"])
 
@@ -20,9 +24,11 @@ async def analyze_report(
     current_user: User = Depends(require_user)
 ):
     try:
+        validate_ocr_file(file)
         contents = await file.read()
         if not contents:
             raise HTTPException(status_code=400, detail="Empty file uploaded")
+        check_upload_size(contents)
         res = ocr_agent.analyze(file_bytes=contents, filename=file.filename, patient_id=patient_id, db=db)
 
         from db.models import Patient
@@ -46,12 +52,14 @@ async def analyze_report(
         raise
     except InferenceUnavailable:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Report analysis failed: {str(e)}")
+    except Exception:
+        logger.exception("Report analysis failed")
+        raise HTTPException(status_code=500, detail="Internal error processing request")
 
 @router.get("/reports", response_model=List[ReportResponse])
-def get_reports(limit: int = 20, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
-    return db.query(Report).limit(limit).all()
+def get_reports(limit: int = 20, offset: int = 0, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    limit, offset = clamp_pagination(limit, offset)
+    return db.query(Report).offset(offset).limit(limit).all()
 
 @router.get("/reports/{report_id}", response_model=ReportResponse)
 def get_report(report_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)):

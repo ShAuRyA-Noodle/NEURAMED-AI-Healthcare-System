@@ -10,6 +10,7 @@ from db.database import get_db
 from db.models import DiagnosisSession, User
 from utils.pdf_export import generate_session_pdf
 from utils.auth import require_user, require_doctor
+from utils.file_handling import clamp_pagination
 
 router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
 
@@ -80,6 +81,7 @@ def list_sessions(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_user),
 ):
+    limit, offset = clamp_pagination(limit, offset)
     query = db.query(DiagnosisSession).filter(
         DiagnosisSession.is_deleted != True
     )

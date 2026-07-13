@@ -10,13 +10,37 @@ from sqlalchemy.orm import Session
 from db.database import get_db
 from db.models import User
 
-SECRET_KEY = os.getenv("SECRET_KEY", "neuramed-secret-key-change-in-production-2026")
-if os.getenv("ENVIRONMENT") == "production" and SECRET_KEY == "neuramed-secret-key-change-in-production-2026":
+_DEFAULT_SECRET_KEY = "neuramed-secret-key-change-in-production-2026"
+_DEFAULT_DOCTOR_INVITE_CODE = "NEURAMED-DOCTOR-2026"
+
+SECRET_KEY = os.getenv("SECRET_KEY", _DEFAULT_SECRET_KEY)
+if os.getenv("ENVIRONMENT") == "production" and SECRET_KEY == _DEFAULT_SECRET_KEY:
     import warnings
     warnings.warn("CRITICAL: SECRET_KEY is using the default value in production! Set the SECRET_KEY environment variable.", stacklevel=2)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
-DOCTOR_INVITE_CODE = os.getenv("DOCTOR_INVITE_CODE", "NEURAMED-DOCTOR-2026")
+DOCTOR_INVITE_CODE = os.getenv("DOCTOR_INVITE_CODE", _DEFAULT_DOCTOR_INVITE_CODE)
+
+
+def assert_production_secrets() -> None:
+    """C4/C5 — fail-closed in production.
+
+    In production, refuse to start with unset or default secrets. Outside
+    production (dev/test), the module-level warnings above keep the app booting.
+    Reads env live so it can be called from a startup event.
+    """
+    if os.getenv("ENVIRONMENT") != "production":
+        return
+    secret = os.getenv("SECRET_KEY")
+    if not secret or secret == _DEFAULT_SECRET_KEY:
+        raise RuntimeError(
+            "SECRET_KEY must be set to a non-default value in production."
+        )
+    invite = os.getenv("DOCTOR_INVITE_CODE")
+    if not invite or invite == _DEFAULT_DOCTOR_INVITE_CODE:
+        raise RuntimeError(
+            "DOCTOR_INVITE_CODE must be set to a non-default value in production."
+        )
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
