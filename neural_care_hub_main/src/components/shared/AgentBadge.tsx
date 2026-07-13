@@ -7,10 +7,10 @@ export const AgentBadge: React.FC<{ agent: AgentType }> = ({ agent }) => {
 
     switch (agent) {
         case 'voice':
-            styleClasses = "bg-cyan-500/15 border-cyan-500/30 text-cyan-500"
+            styleClasses = "bg-primary/15 border-primary/30 text-primary"
             break
         case 'imaging':
-            styleClasses = "bg-green-500/15 border-green-500/30 text-green-500"
+            styleClasses = "bg-secondary/15 border-secondary/30 text-secondary"
             break
         case 'ocr':
             styleClasses = "bg-amber-500/15 border-amber-500/30 text-amber-500"
