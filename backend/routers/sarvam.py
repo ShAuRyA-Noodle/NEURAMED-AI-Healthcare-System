@@ -327,24 +327,3 @@ async def get_supported_languages():
             for code, config in LANGUAGE_CONFIG.items()
         ]
     }
-
-
-def _parse_json_safely(text: str) -> dict:
-    if not text:
-        return {"response_native": "", "response_english": "No response", "urgency": "medium"}
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        import re
-        match = re.search(r'\{[\s\S]*\}', text)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except json.JSONDecodeError:
-                pass
-        return {
-            "response_native": text,
-            "response_english": text,
-            "urgency": "medium",
-            "primary_concern": "See response text",
-        }
