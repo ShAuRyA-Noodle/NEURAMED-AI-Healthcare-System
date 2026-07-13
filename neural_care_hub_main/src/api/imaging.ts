@@ -1,5 +1,5 @@
 import client from './client'
-import type { ScanAnalysisResult, DiagnosisSession, SecondOpinionResult } from '../types'
+import type { ScanAnalysisResult, SecondOpinionResult } from '../types'
 
 export const analyzeImage = ({
   file, scanType, patientId, bodyRegion, clinicalIndication, patientAge, patientGender
@@ -26,9 +26,6 @@ export const analyzeImage = ({
     timeout: 120000,
   }).then(r => r.data)
 }
-
-export const getScans = (limit = 20) =>
-  client.get<DiagnosisSession[]>(`/api/imaging/scans?limit=${limit}`).then(r => r.data)
 
 export const getSecondOpinion = (sessionId: number) =>
   client.post<SecondOpinionResult>(`/api/sessions/${sessionId}/second-opinion`).then(r => r.data)

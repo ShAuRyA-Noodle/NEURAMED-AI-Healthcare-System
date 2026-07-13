@@ -13,11 +13,5 @@ export const updateAppointmentStatus = (id: number, status: AppointmentStatus) =
 export const getAppointmentStats = () =>
     client.get<AppointmentStats>('/api/appointments/stats').then(r => r.data)
 
-export const getUpcomingAppointments = () =>
-    client.get<Appointment[]>('/api/appointments/upcoming').then(r => r.data)
-
-export const getTodayAppointments = () =>
-    client.get<Appointment[]>('/api/appointments/today').then(r => r.data)
-
 export const addAppointmentNotes = (id: number, notes: string) =>
     client.patch<Appointment>(`/api/appointments/${id}/notes`, { notes }).then(r => r.data)
