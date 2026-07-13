@@ -11,7 +11,7 @@ from db.models import DiagnosisSession, Patient, Report, Appointment, User
 from db.schemas import DashboardStats, ActivityFeedItem
 from utils.llm import call_llm
 from core.exceptions import InferenceUnavailable
-from utils.auth import require_user
+from utils.auth import require_doctor
 from utils.file_handling import clamp_pagination
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
@@ -21,7 +21,7 @@ _insights_cache: dict = {"data": None, "timestamp": 0}
 
 
 @router.get("/stats", response_model=DashboardStats)
-def get_stats(db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def get_stats(db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     total_diagnoses = db.query(DiagnosisSession).count()
 
     today = datetime.utcnow().date()
@@ -124,7 +124,7 @@ def get_stats(db: Session = Depends(get_db), current_user: User = Depends(requir
 
 
 @router.get("/activity-feed", response_model=List[ActivityFeedItem])
-def get_activity_feed(limit: int = 20, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def get_activity_feed(limit: int = 20, db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     limit, _ = clamp_pagination(limit)
     sessions = db.query(DiagnosisSession).order_by(
         DiagnosisSession.created_at.desc()
@@ -147,7 +147,7 @@ def get_activity_feed(limit: int = 20, db: Session = Depends(get_db), current_us
 
 
 @router.get("/recent-sessions")
-def get_recent_sessions(limit: int = 10, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def get_recent_sessions(limit: int = 10, db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     limit, _ = clamp_pagination(limit)
     sessions = db.query(DiagnosisSession).order_by(
         DiagnosisSession.created_at.desc()
@@ -167,7 +167,7 @@ def get_recent_sessions(limit: int = 10, db: Session = Depends(get_db), current_
 
 
 @router.get("/quick-stats")
-def get_quick_stats(db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def get_quick_stats(db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     total_voice = db.query(DiagnosisSession).filter(DiagnosisSession.agent_type == "voice").count()
     total_imaging = db.query(DiagnosisSession).filter(DiagnosisSession.agent_type == "imaging").count()
     total_ocr = db.query(DiagnosisSession).filter(DiagnosisSession.agent_type == "ocr").count()
@@ -204,7 +204,7 @@ def get_quick_stats(db: Session = Depends(get_db), current_user: User = Depends(
 
 
 @router.get("/ai-insights")
-def get_ai_insights(db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def get_ai_insights(db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     global _insights_cache
 
     # Check cache (5 minute TTL)
@@ -258,7 +258,7 @@ Be specific and data-driven. Reference actual numbers from the data."""
 
 
 @router.get("/urgency-heatmap")
-def get_urgency_heatmap(db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def get_urgency_heatmap(db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     # Last 28 days grouped by day_of_week + urgency
     now = datetime.utcnow()
     start = now - timedelta(days=28)

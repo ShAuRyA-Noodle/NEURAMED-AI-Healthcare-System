@@ -9,7 +9,7 @@ from db.database import get_db
 from agents import appointment_agent
 from db.models import Appointment, Patient, User
 from db.schemas import AppointmentCreate, AppointmentResponse
-from utils.auth import require_user
+from utils.auth import require_user, require_doctor
 
 logger = logging.getLogger("neuramed.appointments")
 
@@ -149,7 +149,7 @@ def get_appointments(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_user)
+    current_user: User = Depends(require_doctor)
 ):
     query = db.query(Appointment)
     if patient_id:
@@ -167,7 +167,7 @@ def get_appointments(
 
 
 @router.patch("/{appointment_id}/status")
-def update_status(appointment_id: int, body: StatusUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def update_status(appointment_id: int, body: StatusUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     valid_statuses = ["scheduled", "completed", "cancelled"]
     if body.status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
@@ -180,7 +180,7 @@ def update_status(appointment_id: int, body: StatusUpdate, db: Session = Depends
 
 
 @router.patch("/{appointment_id}/notes")
-def add_notes(appointment_id: int, body: NotesUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def add_notes(appointment_id: int, body: NotesUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     app = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not app:
         raise HTTPException(status_code=404, detail="Appointment not found")
