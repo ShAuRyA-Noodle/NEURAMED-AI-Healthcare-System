@@ -150,9 +150,6 @@ class DiagnosisSessionBase(BaseModel):
     conditions_detected: List[str]
     processing_time_ms: int
 
-class DiagnosisSessionCreate(DiagnosisSessionBase):
-    patient_id: Optional[int] = None
-
 class DiagnosisSessionResponse(DiagnosisSessionBase):
     id: int
     patient_id: Optional[int]
@@ -169,9 +166,6 @@ class ScanResultBase(BaseModel):
     confidence_score: float
     model_findings: str
 
-class ScanResultCreate(ScanResultBase):
-    session_id: int
-
 class ScanResultResponse(ScanResultBase):
     id: int
     session_id: int
@@ -186,9 +180,6 @@ class ReportBase(BaseModel):
     abnormal_flags: List[str]
     medications: List[Any]
     summary: str
-
-class ReportCreate(ReportBase):
-    session_id: int
 
 class ReportResponse(ReportBase):
     id: int
@@ -301,10 +292,6 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     user: UserOut
-
-class TokenData(BaseModel):
-    user_id: Optional[int] = None
-    role: Optional[str] = None
 
 # --- Drug Interaction Schemas ---
 class DrugInteractionRequest(BaseModel):
