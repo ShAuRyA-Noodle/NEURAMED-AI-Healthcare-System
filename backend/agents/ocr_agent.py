@@ -2,6 +2,7 @@ import re
 import time
 import logging
 from utils.llm import call_llm
+from core.provenance import Provenance, InferenceStatus, wrap_result
 from utils.ocr_engine import extract_text_from_file
 from db.schemas import ReportAnalysisResult
 from db.models import Report, DiagnosisSession
@@ -203,7 +204,10 @@ def analyze(file_bytes: bytes, filename: str, patient_id: int | None, db: Sessio
 
     # LLM interpretation with enhanced prompt — send up to 8000 chars for thorough analysis
     llm_input = f"Medical report text:\n{extracted_text[:8000]}"
-    llm_result = call_llm(OCR_PROMPT, llm_input, fallback_type="ocr")
+    llm_result, model_used = call_llm(OCR_PROMPT, llm_input)
+    payload = wrap_result(llm_result, Provenance(
+        status=InferenceStatus.OK, source="real_model",
+        model=model_used, vendor="groq"))
 
     processing_ms = int((time.time() - start) * 1000)
 
@@ -232,7 +236,7 @@ def analyze(file_bytes: bytes, filename: str, patient_id: int | None, db: Sessio
             patient_id=patient_id,
             agent_type='ocr',
             input_summary=f"Report: {filename[:100]}",
-            result_json=llm_result,
+            result_json=payload,
             confidence_score=ocr_confidence,
             urgency_level=llm_result.get("urgency", "low"),
             conditions_detected=llm_result.get("conditions", []),

@@ -112,7 +112,7 @@ const Appointments = () => {
       </div>
 
       {/* Stats from API */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+      <div className="grid-auto">
         <StatCard label="TOTAL" value={stats?.total ?? appts?.length ?? 0} icon={Calendar} />
         <StatCard label="SCHEDULED" value={stats?.scheduled ?? appts?.filter(a => a.status === 'scheduled').length ?? 0} icon={Clock} color="var(--cyan)" />
         <StatCard label="COMPLETED" value={stats?.completed ?? appts?.filter(a => a.status === 'completed').length ?? 0} icon={CheckCircle} color="var(--green)" />
@@ -273,14 +273,15 @@ const Appointments = () => {
                       {!formData.patient_id && matchedPatients.length > 0 && (
                         <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', zIndex: 10, background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, marginTop: 4, maxHeight: 200, overflow: 'auto' }}>
                           {matchedPatients.map((p: any) => (
-                            <div key={p.id} data-cursor="hover" onClick={() => { setFormData({ ...formData, patient_id: String(p.id) }); setPatientSearch(''); }}
-                              style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border)', transition: 'background 150ms' }}
+                            <button key={p.id} type="button" data-cursor="hover" onClick={() => { setFormData({ ...formData, patient_id: String(p.id) }); setPatientSearch(''); }}
+                              aria-label={`Select patient ${p.full_name || p.patient_code}`}
+                              style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', color: 'inherit', font: 'inherit', padding: '10px 14px', cursor: 'pointer', border: 'none', borderBottom: '1px solid var(--border)', transition: 'background 150ms' }}
                               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
                               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                               <span className="font-body" style={{ fontSize: 13, color: 'var(--text)' }}>{p.full_name || p.patient_code}</span>
                               <span className="font-number" style={{ fontSize: 10, color: 'var(--cyan)', marginLeft: 8 }}>{p.patient_code}</span>
                               <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 8 }}>{p.phone || ''}</span>
-                            </div>
+                            </button>
                           ))}
                         </div>
                       )}
@@ -299,7 +300,7 @@ const Appointments = () => {
 
                 {modalStep === 2 && (
                   <>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div className="form-grid-2" style={{ gap: 16 }}>
                       <div>
                         <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>DOCTOR NAME</label>
                         <input required value={formData.doctor_name} onChange={e => setFormData({ ...formData, doctor_name: e.target.value })} style={inputStyle} />
@@ -317,7 +318,7 @@ const Appointments = () => {
                       <input required type="datetime-local" value={formData.appointment_date} onChange={e => setFormData({ ...formData, appointment_date: e.target.value })}
                         style={{ ...inputStyle, colorScheme: 'dark' }} />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+                    <div className="form-grid-3" style={{ gap: 16 }}>
                       <div>
                         <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>TYPE</label>
                         <select value={formData.appointment_type} onChange={e => setFormData({ ...formData, appointment_type: e.target.value })} style={{ ...inputStyle, cursor: 'pointer' }}>

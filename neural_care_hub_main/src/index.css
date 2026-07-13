@@ -14,13 +14,53 @@
     --amber: #FF9500;
     --red: #FF3B5C;
     --text: #EEF2F7;
-    --muted: #445566;
-    --dim: #2A3540;
+    --muted: #8AA0AD;   /* secondary text — lightened for WCAG AA (~7.5:1 on --bg) */
+    --dim: #6E828F;     /* tertiary text — lightened for WCAG AA (~5.1:1 on --bg)  */
 
-    --background: var(--bg);
-    --foreground: var(--text);
+    /* ── shadcn HSL token bridge ──────────────────────────────────────────
+       Tailwind maps `background`, `primary`, `muted`, `card`, … to
+       hsl(var(--…)), which requires an "H S% L%" triplet (NO hsl() wrapper,
+       NO commas). Each value below is derived from the brand hex palette
+       above so the shadcn utilities resolve to the SAME cyan/green clinical
+       theme — one source of truth (shadcn primary === brand --cyan).
+       NOTE: `--border`/`--muted` above stay real colors because ~450 inline
+       `var(--border)` / `var(--muted)` usages depend on them; the shadcn
+       border/muted-surface utilities use the dedicated triplets below. */
+    --background: 200 60% 2%;          /* #020608  brand --bg           */
+    --foreground: 200 43% 93%;         /* #E6F0F5  light readable text  */
 
-    --radius: 0.5rem;
+    --card: 210 31% 6%;                /* #0B1015  brand --surface      */
+    --card-foreground: 200 43% 93%;
+    --popover: 210 31% 6%;
+    --popover-foreground: 200 43% 93%;
+
+    --primary: 187 100% 50%;           /* #00E5FF  brand --cyan         */
+    --primary-foreground: 200 60% 4%;
+    --secondary: 157 100% 50%;         /* #00FF9D  brand --green        */
+    --secondary-foreground: 200 60% 4%;
+    --accent: 157 100% 50%;            /* brand green                   */
+    --accent-foreground: 200 60% 4%;
+    --destructive: 350 100% 62%;       /* #FF3B5C  brand --red          */
+    --destructive-foreground: 0 0% 100%;
+
+    --muted-surface: 204 28% 10%;      /* #131C22  subtle muted surface */
+    --muted-foreground: 202 18% 61%;   /* #8AA0AD  ~7.5:1 on --bg (AA)  */
+
+    --border-hsl: 205 20% 15%;         /* subtle border for utilities   */
+    --input: 205 20% 18%;
+    --ring: 187 100% 50%;              /* focus ring = brand cyan       */
+
+    /* Sidebar (shadcn ui/sidebar component) */
+    --sidebar-background: 210 31% 6%;
+    --sidebar-foreground: 200 43% 93%;
+    --sidebar-primary: 187 100% 50%;
+    --sidebar-primary-foreground: 200 60% 4%;
+    --sidebar-accent: 204 28% 10%;
+    --sidebar-accent-foreground: 200 43% 93%;
+    --sidebar-border: 205 20% 15%;
+    --sidebar-ring: 187 100% 50%;
+
+    --radius: 0.75rem;
 
     /* Glow shadows */
     --glow-cyan: 0 0 12px rgba(0, 229, 255, 0.25), 0 0 40px rgba(0, 229, 255, 0.08);
@@ -37,8 +77,28 @@
   }
 }
 
-* {
-  cursor: none !important;
+/* Hide the native cursor ONLY on fine-pointer devices and ONLY while a custom
+   cursor component is mounted (it toggles body.custom-cursor-active). Touch
+   devices keep normal behaviour, disabled buttons keep not-allowed, inputs keep
+   the I-beam, and if the cursor JS throws the native cursor returns. */
+@media (pointer: fine) {
+  body.custom-cursor-active {
+    cursor: none;
+  }
+}
+
+/* Respect users who ask the OS to reduce motion — collapse animations and
+   transitions to near-instant everywhere. Heavy Three.js/rAF scenes are
+   additionally skipped in JS via usePrefersReducedMotion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 ::selection {
@@ -176,6 +236,68 @@ h6 {
 /* ===== MOBILE RESPONSIVE ===== */
 :root {
   --sidebar-width: 220px;
+}
+
+/* ===== RESPONSIVE LAYOUT UTILITIES =====
+   Real CSS grids with media queries so they collapse on mobile —
+   unlike inline `style={{ gridTemplateColumns }}` which no breakpoint
+   can override. Single mobile breakpoint family is 768px; large splits
+   collapse at/above it so you never get mobile chrome + a desktop grid.
+   Inline `gap` on a page element still overrides the class default. */
+
+/* Auto-reflowing stat/KPI grid — wraps naturally via auto-fill */
+.grid-auto {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
+/* Dashboard loading-skeleton grid (class was referenced but never defined,
+   so skeletons rendered as full-width stacked blocks) */
+.responsive-grid-4 {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+/* Two-panel workspace (5fr 7fr): side-by-side on desktop, stacked on mobile */
+.split-workspace {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 5fr 7fr;
+}
+.split-workspace > * { min-width: 0; }
+@media (max-width: 900px) {
+  .split-workspace { grid-template-columns: 1fr; }
+}
+
+/* Content + aside split (dashboard 3fr 2fr) */
+.split-main-aside {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 3fr 2fr;
+}
+.split-main-aside > * { min-width: 0; }
+@media (max-width: 1024px) {
+  .split-main-aside { grid-template-columns: 1fr; }
+}
+
+/* Form rows: pairs/triples on desktop, single column on small screens */
+.form-grid-2 {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr 1fr;
+}
+.form-grid-3 {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, 1fr);
+}
+.form-grid-2 > *,
+.form-grid-3 > * { min-width: 0; }
+@media (max-width: 640px) {
+  .form-grid-2,
+  .form-grid-3 { grid-template-columns: 1fr; }
 }
 
 /* Sidebar mobile */

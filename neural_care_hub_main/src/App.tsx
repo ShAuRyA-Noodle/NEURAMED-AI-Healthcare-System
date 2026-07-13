@@ -12,6 +12,7 @@ import VoiceAgent from "./pages/VoicePage";
 import ImagingAI from "./pages/ImagingPage";
 import OCRReports from "./pages/OcrPage";
 import Patients from "./pages/PatientsPage";
+import PatientDetailPage from "@/pages/PatientDetailPage";
 import Appointments from "./pages/AppointmentsPage";
 import NotFound from "./pages/NotFound";
 import Sessions from "./pages/SessionsPage";
@@ -122,7 +123,7 @@ const AppRoutes = ({ showSplash }: { showSplash: boolean }) => {
             <Route path="/drug-interactions" element={<DrugInteractionPage />} />
             <Route path="/voice/vernacular" element={<SarvamVoicePage />} />
             <Route path="/patients" element={<ProtectedRoute requireRole="doctor"><Patients /></ProtectedRoute>} />
-            <Route path="/patients/:id" element={<ProtectedRoute requireRole="doctor"><Patients /></ProtectedRoute>} />
+            <Route path="/patients/:id" element={<ProtectedRoute requireRole="doctor"><PatientDetailPage /></ProtectedRoute>} />
             <Route path="/sessions" element={<ProtectedRoute requireRole="doctor"><Sessions /></ProtectedRoute>} />
             <Route path="/sessions/:id" element={<ProtectedRoute requireRole="doctor"><SessionDetail /></ProtectedRoute>} />
             <Route path="/patients/:patientId/timeline" element={<ProtectedRoute requireRole="doctor"><TimelinePage /></ProtectedRoute>} />

@@ -1,21 +1,17 @@
 import os
 import json
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from db.database import get_db
 from db.models import User, DiagnosisSession
 from utils.auth import require_user
 from utils.llm import call_llm
+from core.exceptions import InferenceUnavailable
+from agents import voice_agent
 
 logger = logging.getLogger(__name__)
-
-
-def _safe_log(value) -> str:
-    """Strip CR/LF and cap length so user-controlled values can't forge log lines."""
-    return str(value).replace("\r", "").replace("\n", "").replace("\t", " ")[:64]
-
 
 router = APIRouter(prefix="/api/sarvam", tags=["Sarvam"])
 
@@ -59,6 +55,32 @@ async def sarvam_health():
         }
 
 
+@router.post("/transcribe")
+async def sarvam_transcribe(
+    file: UploadFile = File(...),
+    language: str = Form("hi"),
+    current_user: User = Depends(require_user),
+):
+    """Real server-side speech-to-text for vernacular audio, powered by Groq
+    Whisper (whisper-large-v3) with the target language hinted.
+
+    This is NOT a hosted "Sarvam" speech model — it is Groq Whisper, and the
+    provenance says so. On any transcription failure, ``transcribe_with_whisper``
+    raises ``InferenceUnavailable`` (-> 503); we never fabricate a transcript.
+    """
+    audio_bytes = await file.read()
+    transcript = voice_agent.transcribe_with_whisper(audio_bytes, language=language)
+    return {
+        "transcript": transcript,
+        "language": language,
+        "provenance": {
+            "source": "real_model",
+            "model": "whisper-large-v3",
+            "vendor": "groq",
+        },
+    }
+
+
 @router.post("/diagnose")
 async def sarvam_diagnose(
     transcript: str,
@@ -77,7 +99,7 @@ async def sarvam_diagnose(
     # then separately request native language response text via Sarvam/Ollama if available.
 
     api_key = os.getenv("GROQ_API_KEY", "").strip()
-    logger.info("Sarvam: GROQ_API_KEY present=%s, language=%s", bool(api_key), _safe_log(language))
+    logger.info(f"Sarvam: GROQ_API_KEY present={bool(api_key)}, language={language}")
 
     if api_key:
         try:
@@ -123,6 +145,12 @@ async def sarvam_diagnose(
                     "immediate_advice_native": groq_data.get("immediate_advice", ""),
                     "see_doctor_urgency": groq_data.get("see_doctor_urgency", "routine"),
                     "medical_terms_explained": groq_data.get("medical_terms_explained", []),
+                    "provenance": {
+                        "status": "ok",
+                        "source": "real_model",
+                        "model": "llama-3.3-70b-versatile",
+                        "vendor": "groq",
+                    },
                 }
                 logger.info("Sarvam: Groq returned valid English analysis")
 
@@ -193,24 +221,36 @@ async def sarvam_diagnose(
                                     sarvam_text = parsed.get("response_native") or parsed.get("response_english") or parsed.get("response") or str(parsed)
                             except (json.JSONDecodeError, ValueError):
                                 pass  # It's plain text, use as-is
+                            # Real Sarvam model output via local Ollama. It is a
+                            # free-text native-language response, so we do NOT
+                            # fabricate structured fields (urgency, primary_concern,
+                            # or an English translation we don't actually have).
+                            # response_english is only set when the model spoke
+                            # English; otherwise it is omitted, never a placeholder.
                             result = {
                                 "response_native": sarvam_text,
-                                "response_english": sarvam_text if language == "en" else f"[Response in {lang['name']}]",
-                                "urgency": "medium",
-                                "primary_concern": "Medical advice provided",
                                 "immediate_advice_native": "",
-                                "see_doctor_urgency": "routine",
                                 "medical_terms_explained": [],
+                                "provenance": {
+                                    "status": "ok",
+                                    "source": "real_model",
+                                    "model": model_name,
+                                    "vendor": "ollama",
+                                },
                             }
+                            if language == "en":
+                                result["response_english"] = sarvam_text
                             logger.info(f"Sarvam: Got response from {model_name}")
                             break
             except Exception as e:
                 logger.warning(f"Sarvam {model_name} failed: {e}")
 
-    # FALLBACK 2: Use fallback dict
+    # No real inference path produced a result — fail loud, do not fabricate.
     if not result:
-        from utils.llm import _fallback
-        result = _fallback("sarvam")
+        raise InferenceUnavailable(
+            "Sarvam vernacular inference failed: no Groq and no local Ollama model produced a result.",
+            vendor="sarvam",
+        )
 
     # Save session
     session_record = DiagnosisSession(
@@ -330,24 +370,3 @@ async def get_supported_languages():
             for code, config in LANGUAGE_CONFIG.items()
         ]
     }
-
-
-def _parse_json_safely(text: str) -> dict:
-    if not text:
-        return {"response_native": "", "response_english": "No response", "urgency": "medium"}
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        import re
-        match = re.search(r'\{[\s\S]*\}', text)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except json.JSONDecodeError:
-                pass
-        return {
-            "response_native": text,
-            "response_english": text,
-            "urgency": "medium",
-            "primary_concern": "See response text",
-        }

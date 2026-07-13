@@ -9,6 +9,8 @@ import { ConfidenceMeter } from '@/components/shared/ConfidenceMeter';
 import { UrgencyBadge } from '@/components/shared/UrgencyBadge';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { SkeletonCard } from '@/components/shared/SkeletonCard';
+import { ProvenanceChip } from '@/components/shared/ProvenanceChip';
+import { CitationList } from '@/components/shared/CitationList';
 import VoiceOrb from '@/components/three/VoiceOrb';
 import type { DiagnosisResult, ConditionDetail } from '@/types';
 
@@ -327,7 +329,7 @@ const VoicePage = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '5fr 7fr', gap: 24 }}>
+      <div className="split-workspace">
         {/* LEFT: Input Panel */}
         <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column' }}>
           {/* Tab Bar */}
@@ -424,7 +426,12 @@ const VoicePage = () => {
               {/* VoiceOrb + Mic Button */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '10px 0' }}>
                 {/* Three.js VoiceOrb */}
-                <div data-cursor="hover" onClick={toggleRecording} style={{ cursor: 'pointer', position: 'relative' }}>
+                <div data-cursor="hover" onClick={toggleRecording}
+                  role="button" tabIndex={0}
+                  aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+                  aria-pressed={isRecording}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleRecording(); } }}
+                  style={{ cursor: 'pointer', position: 'relative' }}>
                   <VoiceOrb isRecording={isRecording} audioLevel={waveData.length > 0 ? Math.max(...waveData) / 56 : 0} />
                   {/* Overlay mic icon */}
                   <div style={{
@@ -498,7 +505,7 @@ const VoicePage = () => {
           ) : isPending ? (
             <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
               <SkeletonCard height={60} />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <div className="form-grid-3" style={{ gap: 12 }}>
                 <SkeletonCard height={160} />
                 <SkeletonCard height={160} />
                 <SkeletonCard height={160} />
@@ -547,6 +554,9 @@ const VoicePage = () => {
               </div>
 
               <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20, flex: 1, overflowY: 'auto' }}>
+                {/* Provenance — what model produced this + how many real sources */}
+                {result.provenance && <ProvenanceChip provenance={result.provenance} />}
+
                 {/* Listen to Analysis */}
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px',
@@ -588,7 +598,7 @@ const VoicePage = () => {
                 </div>
 
                 {/* Conditions + Right Column */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                <div className="form-grid-2" style={{ gap: 20 }}>
                   {/* Left: Condition Cards */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em' }}>DIFFERENTIAL DIAGNOSIS</span>
@@ -642,6 +652,13 @@ const VoicePage = () => {
                                   background: 'rgba(239,68,68,0.08)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.15)'
                                 }}>⚠ {f}</span>
                               ))}
+                            </div>
+                          )}
+
+                          {/* Real citations grounding this differential */}
+                          {c.citations && c.citations.length > 0 && (
+                            <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 8 }}>
+                              <CitationList citations={c.citations} compact />
                             </div>
                           )}
                         </motion.div>

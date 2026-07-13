@@ -127,7 +127,7 @@ const SessionDetail = () => {
       </div>
 
       {/* Overview Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+      <div className="grid-auto">
         <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 20, textAlign: 'center' }}>
           <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 12 }}>CONFIDENCE</span>
           <ConfidenceMeter value={session.confidence_score || 0} size={80} />
@@ -345,7 +345,9 @@ const SessionDetail = () => {
           <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 20, height: 'fit-content' }}>
             <span className="font-heading" style={{ fontSize: 14, color: 'var(--text)', display: 'block', marginBottom: 16 }}>Related Sessions</span>
             {session.related_sessions.map((rs: any) => (
-              <div key={rs.id} data-cursor="hover" onClick={() => navigate(`/sessions/${rs.id}`)} style={{
+              <button key={rs.id} type="button" data-cursor="hover" onClick={() => navigate(`/sessions/${rs.id}`)}
+                aria-label={`Open related session ${rs.id}`} style={{
+                width: '100%', textAlign: 'left', font: 'inherit', color: 'inherit', display: 'block',
                 background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: 12, cursor: 'pointer', marginBottom: 8
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -361,7 +363,7 @@ const SessionDetail = () => {
                   <UrgencyBadge urgency={rs.urgency_level} />
                   <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)' }}>{rs.created_at ? format(new Date(rs.created_at), 'MMM d') : '—'}</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}

@@ -4,6 +4,29 @@ export type ScanType = 'CT Scan' | 'MRI' | 'X-Ray' | 'Ultrasound'
 export type AppointmentStatus = 'scheduled' | 'completed' | 'cancelled'
 export type AppointmentType = 'initial' | 'follow_up' | 'emergency' | 'teleconsult'
 
+// --- Provenance & Citations (shared across every AI result surface) ---
+export interface Provenance {
+    status: string                 // 'ok' | 'degraded' | 'unavailable'
+    source: string                 // real_model | real_model_degraded | unavailable
+    model: string | null
+    vendor: string | null
+    reason?: string | null         // present when status !== 'ok'
+    grounded_in?: string[]         // citation / source URLs
+}
+
+export interface Citation {
+    pmid?: string
+    title?: string
+    year?: string
+    journal?: string
+    url?: string
+}
+
+export interface Icd10Candidate {
+    code: string
+    name: string
+}
+
 // --- Voice Agent Types ---
 export interface ConditionDetail {
     name: string
@@ -12,6 +35,9 @@ export interface ConditionDetail {
     description: string
     matching_symptoms: string[]
     red_flags: string[]
+    // Phase 2 grounding: real ICD-10 candidates + verified citations
+    icd10_candidates?: Icd10Candidate[]
+    citations?: Citation[]
 }
 
 export interface RecommendedTest {
@@ -34,6 +60,8 @@ export interface DiagnosisResult {
     when_to_go_to_er: string
     transcript: string
     processing_time_ms: number
+    provenance?: Provenance
+    conditions_detected?: string[]
     // Backward compat
     confidence: number
     recommendations: string[]
@@ -93,6 +121,12 @@ export interface ScanAnalysisResult {
     icd10_codes?: { code: string; description: string }[]
     report_text?: string
     body_region?: string
+    // Real classifier / provenance / honesty fields
+    pathology_scores?: Record<string, number>
+    classifier_available?: boolean
+    measurements_enabled?: boolean
+    provenance?: Provenance
+    disclaimer?: string
 }
 
 export interface RichRecommendation {
@@ -386,6 +420,54 @@ export interface PatientDetail extends Patient {
     agent_usage: Record<string, number>
 }
 
+/**
+ * The shape GET /api/patients actually returns — the base Patient row plus the
+ * fields computed in backend/routers/patients.py (get_patients handler).
+ * `Patient` is the raw DB row; `EnrichedPatient` is this list-endpoint response.
+ *
+ * NOTE ON CASING: the backend uppercases the last-session agent/urgency
+ * (`agent_type.upper()`, `urgency_level.upper()`), so these arrive as e.g.
+ * "VOICE" / "HIGH", NOT the lowercase AgentType/UrgencyLevel unions. They are
+ * typed as `string` here to reflect reality; consumers must lower-case before
+ * comparing against those unions.
+ */
+export interface EnrichedPatient {
+    id: number
+    patient_code: string
+    first_name: string | null
+    last_name: string | null
+    /** Always a non-empty string (falls back to patient_code server-side). */
+    full_name: string
+    age: number | null
+    gender: string | null
+    phone: string | null
+    email: string | null
+    address: string | null
+    emergency_contact: string | null
+    allergies: string | null
+    chronic_conditions: string | null
+    insurance_id: string | null
+    created_at: string
+    demographics: {
+        age: number | null
+        gender: string | null
+        blood_type: string
+        date_of_birth: string | null
+    }
+    total_sessions: number
+    /** Duplicate of total_sessions kept for backward compat by the backend. */
+    session_count: number
+    /** UPPERCASE agent type ("VOICE" | "IMAGING" | "OCR") or null when the patient has no sessions. */
+    last_session_agent: string | null
+    /** UPPERCASE urgency ("LOW" | "MEDIUM" | "HIGH" | "CRITICAL"); backend defaults to "LOW". */
+    last_session_urgency: string
+    last_session_date: string | null
+    most_common_condition: string | null
+    /** Distinct condition names across all of the patient's sessions. */
+    total_conditions_detected: string[]
+    risk_score: number
+}
+
 // --- Session Types ---
 export interface DiagnosisSession {
     id: number
@@ -487,33 +569,40 @@ export interface User {
     language_preference?: string
 }
 
-// --- Drug Interaction Types ---
+// --- Drug Interaction Types (RAG: cite-or-abstain, FDA labels via openFDA) ---
+export interface DrugEvidenceSnippet {
+    source_drug: string
+    snippet: string
+    citation_url: string
+}
+
+export interface DrugPair {
+    pair: [string, string] | string[]
+    status: 'evidence' | 'no_evidence'
+    // Present when status === 'evidence'
+    severity?: string           // contraindicated | major | moderate | minor | unspecified
+    summary?: string
+    clinical_management?: string
+    citations?: string[]        // FDA label URLs
+    evidence?: DrugEvidenceSnippet[]
+    // Present when status === 'no_evidence'
+    note?: string
+    sources_checked?: string[]
+}
+
+export interface DrugNormalized {
+    input: string
+    generic_name?: string
+    [key: string]: unknown
+}
+
 export interface DrugInteractionResult {
+    drugs_normalized?: DrugNormalized[]
+    pairs: DrugPair[]
+    sources_checked: string[]
     overall_risk: string
-    interaction_count: Record<string, number>
-    interactions: DrugInteraction[]
-    safe_pairs: SafePair[]
-    overall_recommendations: string[]
-}
-
-export interface DrugInteraction {
-    drug_a: string
-    drug_b: string
-    severity: string
-    severity_score: number
-    mechanism: string
-    clinical_effect: string
-    onset?: string
-    documentation?: string
-    management: string
-    alternatives?: { replace: string; with: string; note: string }[]
-    references?: string[]
-}
-
-export interface SafePair {
-    drug_a: string
-    drug_b: string
-    note: string
+    disclaimer?: string
+    provenance?: Provenance
 }
 
 // --- Timeline Types ---
@@ -570,38 +659,43 @@ export interface RecurringCondition {
     possible_cause: string
 }
 
-// --- Second Opinion Types ---
+// --- Second Opinion Types (real multi-vendor ensemble; disagreement surfaced) ---
+export interface SecondOpinionVote {
+    vendor: string
+    model: string
+    status: string              // 'ok' | 'unavailable' | 'error'
+    primary_diagnosis?: string
+    icd10?: string
+    confidence?: number
+    reasoning?: string
+    key_evidence?: string[]
+    differentials?: string[]
+    agree_with_original?: boolean
+    abstain?: boolean
+    abstain_reason?: string
+    reason?: string             // failure reason when status !== 'ok'
+}
+
+export interface SecondOpinionDissent {
+    vendor: string
+    model: string
+    primary_diagnosis?: string
+    reasoning?: string
+}
+
 export interface SecondOpinionResult {
     session_id: number
-    opinions: {
-        conservative: PhysicianOpinion
-        balanced: PhysicianOpinion
-        differential: PhysicianOpinion
-    }
-    synthesis: OpinionSynthesis
-}
-
-export interface PhysicianOpinion {
-    physician_id: string
-    primary_diagnosis: string
-    confidence: number
-    reasoning: string
-    agreed_findings: string[]
-    disputed_findings: string[]
-    additional_diagnoses: string[]
-    recommended_tests: string[]
-    urgency_assessment: string
-    key_message: string
-}
-
-export interface OpinionSynthesis {
-    consensus_level: string
-    consensus_diagnosis: string | null
-    majority_diagnosis: string | null
-    agreement_areas: string[]
-    dispute_areas: string[]
-    synthesized_recommendation: string
-    clinical_note: string
+    consensus_level: string     // unanimous | majority | split
+    agreement_pct: number
+    agreed_diagnosis: string | null
+    votes: SecondOpinionVote[]
+    dissent: SecondOpinionDissent[]
+    panel_size?: number
+    real_votes: number
+    abstained: string[]
+    unavailable: string[]
+    disclaimer?: string
+    provenance?: Provenance
 }
 
 // --- Sarvam Types ---

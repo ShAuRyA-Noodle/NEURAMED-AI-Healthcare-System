@@ -1,5 +1,5 @@
 import client from './client'
-import type { ReportAnalysisResult, DiagnosisSession } from '../types'
+import type { ReportAnalysisResult } from '../types'
 
 export const analyzeReport = (file: File, patientId?: number) => {
   const formData = new FormData()
@@ -9,6 +9,3 @@ export const analyzeReport = (file: File, patientId?: number) => {
     headers: { 'Content-Type': 'multipart/form-data' }
   }).then(r => r.data)
 }
-
-export const getReports = (limit = 20) =>
-  client.get<DiagnosisSession[]>(`/api/ocr/reports?limit=${limit}`).then(r => r.data)

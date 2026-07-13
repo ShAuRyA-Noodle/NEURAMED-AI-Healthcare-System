@@ -2,16 +2,13 @@ import time
 import os
 import logging
 from utils.llm import call_llm
+from core.provenance import Provenance, InferenceStatus, wrap_result
+from ml import grounding
 from db.schemas import DiagnosisResult, ConditionDetail, RecommendedTest
 from db.models import DiagnosisSession, Patient
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
-
-
-def _safe_log(value) -> str:
-    """Strip CR/LF and cap length so user-controlled values can't forge log lines."""
-    return str(value).replace("\r", "").replace("\n", "").replace("\t", " ")[:64]
 
 LANGUAGE_CONFIG = {
     "hi": {"name": "Hindi", "script": "Devanagari"},
@@ -54,7 +51,7 @@ def _translate_via_groq(text: str, target_lang: str) -> str:
         if translated and len(translated) > 5:
             return translated
     except Exception as e:
-        logger.warning("Translation to %s failed: %s", _safe_log(target_lang), _safe_log(e))
+        logger.warning(f"Translation to {target_lang} failed: {e}")
     return text
 
 
@@ -136,7 +133,7 @@ def _translate_to_english(text: str, source_lang: str) -> str:
             logger.info(f"Translated {lang['name']} transcript to English")
             return translated
     except Exception as e:
-        logger.warning("Translation from %s to English failed: %s", _safe_log(source_lang), _safe_log(e))
+        logger.warning(f"Translation from {source_lang} to English failed: {e}")
     return text
 
 SYSTEM_PROMPT = """You are Dr. NEURAMED, an expert clinical AI diagnostic assistant trained on medical literature. Analyze the patient's reported symptoms with the thoroughness of a senior physician.
@@ -181,32 +178,100 @@ Rules:
 - when_to_go_to_er: only include genuine ER indicators"""
 
 
-def transcribe_audio_fallback(audio_bytes: bytes) -> str:
-    import speech_recognition as sr
-    import io
-    recognizer = sr.Recognizer()
+def _get_groq_client(api_key: str):
+    """Seam for testing — monkeypatch this, not the groq package."""
+    from groq import Groq
+    return Groq(api_key=api_key)
+
+
+def transcribe_with_whisper(audio_bytes: bytes, language: str = None) -> str:
+    """Transcribe audio via Groq's Whisper (whisper-large-v3).
+
+    Uses the OpenAI-compatible Groq audio API. Raises InferenceUnavailable on
+    any failure — a failed transcription must NEVER be returned as if it were
+    real patient speech.
+    """
+    from core.exceptions import InferenceUnavailable
+    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    if not api_key:
+        raise InferenceUnavailable(
+            "GROQ_API_KEY not configured for speech-to-text.", vendor="groq")
+    client = _get_groq_client(api_key)
     try:
-        with sr.AudioFile(io.BytesIO(audio_bytes)) as source:
-            audio = recognizer.record(source)
-        return recognizer.recognize_google(audio)
+        resp = client.audio.transcriptions.create(
+            file=("audio.wav", audio_bytes),
+            model="whisper-large-v3",
+            language=language,            # None => auto-detect
+            response_format="verbose_json",
+            temperature=0.0,
+        )
+        text = (getattr(resp, "text", "") or "").strip()
     except Exception as e:
-        logger.error(f"SpeechRecognition failed: {e}")
-        return "Audio transcription failed. Please use text input."
+        raise InferenceUnavailable(
+            f"Whisper transcription failed: {type(e).__name__}: {e}",
+            vendor="groq")
+    if not text:
+        raise InferenceUnavailable("Whisper returned empty transcript.", vendor="groq")
+    return text
 
 
-def transcribe_audio(audio_bytes: bytes) -> str:
-    api_key = os.getenv("ELEVENLABS_API_KEY", "").strip()
-    if api_key:
+def transcribe_audio(audio_bytes: bytes, language: str = None) -> str:
+    """Transcribe audio to text.
+
+    Primary path is Groq Whisper. ElevenLabs is tried ONLY when its API key is
+    set; on any ElevenLabs failure we fall through to Whisper. If every path
+    fails, InferenceUnavailable propagates — we never return a placeholder
+    string that could be diagnosed as symptoms.
+    """
+    eleven_key = os.getenv("ELEVENLABS_API_KEY", "").strip()
+    if eleven_key:
         try:
             from elevenlabs.client import ElevenLabs
-            client = ElevenLabs(api_key=api_key)
+            client = ElevenLabs(api_key=eleven_key)
             result = client.speech_to_text.convert(
                 file=audio_bytes, model_id="scribe_v1"
             )
-            return result.text
+            text = (getattr(result, "text", "") or "").strip()
+            if text:
+                return text
+            logger.warning("ElevenLabs returned empty transcript; falling back to Whisper.")
         except Exception as e:
-            logger.error(f"ElevenLabs failed: {e}")
-    return transcribe_audio_fallback(audio_bytes)
+            logger.error(f"ElevenLabs failed, falling back to Whisper: {e}")
+    return transcribe_with_whisper(audio_bytes, language=language)
+
+
+def ground_diagnosis(result: dict) -> dict:
+    """Attach real ICD-10 codes + verified citations to each differential.
+    Best-effort: never raises. Adds provenance.grounded_in with citation URLs."""
+    try:
+        conditions = result.get("conditions") or []
+        grounded_urls = []
+        for cond in conditions:
+            if not isinstance(cond, dict):
+                continue
+            name = (cond.get("name") or "").strip()
+            if not name or name.lower().startswith("undetermined"):
+                continue
+            # Real ICD-10 code (only set if the model didn't already provide a valid one)
+            icd = grounding.icd10_lookup(name, 3)
+            if icd:
+                cond["icd10_candidates"] = icd
+                if not cond.get("icd_code"):
+                    cond["icd_code"] = icd[0]["code"]
+            # Up to 2 real citations
+            cites = grounding.evidence(name, 2)
+            if cites:
+                cond["citations"] = cites
+                grounded_urls.extend(c["url"] for c in cites if c.get("url"))
+        if grounded_urls:
+            prov = result.get("provenance")
+            if isinstance(prov, dict):
+                existing = prov.get("grounded_in") or []
+                prov["grounded_in"] = existing + grounded_urls
+        return result
+    except Exception as e:
+        logger.warning("ground_diagnosis failed (non-fatal): %s", e)
+        return result
 
 
 def diagnose(transcript: str = None,
@@ -222,7 +287,10 @@ def diagnose(transcript: str = None,
             import base64
             audio_bytes = base64.b64decode(audio_base64)
         if audio_bytes:
-            transcript = transcribe_audio(audio_bytes)
+            # May raise InferenceUnavailable — let it propagate. A failed
+            # transcription must never be fed to the diagnostic LLM as symptoms.
+            stt_lang = language if language and language != "en" else None
+            transcript = transcribe_audio(audio_bytes, language=stt_lang)
         else:
             transcript = "No symptoms provided"
 
@@ -236,8 +304,17 @@ def diagnose(transcript: str = None,
 
     start_time = time.time()
 
-    result_json = call_llm(SYSTEM_PROMPT, f"Patient symptoms: {transcript}",
-                           fallback_type="voice")
+    result_json, model_used = call_llm(SYSTEM_PROMPT, f"Patient symptoms: {transcript}")
+    payload = wrap_result(result_json, Provenance(
+        status=InferenceStatus.OK, source="real_model",
+        model=model_used, vendor="groq"))
+
+    # Ground each differential with real ICD-10 codes + verified citations.
+    # payload is a shallow copy of result_json, so payload["conditions"] shares
+    # the same condition dicts — enriching here fills icd_code before both the
+    # persisted envelope and the condition_details extraction below. Best-effort:
+    # ground_diagnosis never raises, so a grounding hiccup cannot break diagnosis.
+    payload = ground_diagnosis(payload)
 
     processing_time_ms = int((time.time() - start_time) * 1000)
 
@@ -280,7 +357,7 @@ def diagnose(transcript: str = None,
         patient_id=patient_id,
         agent_type='voice',
         input_summary=transcript[:200],
-        result_json=result_json,
+        result_json=payload,
         confidence_score=overall_conf,
         urgency_level=result_json.get("urgency", "medium"),
         conditions_detected=condition_names,
@@ -306,7 +383,7 @@ def diagnose(transcript: str = None,
     er_text = result_json.get("when_to_go_to_er", "")
 
     if language and language != "en":
-        logger.info("Translating diagnosis results to %s", _safe_log(language))
+        logger.info(f"Translating diagnosis results to {language}")
         # Collect ALL translatable text into one batch for speed
         all_texts = [
             urgency_reasoning, follow_up_text, diff_summary, er_text,

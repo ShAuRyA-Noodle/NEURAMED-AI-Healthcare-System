@@ -1,91 +1,85 @@
 from dotenv import load_dotenv
 import os
 import sys
-import logging
 
-# Fix Windows console encoding for Indian language support
-if sys.platform == "win32":
+# Fix Windows console encoding for Indian language support.
+# Guarded so it does NOT run under pytest — replacing sys.stdout/stderr grabs
+# pytest's capture buffer and crashes at teardown ("I/O operation on closed file").
+if sys.platform == "win32" and "pytest" not in sys.modules:
     import io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
+# Define path to .env file relative to this script
 env_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path=env_path)
 
-logger = logging.getLogger("neuramed")
+import logging
 logging.basicConfig(level=logging.INFO)
+_log = logging.getLogger("neuramed")
+_log.info("NEURAMED starting | env=%s | groq=%s | elevenlabs=%s",
+          os.getenv("ENVIRONMENT", "development"),
+          "configured" if os.getenv("GROQ_API_KEY") else "MISSING",
+          "configured" if os.getenv("ELEVENLABS_API_KEY") else "MISSING")
 
-# Startup diagnostics — never log key prefixes/values
-logger.info("=== NEURAMED STARTUP ===")
-logger.info("GROQ KEY: %s", "LOADED" if os.getenv("GROQ_API_KEY") else "MISSING")
-logger.info("ELEVENLABS KEY: %s", "LOADED" if os.getenv("ELEVENLABS_API_KEY") else "MISSING")
-logger.info("ENVIRONMENT: %s", os.getenv("ENVIRONMENT", "development"))
-
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from starlette.middleware.base import BaseHTTPMiddleware
 from datetime import datetime
 
-from slowapi import Limiter, _rate_limit_exceeded_handler  # type: ignore[import]
-from slowapi.util import get_remote_address  # type: ignore[import]
-from slowapi.errors import RateLimitExceeded  # type: ignore[import]
-from db.database import engine, Base
 from routers import voice, imaging, ocr, dashboard, patients, appointments, search, system, auth
 from routers import drug_interactions, second_opinion, timeline, sarvam
-from utils.auth import _decode_and_validate
 
-Base.metadata.create_all(bind=engine)
+# Schema is owned by Alembic migrations (see backend/migrations/).
+# Run `alembic upgrade head` to create/update tables.
 
-_limiter = Limiter(key_func=get_remote_address)
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+IS_PRODUCTION = ENVIRONMENT == "production"
 
-app = FastAPI(
-    title="NEURAMED API",
-    docs_url=None if os.getenv("ENVIRONMENT") == "production" else "/docs",
-    redoc_url=None if os.getenv("ENVIRONMENT") == "production" else "/redoc",
+# M4 — disable interactive docs in production; keep them on in dev/test.
+_docs_kwargs = (
+    {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    if IS_PRODUCTION else {}
 )
+app = FastAPI(title="NEURAMED API", **_docs_kwargs)
 
-# Wire rate limiter — must happen before adding routes
-app.state.limiter = _limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+from core.exceptions import InferenceUnavailable, inference_unavailable_handler
+app.add_exception_handler(InferenceUnavailable, inference_unavailable_handler)
 
-# ── Security headers middleware ───────────────────────────────────────────────
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        if os.getenv("ENVIRONMENT") == "production":
-            response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
-        return response
+# C4/C5 — fail closed on default/unset secrets in production.
+from utils.auth import assert_production_secrets
 
-app.add_middleware(SecurityHeadersMiddleware)
 
-# ── CORS: explicit origins only, never wildcard ───────────────────────────────
-_raw_origins = os.getenv("ALLOWED_ORIGINS", "")
-if not _raw_origins or _raw_origins.strip() == "*":
-    # Development fallback — only localhost
-    _origins = ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"]
-    logger.warning("ALLOWED_ORIGINS not set — restricting CORS to localhost only")
+@app.on_event("startup")
+def _startup_security_checks():
+    assert_production_secrets()
+
+
+# H3 — CORS allowlist. In production a concrete allowlist is required; a
+# wildcard alongside credentials is forbidden. Dev/test stay permissive.
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
+if IS_PRODUCTION:
+    if not ALLOWED_ORIGINS or ALLOWED_ORIGINS.strip() == "*":
+        raise RuntimeError(
+            "ALLOWED_ORIGINS must be an explicit allowlist in production "
+            "(wildcard is not allowed with credentials)."
+        )
+    origins = [o.strip() for o in ALLOWED_ORIGINS.split(",") if o.strip()]
 else:
-    _origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+    origins = ["*"] if ALLOWED_ORIGINS == "*" else [o.strip() for o in ALLOWED_ORIGINS.split(",")]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_origins,
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 os.makedirs("uploads", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# H1 — no public static mount for uploads/. Raw medical images are served only
+# via the authorized endpoint GET /api/imaging/file/{scan_id}/{kind}.
 
-# ── Routers ───────────────────────────────────────────────────────────────────
-app.include_router(auth.router)
+# Include routers
 app.include_router(voice.router)
 app.include_router(imaging.router)
 app.include_router(ocr.router)
@@ -97,42 +91,32 @@ from routers import export
 app.include_router(export.router)
 app.include_router(search.router)
 app.include_router(system.router)
+app.include_router(auth.router)
 app.include_router(drug_interactions.router)
 app.include_router(second_opinion.router)
 app.include_router(timeline.router)
 app.include_router(sarvam.router)
 
-from ws_manager import manager
+from ws_manager import manager, broadcast_to_clients
 
-# ── Authenticated WebSocket — doctors only ────────────────────────────────────
+from utils.auth import decode_token
+
+
 @app.websocket("/ws/live-feed")
 async def websocket_endpoint(websocket: WebSocket):
-    # Accept token from query param or cookie (cookies auto-sent same-origin)
-    token = (
-        websocket.query_params.get("token")
-        or websocket.cookies.get("neuramed_session")
-    )
-    if not token:
-        await websocket.close(code=4401, reason="Authentication required")
+    # H2 — authenticate the WebSocket. Browsers can't set Authorization headers
+    # on a WS handshake, so the JWT is passed as a query param: ?token=<jwt>.
+    token = websocket.query_params.get("token")
+    if decode_token(token) is None:
+        await websocket.close(code=1008)
         return
-
-    payload = _decode_and_validate(token, "access")
-    if not payload:
-        await websocket.close(code=4401, reason="Invalid or expired token")
-        return
-
-    if payload.get("role") != "doctor":
-        await websocket.close(code=4403, reason="Access restricted to doctors")
-        return
-
     await manager.connect(websocket)
     try:
         while True:
-            await websocket.receive_text()
+            data = await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
-
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "timestamp": datetime.utcnow().isoformat() + "Z"}
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}
