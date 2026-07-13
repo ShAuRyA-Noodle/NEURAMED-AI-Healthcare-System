@@ -73,6 +73,12 @@ class ScanAnalysisResult(BaseModel):
     icd10_codes: List[Dict[str, str]] = []
     report_text: str = ""
     body_region: str = ""
+    # Honesty / provenance fields
+    pathology_scores: Dict[str, Any] = {}
+    measurements_enabled: bool = False
+    classifier_available: bool = False
+    provenance: Dict[str, Any] = {}
+    disclaimer: str = ""
 
 class ReportAnalysisResult(BaseModel):
     sections: Dict[str, str]
