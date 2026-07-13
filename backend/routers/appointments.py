@@ -39,6 +39,8 @@ def create_appointment(app_req: AppointmentCreate, db: Session = Depends(get_db)
             duration_minutes=app_req.duration_minutes or 30,
             location=app_req.location,
         )
+    except appointment_agent.SchedulingConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
