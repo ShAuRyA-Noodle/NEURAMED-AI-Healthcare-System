@@ -116,9 +116,10 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
           onKeyDown={e => { if (e.key === 'Escape') { setShowResults(false); setSearchQuery(''); (e.target as HTMLInputElement).blur(); } }}
         />
         {searchQuery && (
-          <button onClick={() => { setSearchQuery(''); setShowResults(false); }} style={{
-            position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-            background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 2
+          <button onClick={() => { setSearchQuery(''); setShowResults(false); }} aria-label="Clear search" style={{
+            position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)',
+            background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer',
+            width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
           }}>
             <X size={14} />
           </button>
@@ -151,14 +152,15 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
                       <span className="font-body" style={{ fontSize: 9, color: 'var(--dim)', letterSpacing: '0.15em' }}>PATIENTS</span>
                     </div>
                     {searchResults.patients.map((p: any) => (
-                      <div key={p.id} data-cursor="hover"
+                      <button key={p.id} type="button" data-cursor="hover"
+                        aria-label={`Open patient ${p.patient_code}`}
                         onClick={() => { navigate('/patients'); setShowResults(false); setSearchQuery(''); }}
-                        style={{ padding: '10px 14px', cursor: 'pointer', transition: 'background 150ms', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                        style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', color: 'inherit', font: 'inherit', padding: '10px 14px', cursor: 'pointer', transition: 'background 150ms', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,229,255,0.04)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                         <span className="font-number" style={{ fontSize: 13, color: 'var(--cyan)' }}>{p.patient_code}</span>
                         <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>{p.age}yo · {p.gender}</span>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -168,9 +170,10 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
                       <span className="font-body" style={{ fontSize: 9, color: 'var(--dim)', letterSpacing: '0.15em' }}>SESSIONS</span>
                     </div>
                     {searchResults.sessions.map((s: any) => (
-                      <div key={s.id} data-cursor="hover"
+                      <button key={s.id} type="button" data-cursor="hover"
+                        aria-label={`Open session ${s.id} for ${s.patient_code}`}
                         onClick={() => { navigate(`/sessions/${s.id}`); setShowResults(false); setSearchQuery(''); }}
-                        style={{ padding: '10px 14px', cursor: 'pointer', transition: 'background 150ms', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                        style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', color: 'inherit', font: 'inherit', padding: '10px 14px', cursor: 'pointer', transition: 'background 150ms', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,229,255,0.04)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -178,7 +181,7 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
                           <span className="font-body" style={{ fontSize: 12, color: 'var(--text)' }}>{s.patient_code}</span>
                           <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'rgba(0,229,255,0.08)', color: 'var(--cyan)', fontFamily: '"DM Mono", monospace', textTransform: 'capitalize' }}>{s.agent_type}</span>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -188,9 +191,10 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
                       <span className="font-body" style={{ fontSize: 9, color: 'var(--dim)', letterSpacing: '0.15em' }}>APPOINTMENTS</span>
                     </div>
                     {searchResults.appointments.map((a: any) => (
-                      <div key={a.id} data-cursor="hover"
+                      <button key={a.id} type="button" data-cursor="hover"
+                        aria-label={`Open appointment for ${a.patient_code} with Dr. ${a.doctor_name}`}
                         onClick={() => { navigate('/appointments'); setShowResults(false); setSearchQuery(''); }}
-                        style={{ padding: '10px 14px', cursor: 'pointer', transition: 'background 150ms', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                        style={{ width: '100%', border: 'none', background: 'transparent', textAlign: 'left', color: 'inherit', font: 'inherit', padding: '10px 14px', cursor: 'pointer', transition: 'background 150ms', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,229,255,0.04)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -198,7 +202,7 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
                           <span className="font-body" style={{ fontSize: 12, color: 'var(--text)' }}>Dr. {a.doctor_name}</span>
                         </div>
                         <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: a.status === 'scheduled' ? 'rgba(0,229,255,0.08)' : 'rgba(0,255,157,0.08)', color: a.status === 'scheduled' ? 'var(--cyan)' : 'var(--green)', fontFamily: '"DM Mono", monospace', textTransform: 'capitalize' }}>{a.status}</span>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -215,14 +219,17 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
           {hours}<span style={{ opacity: colonVisible ? 1 : 0 }}>:</span>{minutes}<span style={{ opacity: colonVisible ? 0.5 : 0, fontSize: 11 }}>:{seconds}</span>
         </span>
 
-        <div data-cursor="hover" style={{ position: 'relative', cursor: 'pointer' }}>
+        <button type="button" aria-label="Notifications" data-cursor="hover" style={{
+          position: 'relative', cursor: 'pointer', background: 'transparent', border: 'none', padding: 0,
+          width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
           <Bell size={18} style={{ color: 'var(--muted)', transition: 'color 200ms' }} />
           <div style={{
             width: 7, height: 7, borderRadius: '50%', background: 'var(--red)',
-            position: 'absolute', top: -2, right: -2, border: '2px solid var(--bg)',
+            position: 'absolute', top: 11, right: 11, border: '2px solid var(--bg)',
             boxShadow: '0 0 6px rgba(255,59,92,0.4)',
           }} />
-        </div>
+        </button>
 
         {/* LIVE pill with pulsing dot */}
         <div className="hide-mobile" style={{
