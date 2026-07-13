@@ -1,6 +1,7 @@
 import { useEffect, useRef, ReactNode } from 'react';
 import * as THREE from 'three';
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
+import { ENABLE_3D } from '../../lib/enable3d';
 
 interface DashboardHeroProps {
   children?: ReactNode;
@@ -12,8 +13,8 @@ const DashboardHero = ({ children }: DashboardHeroProps) => {
   const reducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
-    // Skip on mobile or when reduced motion is requested — CSS fallback handles it
-    if (window.innerWidth < 768 || reducedMotion) return;
+    // Decorative only — off by default, and skipped on mobile / reduced motion.
+    if (!ENABLE_3D || window.innerWidth < 768 || reducedMotion) return;
 
     const container = containerRef.current;
     if (!container) return;

@@ -7,6 +7,7 @@ import { login as apiLogin, register as apiRegister } from '../api/auth';
 import LoginCursor from '../components/cursor/LoginCursor';
 import { useToast } from '@/hooks/useToast';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
+import { ENABLE_3D } from '../lib/enable3d';
 
 // ─── PASSWORD STRENGTH ───
 const STRENGTH_LABELS = [
@@ -43,7 +44,7 @@ const useMiniScene = (canvasRef: React.RefObject<HTMLCanvasElement | null>, type
 
   useEffect(() => {
     // Don't spin up a WebGL context on phones or when reduced motion is requested.
-    if (typeof window !== 'undefined' && (window.innerWidth < 768 || reducedMotion)) return;
+    if (!ENABLE_3D || (typeof window !== 'undefined' && (window.innerWidth < 768 || reducedMotion))) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -327,9 +328,9 @@ const LoginPage = () => {
 
   // THREE.JS BACKGROUND
   useEffect(() => {
-    // Don't initialise the full-screen DNA/particle scene on phones or when the
-    // user requested reduced motion — the static CSS gradient fallback stands in.
-    if (window.innerWidth < 768 || reducedMotion) return;
+    // Decorative full-screen DNA/particle scene — off by default; also skipped on
+    // phones / reduced motion. The static CSS gradient fallback stands in.
+    if (!ENABLE_3D || window.innerWidth < 768 || reducedMotion) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
