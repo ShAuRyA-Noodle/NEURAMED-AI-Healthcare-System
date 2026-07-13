@@ -9,6 +9,8 @@ import { ConfidenceMeter } from '@/components/shared/ConfidenceMeter';
 import { UrgencyBadge } from '@/components/shared/UrgencyBadge';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { SkeletonCard } from '@/components/shared/SkeletonCard';
+import { ProvenanceChip } from '@/components/shared/ProvenanceChip';
+import { CitationList } from '@/components/shared/CitationList';
 import VoiceOrb from '@/components/three/VoiceOrb';
 import type { DiagnosisResult, ConditionDetail } from '@/types';
 
@@ -552,6 +554,9 @@ const VoicePage = () => {
               </div>
 
               <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20, flex: 1, overflowY: 'auto' }}>
+                {/* Provenance — what model produced this + how many real sources */}
+                {result.provenance && <ProvenanceChip provenance={result.provenance} />}
+
                 {/* Listen to Analysis */}
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px',
@@ -647,6 +652,13 @@ const VoicePage = () => {
                                   background: 'rgba(239,68,68,0.08)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.15)'
                                 }}>⚠ {f}</span>
                               ))}
+                            </div>
+                          )}
+
+                          {/* Real citations grounding this differential */}
+                          {c.citations && c.citations.length > 0 && (
+                            <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 8 }}>
+                              <CitationList citations={c.citations} compact />
                             </div>
                           )}
                         </motion.div>
