@@ -327,7 +327,7 @@ const VoicePage = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '5fr 7fr', gap: 24 }}>
+      <div className="split-workspace">
         {/* LEFT: Input Panel */}
         <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column' }}>
           {/* Tab Bar */}
@@ -498,7 +498,7 @@ const VoicePage = () => {
           ) : isPending ? (
             <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
               <SkeletonCard height={60} />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <div className="form-grid-3" style={{ gap: 12 }}>
                 <SkeletonCard height={160} />
                 <SkeletonCard height={160} />
                 <SkeletonCard height={160} />
@@ -588,7 +588,7 @@ const VoicePage = () => {
                 </div>
 
                 {/* Conditions + Right Column */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                <div className="form-grid-2" style={{ gap: 20 }}>
                   {/* Left: Condition Cards */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em' }}>DIFFERENTIAL DIAGNOSIS</span>

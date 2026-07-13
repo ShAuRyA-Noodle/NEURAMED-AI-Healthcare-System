@@ -237,7 +237,7 @@ const OCRReports = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '5fr 7fr', gap: 24 }}>
+      <div className="split-workspace">
         {/* LEFT */}
         <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column' }}>
           {/* Drop zone */}
@@ -811,7 +811,7 @@ const OCRReports = () => {
                               <Stethoscope size={14} style={{ color: 'var(--amber)' }} />
                               <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em' }}>SPECIALIST REFERRALS</span>
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                            <div className="form-grid-2" style={{ gap: 8 }}>
                               {result.specialist_referrals.map((ref, i) => {
                                 const urgColor = URGENCY_COLORS[ref.urgency] || URGENCY_COLORS.routine;
                                 return (

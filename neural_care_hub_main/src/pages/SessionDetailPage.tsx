@@ -127,7 +127,7 @@ const SessionDetail = () => {
       </div>
 
       {/* Overview Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+      <div className="grid-auto">
         <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 20, textAlign: 'center' }}>
           <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 12 }}>CONFIDENCE</span>
           <ConfidenceMeter value={session.confidence_score || 0} size={80} />
