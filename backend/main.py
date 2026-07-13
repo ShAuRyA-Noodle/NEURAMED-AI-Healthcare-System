@@ -27,12 +27,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from datetime import datetime
 
-from db.database import engine, Base
 from routers import voice, imaging, ocr, dashboard, patients, appointments, search, system, auth
 from routers import drug_interactions, second_opinion, timeline, sarvam
 
-# Create all tables
-Base.metadata.create_all(bind=engine)
+# Schema is owned by Alembic migrations (see backend/migrations/).
+# Run `alembic upgrade head` to create/update tables.
 
 app = FastAPI(title="NEURAMED API")
 
