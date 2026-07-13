@@ -8,6 +8,7 @@ from db.database import get_db
 from db.models import User, DiagnosisSession
 from utils.auth import require_user
 from utils.llm import call_llm
+from core.exceptions import InferenceUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -201,10 +202,12 @@ async def sarvam_diagnose(
             except Exception as e:
                 logger.warning(f"Sarvam {model_name} failed: {e}")
 
-    # FALLBACK 2: Use fallback dict
+    # No real inference path produced a result — fail loud, do not fabricate.
     if not result:
-        from utils.llm import _fallback
-        result = _fallback("sarvam")
+        raise InferenceUnavailable(
+            "Sarvam vernacular inference failed: no Groq and no local Ollama model produced a result.",
+            vendor="sarvam",
+        )
 
     # Save session
     session_record = DiagnosisSession(
