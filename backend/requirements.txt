@@ -27,7 +27,7 @@ alembic
 torch
 torchxrayvision
 scikit-image
-pydicom>=3
+pydicom>=3.0.2
 pylibjpeg
 pylibjpeg-libjpeg
 pylibjpeg-openjpeg
