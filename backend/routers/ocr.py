@@ -8,6 +8,7 @@ from agents import ocr_agent
 from db.models import Report, User
 from db.schemas import ReportAnalysisResult, ReportResponse
 from utils.auth import require_user
+from core.exceptions import InferenceUnavailable
 
 router = APIRouter(prefix="/api/ocr", tags=["OCR"])
 
@@ -41,6 +42,8 @@ async def analyze_report(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
+        raise
+    except InferenceUnavailable:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Report analysis failed: {str(e)}")

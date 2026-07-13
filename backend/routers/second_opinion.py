@@ -8,6 +8,7 @@ from db.database import get_db
 from db.models import User, DiagnosisSession
 from utils.auth import require_user
 from utils.llm import call_llm
+from core.provenance import Provenance, InferenceStatus, wrap_result
 
 logger = logging.getLogger(__name__)
 
@@ -97,11 +98,13 @@ Return JSON:
 
 Return only valid JSON."""
 
-    return call_llm(
+    result, model_used = call_llm(
         system_prompt="You are a physician. Return only valid JSON.",
         user_message=prompt,
-        fallback_type="second_opinion",
     )
+    return wrap_result(result, Provenance(
+        status=InferenceStatus.OK, source="real_model",
+        model=model_used, vendor="groq"))
 
 
 def synthesize_opinions(conservative: dict, balanced: dict, differential: dict) -> dict:

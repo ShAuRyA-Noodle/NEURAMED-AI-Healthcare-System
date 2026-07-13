@@ -2,6 +2,7 @@ import time
 import os
 import logging
 from utils.llm import call_llm
+from core.provenance import Provenance, InferenceStatus, wrap_result
 from db.schemas import DiagnosisResult, ConditionDetail, RecommendedTest
 from db.models import DiagnosisSession, Patient
 from sqlalchemy.orm import Session
@@ -231,8 +232,10 @@ def diagnose(transcript: str = None,
 
     start_time = time.time()
 
-    result_json = call_llm(SYSTEM_PROMPT, f"Patient symptoms: {transcript}",
-                           fallback_type="voice")
+    result_json, model_used = call_llm(SYSTEM_PROMPT, f"Patient symptoms: {transcript}")
+    payload = wrap_result(result_json, Provenance(
+        status=InferenceStatus.OK, source="real_model",
+        model=model_used, vendor="groq"))
 
     processing_time_ms = int((time.time() - start_time) * 1000)
 
@@ -275,7 +278,7 @@ def diagnose(transcript: str = None,
         patient_id=patient_id,
         agent_type='voice',
         input_summary=transcript[:200],
-        result_json=result_json,
+        result_json=payload,
         confidence_score=overall_conf,
         urgency_level=result_json.get("urgency", "medium"),
         conditions_detected=condition_names,

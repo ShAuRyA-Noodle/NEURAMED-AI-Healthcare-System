@@ -515,7 +515,7 @@ def analyze(
         NOTE: You are analyzing computed statistics, NOT viewing the image directly.
         Be honest about confidence limits. Do not fabricate findings you cannot verify.
         """
-        vision_result = call_llm(IMAGING_PROMPT_FALLBACK, stats_summary, fallback_type="imaging")
+        vision_result, _model_used = call_llm(IMAGING_PROMPT_FALLBACK, stats_summary)
 
     processing_ms = int((time.time() - start) * 1000)
 
