@@ -10,6 +10,7 @@ from db.database import get_db
 from db.models import DiagnosisSession, User
 from utils.pdf_export import generate_session_pdf
 from utils.auth import require_user, require_doctor
+from utils.file_handling import clamp_pagination
 
 router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
 
@@ -78,8 +79,9 @@ def list_sessions(
     limit: int = 50,
     offset: int = 0,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_user),
+    current_user: User = Depends(require_doctor),
 ):
+    limit, offset = clamp_pagination(limit, offset)
     query = db.query(DiagnosisSession).filter(
         DiagnosisSession.is_deleted != True
     )
@@ -118,7 +120,7 @@ def list_sessions(
 
 
 @router.get("/{session_id}")
-def get_session_detail(session_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def get_session_detail(session_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     session = db.query(DiagnosisSession).filter(DiagnosisSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -183,7 +185,7 @@ def delete_session(session_id: int, db: Session = Depends(get_db), current_user:
 
 
 @router.get("/{session_id}/export-pdf")
-def export_pdf(session_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def export_pdf(session_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     session = db.query(DiagnosisSession).filter(DiagnosisSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")

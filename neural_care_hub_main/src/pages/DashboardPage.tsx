@@ -305,8 +305,9 @@ const Dashboard = () => {
           <span className="font-heading" style={{ fontSize: 16, color: 'var(--text)', fontWeight: 600 }}>Diagnostic Activity</span>
           <div style={{ display: 'flex', gap: 4 }}>
             {([7, 14, 30] as const).map(r => (
-              <button key={r} onClick={() => setChartRange(r)} className="font-body" style={{
+              <button key={r} onClick={() => setChartRange(r)} className="font-body" aria-label={`Show last ${r} days`} aria-pressed={chartRange === r} style={{
                 fontSize: 11, padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                minHeight: 44, minWidth: 44,
                 background: chartRange === r ? 'rgba(0,229,255,0.12)' : 'transparent',
                 color: chartRange === r ? 'var(--cyan)' : 'var(--muted)',
               }}>{r}D</button>
@@ -334,7 +335,7 @@ const Dashboard = () => {
       {/* ═══════ 1E. SPLIT ROW: Recent Sessions + AI Insights ═══════ */}
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}
-        style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 16 }}
+        className="split-main-aside"
       >
         {/* Recent Sessions */}
         <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, overflowX: 'auto' }}>
@@ -354,6 +355,9 @@ const Dashboard = () => {
               <tbody>
                 {recentSessions?.slice(0, 8).map((s: any) => (
                   <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/sessions/${s.id}`)}
+                    role="button" tabIndex={0}
+                    aria-label={`Open session ${s.id} for ${s.patient_code}`}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/sessions/${s.id}`); } }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td className="font-number" style={{ fontSize: 12, color: 'var(--cyan)', padding: '10px 12px' }}>{s.patient_code}</td>

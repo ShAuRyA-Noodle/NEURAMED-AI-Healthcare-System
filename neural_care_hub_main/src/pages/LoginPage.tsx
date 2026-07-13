@@ -5,6 +5,8 @@ import * as THREE from 'three';
 import { useAuth } from '../context/AuthContext';
 import { login as apiLogin, register as apiRegister } from '../api/auth';
 import LoginCursor from '../components/cursor/LoginCursor';
+import { useToast } from '@/hooks/useToast';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 
 // ─── PASSWORD STRENGTH ───
 const STRENGTH_LABELS = [
@@ -34,7 +36,15 @@ const SPECIALIZATIONS = [
 
 // ─── MINI THREE.JS SCENES FOR ROLE CARDS ───
 const useMiniScene = (canvasRef: React.RefObject<HTMLCanvasElement | null>, type: 'doctor' | 'patient', isActive: boolean) => {
+  const reducedMotion = usePrefersReducedMotion();
+  // Track selection without re-creating the WebGL context on every toggle.
+  const activeRef = useRef(isActive);
+  useEffect(() => { activeRef.current = isActive; }, [isActive]);
+
   useEffect(() => {
+    // Don't spin up a WebGL context on phones or when reduced motion is requested.
+    if (typeof window !== 'undefined' && (window.innerWidth < 768 || reducedMotion)) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -48,16 +58,13 @@ const useMiniScene = (canvasRef: React.RefObject<HTMLCanvasElement | null>, type
     renderer.setClearColor(0x000000, 0);
 
     let mesh: THREE.Object3D;
+    let material: THREE.Material;
 
     if (type === 'doctor') {
       // Wireframe Icosahedron
       const geo = new THREE.IcosahedronGeometry(0.9, 1);
-      const mat = new THREE.MeshBasicMaterial({
-        color: isActive ? 0x00FF9D : 0x00E5FF,
-        wireframe: true,
-        transparent: true,
-        opacity: isActive ? 0.6 : 0.25,
-      });
+      const mat = new THREE.MeshBasicMaterial({ wireframe: true, transparent: true });
+      material = mat;
       mesh = new THREE.Mesh(geo, mat);
     } else {
       // Heartbeat sine wave ring
@@ -68,11 +75,8 @@ const useMiniScene = (canvasRef: React.RefObject<HTMLCanvasElement | null>, type
         pts.push(new THREE.Vector3(Math.cos(angle) * r, Math.sin(angle) * r, 0));
       }
       const geo = new THREE.BufferGeometry().setFromPoints(pts);
-      const mat = new THREE.LineBasicMaterial({
-        color: isActive ? 0x00E5FF : 0x00E5FF,
-        transparent: true,
-        opacity: isActive ? 0.7 : 0.25,
-      });
+      const mat = new THREE.LineBasicMaterial({ transparent: true });
+      material = mat;
       mesh = new THREE.Line(geo, mat);
     }
 
@@ -81,6 +85,16 @@ const useMiniScene = (canvasRef: React.RefObject<HTMLCanvasElement | null>, type
     let animId: number;
     const animate = () => {
       animId = requestAnimationFrame(animate);
+      // Read the latest selection each frame so color/opacity update without
+      // re-initialising the scene (isActive is intentionally out of the deps).
+      const active = activeRef.current;
+      if (type === 'doctor') {
+        (material as THREE.MeshBasicMaterial).color.setHex(active ? 0x00FF9D : 0x00E5FF);
+        material.opacity = active ? 0.6 : 0.25;
+      } else {
+        (material as THREE.LineBasicMaterial).color.setHex(0x00E5FF);
+        material.opacity = active ? 0.7 : 0.25;
+      }
       mesh.rotation.y += type === 'doctor' ? 0.008 : 0.004;
       mesh.rotation.x += type === 'doctor' ? 0.004 : 0.002;
       renderer.render(scene, camera);
@@ -89,9 +103,20 @@ const useMiniScene = (canvasRef: React.RefObject<HTMLCanvasElement | null>, type
 
     return () => {
       cancelAnimationFrame(animId);
+      // Dispose every geometry + material in the scene, then the renderer, so
+      // toggling / unmounting doesn't leak GPU buffers or WebGL contexts.
+      scene.traverse((obj) => {
+        const withGeo = obj as THREE.Mesh;
+        if (withGeo.geometry) withGeo.geometry.dispose();
+        const mat = (obj as THREE.Mesh).material;
+        if (mat) {
+          if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+          else mat.dispose();
+        }
+      });
       renderer.dispose();
     };
-  }, [canvasRef, type, isActive]);
+  }, [canvasRef, type, reducedMotion]);
 };
 
 // ─── ROLE CARD ───
@@ -197,8 +222,8 @@ const DoctorCredentialsStep = ({ credentials, setCredentials, onBack, onSubmit }
       </div>
 
       <div style={{ marginBottom: 14 }}>
-        <label style={labelStyle}>Medical License Number</label>
-        <input value={credentials.license} onChange={e => setCredentials({ ...credentials, license: e.target.value })}
+        <label htmlFor="cred-license" style={labelStyle}>Medical License Number</label>
+        <input id="cred-license" value={credentials.license} onChange={e => setCredentials({ ...credentials, license: e.target.value })}
           placeholder="e.g. MCI-12345"
           style={{ ...inputStyle, textTransform: 'uppercase', letterSpacing: '0.08em' }}
           onFocus={e => { e.target.style.borderColor = '#00FF9D'; e.target.style.boxShadow = '0 0 0 3px rgba(0,255,157,0.1)'; }}
@@ -206,8 +231,8 @@ const DoctorCredentialsStep = ({ credentials, setCredentials, onBack, onSubmit }
       </div>
 
       <div style={{ marginBottom: 14 }}>
-        <label style={labelStyle}>Specialization</label>
-        <select value={credentials.specialization}
+        <label htmlFor="cred-specialization" style={labelStyle}>Specialization</label>
+        <select id="cred-specialization" value={credentials.specialization}
           onChange={e => setCredentials({ ...credentials, specialization: e.target.value })}
           style={{
             ...inputStyle, cursor: 'pointer', appearance: 'none',
@@ -225,16 +250,16 @@ const DoctorCredentialsStep = ({ credentials, setCredentials, onBack, onSubmit }
       </div>
 
       <div style={{ marginBottom: 14 }}>
-        <label style={labelStyle}>Hospital / Clinic Name</label>
-        <input value={credentials.hospital} onChange={e => setCredentials({ ...credentials, hospital: e.target.value })}
+        <label htmlFor="cred-hospital" style={labelStyle}>Hospital / Clinic Name</label>
+        <input id="cred-hospital" value={credentials.hospital} onChange={e => setCredentials({ ...credentials, hospital: e.target.value })}
           style={inputStyle}
           onFocus={e => { e.target.style.borderColor = '#00FF9D'; e.target.style.boxShadow = '0 0 0 3px rgba(0,255,157,0.1)'; }}
           onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }} />
       </div>
 
       <div style={{ marginBottom: 20 }}>
-        <label style={labelStyle}>Years of Practice: <span style={{ color: '#00FF9D', fontWeight: 600 }}>{credentials.yearsOfPractice}</span></label>
-        <input type="range" min={0} max={50} value={credentials.yearsOfPractice}
+        <label htmlFor="cred-years" style={labelStyle}>Years of Practice: <span style={{ color: '#00FF9D', fontWeight: 600 }}>{credentials.yearsOfPractice}</span></label>
+        <input id="cred-years" type="range" min={0} max={50} value={credentials.yearsOfPractice}
           onChange={e => setCredentials({ ...credentials, yearsOfPractice: parseInt(e.target.value) })}
           style={{ width: '100%', accentColor: '#00FF9D', height: 4, cursor: 'pointer' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: '"DM Mono", monospace', fontSize: 9, color: '#445566', marginTop: 4 }}>
@@ -271,6 +296,8 @@ const DoctorCredentialsStep = ({ credentials, setCredentials, onBack, onSubmit }
 const LoginPage = () => {
   const navigate = useNavigate();
   const { login: authLogin } = useAuth();
+  const { addToast } = useToast();
+  const reducedMotion = usePrefersReducedMotion();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mouseRef = useRef({ x: 0, y: 0 });
 
@@ -295,6 +322,10 @@ const LoginPage = () => {
 
   // THREE.JS BACKGROUND
   useEffect(() => {
+    // Don't initialise the full-screen DNA/particle scene on phones or when the
+    // user requested reduced motion — the static CSS gradient fallback stands in.
+    if (window.innerWidth < 768 || reducedMotion) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -440,7 +471,7 @@ const LoginPage = () => {
       document.removeEventListener('mousemove', handleMouse);
       renderer.dispose();
     };
-  }, []);
+  }, [reducedMotion]);
 
   // Form handlers
   const triggerShake = useCallback(() => {
@@ -501,7 +532,10 @@ const LoginPage = () => {
             hospital_name: credentials.hospital,
             years_of_practice: credentials.yearsOfPractice,
           });
-        } catch { /* profile update is best-effort */ }
+        } catch (err) {
+          addToast('error', 'Account created, but your professional details could not be saved. Please complete your profile from Settings.');
+          console.error('Profile PATCH failed after registration:', err);
+        }
       }
 
       setTimeout(() => navigate('/dashboard', { replace: true }), 1200);
@@ -524,9 +558,18 @@ const LoginPage = () => {
   };
 
   return (
-    <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100vh', overflow: 'hidden' }}>
       <LoginCursor />
-      <canvas ref={canvasRef} style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 }} />
+      <canvas ref={canvasRef} style={{
+        position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0,
+        // Static themed fallback shown when the WebGL scene is skipped
+        // (mobile / reduced motion). When the scene runs, its opaque clear
+        // color paints over this.
+        background:
+          'radial-gradient(ellipse 800px 600px at 20% 30%, rgba(0,229,255,0.06), transparent 60%),' +
+          'radial-gradient(ellipse 700px 500px at 80% 80%, rgba(0,255,157,0.05), transparent 60%),' +
+          '#020608',
+      }} />
 
       <div style={{
         position: 'fixed', inset: 0, zIndex: 10,
@@ -627,21 +670,21 @@ const LoginPage = () => {
                 {tab === 'login' && (
                   <motion.div key="login" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ duration: 0.2 }}>
                     <div style={{ marginBottom: 14 }}>
-                      <label style={labelStyle}>Email Address</label>
-                      <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                      <label htmlFor="login-email" style={labelStyle}>Email Address</label>
+                      <input id="login-email" type="email" value={email} onChange={e => setEmail(e.target.value)}
                         style={inputStyle}
                         onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                         onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
                         onKeyDown={e => e.key === 'Enter' && handleLogin()} />
                     </div>
                     <div style={{ marginBottom: 20, position: 'relative' }}>
-                      <label style={labelStyle}>Password</label>
-                      <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
+                      <label htmlFor="login-password" style={labelStyle}>Password</label>
+                      <input id="login-password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
                         style={inputStyle}
                         onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                         onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
                         onKeyDown={e => e.key === 'Enter' && handleLogin()} />
-                      <button onClick={() => setShowPassword(!showPassword)} style={{
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} style={{
                         position: 'absolute', right: 12, top: 32, background: 'transparent', border: 'none', color: '#445566', cursor: 'pointer', fontSize: 16,
                       }}>{showPassword ? '🙈' : '👁️'}</button>
                     </div>
@@ -661,14 +704,14 @@ const LoginPage = () => {
                 {tab === 'register' && regStep === 'basic' && (
                   <motion.div key="register-basic" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.2 }}>
                     <div style={{ marginBottom: 14 }}>
-                      <label style={labelStyle}>Full Name</label>
-                      <input value={fullName} onChange={e => setFullName(e.target.value)} style={inputStyle}
+                      <label htmlFor="reg-fullname" style={labelStyle}>Full Name</label>
+                      <input id="reg-fullname" value={fullName} onChange={e => setFullName(e.target.value)} style={inputStyle}
                         onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                         onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }} />
                     </div>
                     <div style={{ marginBottom: 14 }}>
-                      <label style={labelStyle}>Email Address</label>
-                      <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle}
+                      <label htmlFor="reg-email" style={labelStyle}>Email Address</label>
+                      <input id="reg-email" type="email" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle}
                         onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                         onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }} />
                     </div>
@@ -686,8 +729,8 @@ const LoginPage = () => {
                     <AnimatePresence>
                       {role === 'doctor' && (
                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ marginBottom: 14, overflow: 'hidden' }}>
-                          <label style={labelStyle}>Doctor Invite Code</label>
-                          <input value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())}
+                          <label htmlFor="reg-invite" style={labelStyle}>Doctor Invite Code</label>
+                          <input id="reg-invite" value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())}
                             style={{ ...inputStyle, textTransform: 'uppercase', letterSpacing: '0.1em' }}
                             onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                             onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }} />
@@ -697,8 +740,8 @@ const LoginPage = () => {
                     </AnimatePresence>
 
                     <div style={{ marginBottom: 14 }}>
-                      <label style={labelStyle}>Password</label>
-                      <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle}
+                      <label htmlFor="reg-password" style={labelStyle}>Password</label>
+                      <input id="reg-password" type="password" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle}
                         onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                         onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }} />
                       {password && (
@@ -726,8 +769,8 @@ const LoginPage = () => {
                     </div>
 
                     <div style={{ marginBottom: 18 }}>
-                      <label style={labelStyle}>Confirm Password</label>
-                      <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={inputStyle}
+                      <label htmlFor="reg-confirm-password" style={labelStyle}>Confirm Password</label>
+                      <input id="reg-confirm-password" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={inputStyle}
                         onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                         onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
                         onKeyDown={e => e.key === 'Enter' && handleRegisterBasic()} />
@@ -769,10 +812,10 @@ const LoginPage = () => {
               {regStep === 'basic' && (
                 <p style={{ fontFamily: '"DM Mono", monospace', fontSize: 12, color: '#445566', textAlign: 'center', marginTop: 14 }}>
                   {tab === 'login' ? "Don't have an account? " : "Already have an account? "}
-                  <span onClick={() => { setTab(tab === 'login' ? 'register' : 'login'); setError(''); setRegStep('basic'); }}
-                    style={{ color: '#00E5FF', cursor: 'pointer' }}>
+                  <button type="button" onClick={() => { setTab(tab === 'login' ? 'register' : 'login'); setError(''); setRegStep('basic'); }}
+                    style={{ color: '#00E5FF', cursor: 'pointer', background: 'transparent', border: 'none', padding: 0, font: 'inherit' }}>
                     {tab === 'login' ? 'Register →' : 'Sign in →'}
-                  </span>
+                  </button>
                 </p>
               )}
             </>

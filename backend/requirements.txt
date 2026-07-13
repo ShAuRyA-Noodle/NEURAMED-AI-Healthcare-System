@@ -1,29 +1,33 @@
-fastapi>=0.115.0
-uvicorn[standard]>=0.32.0
+fastapi
+uvicorn
 sqlalchemy>=2.0.36
-psycopg2-binary>=2.9.10
-pydantic[email]>=2.10.0
-python-multipart>=0.0.32
-groq>=1.2.0
-python-dotenv>=1.2.2
-# SECURITY: python-jose 3.3.0 is the latest PyPI release and still carries
-# CVE-2024-33663 (algorithm confusion) and CVE-2024-33664 (JWT-bomb DoS).
-# No patched release exists. Mitigation in code: tokens are decoded with an
-# explicit algorithms=["HS256"] allowlist (see utils/auth.py). Recommended
-# follow-up: migrate JWT handling to PyJWT (pyjwt>=2.10.1). Tracked for human review.
-python-jose[cryptography]>=3.3.0
-slowapi>=0.1.9
-elevenlabs>=1.12.0
+psycopg2-binary
+pydantic[email]
+python-multipart
+groq
+python-dotenv
+elevenlabs
 gTTS>=2.5.4
-SpeechRecognition>=3.16.1
-pytesseract>=0.3.13
-pdf2image>=1.17.0
-Pillow>=11.0.0
-opencv-python-headless>=4.13.0.92
-scikit-image>=0.24.0
-numpy>=2.4.6
-reportlab>=4.1.0
-aiofiles>=24.1.0
-websockets>=16.0
-PyMuPDF>=1.24.0
-httpx>=0.27.0
+python-jose[cryptography]
+
+pytesseract
+pdf2image
+Pillow
+opencv-python
+scikit-image
+numpy
+reportlab==4.1.0
+aiofiles
+websockets
+PyMuPDF
+httpx
+pytest
+pytest-asyncio
+alembic
+torch
+torchxrayvision
+scikit-image
+pydicom>=3
+pylibjpeg
+pylibjpeg-libjpeg
+pylibjpeg-openjpeg

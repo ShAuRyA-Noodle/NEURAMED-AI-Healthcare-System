@@ -1,46 +1,52 @@
 import os
 import hashlib
 import hmac
-import secrets
-from datetime import datetime, timedelta, timezone
-from typing import Optional, Set
+from datetime import datetime, timedelta
+from typing import Optional
 from jose import JWTError, jwt
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from db.database import get_db
 from db.models import User
 
-# ── Secret key: fail-fast if missing or too short ────────────────────────────
-_raw_secret = os.getenv("SECRET_KEY", "")
-if not _raw_secret or len(_raw_secret) < 32:
-    raise RuntimeError(
-        "SECRET_KEY env var is missing or shorter than 32 chars. "
-        "Generate one: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
-    )
-SECRET_KEY = _raw_secret
+_DEFAULT_SECRET_KEY = "neuramed-secret-key-change-in-production-2026"
+_DEFAULT_DOCTOR_INVITE_CODE = "NEURAMED-DOCTOR-2026"
 
-# ── Doctor invite code: fail-fast if missing ─────────────────────────────────
-_raw_invite = os.getenv("DOCTOR_INVITE_CODE", "")
-if not _raw_invite:
-    raise RuntimeError(
-        "DOCTOR_INVITE_CODE env var is not set. "
-        "Set a strong random value distributed out-of-band to doctors."
-    )
-DOCTOR_INVITE_CODE = _raw_invite
-
+SECRET_KEY = os.getenv("SECRET_KEY", _DEFAULT_SECRET_KEY)
+if os.getenv("ENVIRONMENT") == "production" and SECRET_KEY == _DEFAULT_SECRET_KEY:
+    import warnings
+    warnings.warn("CRITICAL: SECRET_KEY is using the default value in production! Set the SECRET_KEY environment variable.", stacklevel=2)
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 15    # short-lived; refresh rotates
-REFRESH_TOKEN_EXPIRE_DAYS = 7
+ACCESS_TOKEN_EXPIRE_DAYS = 30
+DOCTOR_INVITE_CODE = os.getenv("DOCTOR_INVITE_CODE", _DEFAULT_DOCTOR_INVITE_CODE)
 
-# ── In-memory JTI blacklist (swap for Redis in production) ───────────────────
-_revoked_jtis: Set[str] = set()
+
+def assert_production_secrets() -> None:
+    """C4/C5 — fail-closed in production.
+
+    In production, refuse to start with unset or default secrets. Outside
+    production (dev/test), the module-level warnings above keep the app booting.
+    Reads env live so it can be called from a startup event.
+    """
+    if os.getenv("ENVIRONMENT") != "production":
+        return
+    secret = os.getenv("SECRET_KEY")
+    if not secret or secret == _DEFAULT_SECRET_KEY:
+        raise RuntimeError(
+            "SECRET_KEY must be set to a non-default value in production."
+        )
+    invite = os.getenv("DOCTOR_INVITE_CODE")
+    if not invite or invite == _DEFAULT_DOCTOR_INVITE_CODE:
+        raise RuntimeError(
+            "DOCTOR_INVITE_CODE must be set to a non-default value in production."
+        )
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
-# ── Password hashing: PBKDF2-SHA256 @ 600k iterations (OWASP 2024) ───────────
+# Use PBKDF2 instead of bcrypt to avoid passlib compatibility issues
 _HASH_ALGO = "sha256"
-_HASH_ITERATIONS = 600_000
+_HASH_ITERATIONS = 260000
 
 
 def get_password_hash(password: str) -> str:
@@ -59,98 +65,46 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
-# ── Token creation ────────────────────────────────────────────────────────────
-def create_access_token(data: dict) -> str:
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    jti = secrets.token_urlsafe(16)
-    to_encode.update({"exp": expire, "jti": jti, "type": "access"})
+    expire = datetime.utcnow() + (expires_delta or timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS))
+    to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def create_refresh_token(data: dict) -> str:
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    jti = secrets.token_urlsafe(16)
-    to_encode.update({"exp": expire, "jti": jti, "type": "refresh"})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+def decode_token(token: Optional[str]) -> Optional[dict]:
+    """Validate a JWT and return its payload, or None if missing/invalid.
 
-
-def revoke_token(token: str) -> None:
-    """Blacklist a token's JTI so it can never be reused."""
+    Shared decode logic used by both the HTTP dependency (require_user) and
+    the WebSocket handshake (which passes the token as a query param).
+    """
+    if not token:
+        return None
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        jti = payload.get("jti")
-        if jti:
-            _revoked_jtis.add(jti)
-    except JWTError:
-        pass
-
-
-def _decode_and_validate(token: str, expected_type: str = "access") -> Optional[dict]:
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("type") != expected_type:
-            return None
-        jti = payload.get("jti")
-        if jti and jti in _revoked_jtis:
-            return None
-        return payload
     except JWTError:
         return None
-
-
-def decode_refresh_token(token: str) -> Optional[dict]:
-    return _decode_and_validate(token, "refresh")
-
-
-# ── Token extraction: Authorization header OR httpOnly cookie ────────────────
-def _extract_token(request: Request, bearer_token: Optional[str]) -> Optional[str]:
-    if bearer_token:
-        return bearer_token
-    return request.cookies.get("neuramed_session")
-
-
-# ── FastAPI dependency functions ──────────────────────────────────────────────
-async def get_current_user(
-    request: Request,
-    token: Optional[str] = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-) -> Optional[User]:
-    raw = _extract_token(request, token)
-    if not raw:
+    if payload.get("sub") is None:
         return None
-    payload = _decode_and_validate(raw, "access")
-    if not payload:
-        return None
-    user_id = payload.get("sub")
-    if not user_id:
-        return None
-    return db.query(User).filter(User.id == int(user_id)).first()
+    return payload
 
 
 async def require_user(
-    request: Request,
-    token: Optional[str] = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
 ) -> User:
-    raw = _extract_token(request, token)
-    _exc = HTTPException(
+    credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    if not raw:
-        raise _exc
-    payload = _decode_and_validate(raw, "access")
-    if not payload:
-        raise _exc
+    payload = decode_token(token)
+    if payload is None:
+        raise credentials_exception
     user_id = payload.get("sub")
-    if not user_id:
-        raise _exc
     user = db.query(User).filter(User.id == int(user_id)).first()
-    if not user:
-        raise _exc
+    if user is None:
+        raise credentials_exception
     return user
 
 
@@ -158,6 +112,6 @@ async def require_doctor(current_user: User = Depends(require_user)) -> User:
     if current_user.role != "doctor":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access restricted to doctors only",
+            detail="Access restricted to doctors only"
         )
     return current_user

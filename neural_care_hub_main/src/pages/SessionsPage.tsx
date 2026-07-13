@@ -118,7 +118,7 @@ const Sessions = () => {
       </div>
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
+      <div className="grid-auto" style={{ gap: 12 }}>
         <StatCard label="TOTAL" value={stats?.total ?? total} icon={Activity} />
         <StatCard label="TODAY" value={stats?.today ?? 0} icon={Clock} color="var(--cyan)" />
         <StatCard label="THIS WEEK" value={stats?.this_week ?? 0} icon={BarChart3} color="var(--green)" />

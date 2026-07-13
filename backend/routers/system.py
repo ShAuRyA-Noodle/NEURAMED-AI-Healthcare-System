@@ -43,7 +43,7 @@ def get_system_info(db: Session = Depends(get_db), current_user: User = Depends(
 
 
 @router.get("/health")
-def detailed_health(db: Session = Depends(get_db), _auth: User = Depends(require_user)):
+def detailed_health(db: Session = Depends(get_db)):
     now = datetime.utcnow()
     uptime = now - SERVER_START_TIME
     return {
@@ -51,4 +51,5 @@ def detailed_health(db: Session = Depends(get_db), _auth: User = Depends(require
         "timestamp": now.isoformat(),
         "uptime_seconds": int(uptime.total_seconds()),
         "database": "connected",
+        "groq_api": "configured" if os.getenv("GROQ_API_KEY", "").strip() else "missing",
     }

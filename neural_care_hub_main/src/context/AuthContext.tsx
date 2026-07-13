@@ -21,34 +21,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Always verify session via server — httpOnly cookie is sent automatically.
-    // sessionStorage token is a fallback for cross-origin dev (no proxy).
-    getMe()
-      .then(u => {
-        const saved = sessionStorage.getItem('neuramed_token')
-        setToken(saved)
+    const savedToken = localStorage.getItem('neuramed_token')
+    if (savedToken) {
+      // Don't trust localStorage user — verify token with server first
+      getMe().then(u => {
+        setToken(savedToken)
         setUser(u)
-      })
-      .catch(() => {
-        sessionStorage.removeItem('neuramed_token')
-        sessionStorage.removeItem('neuramed_user')
+        localStorage.setItem('neuramed_user', JSON.stringify(u))
+      }).catch(() => {
+        localStorage.removeItem('neuramed_token')
+        localStorage.removeItem('neuramed_user')
         setToken(null)
         setUser(null)
-      })
-      .finally(() => setIsLoading(false))
+      }).finally(() => setIsLoading(false))
+    } else {
+      setIsLoading(false)
+    }
   }, [])
 
-  const login = (newToken: string, newUser: User) => {
-    // sessionStorage — cleared on tab close, not shared across tabs
-    sessionStorage.setItem('neuramed_token', newToken)
-    sessionStorage.setItem('neuramed_user', JSON.stringify(newUser))
+  const loginFn = (newToken: string, newUser: User) => {
+    localStorage.setItem('neuramed_token', newToken)
+    localStorage.setItem('neuramed_user', JSON.stringify(newUser))
     setToken(newToken)
     setUser(newUser)
   }
 
   const logout = () => {
-    sessionStorage.removeItem('neuramed_token')
-    sessionStorage.removeItem('neuramed_user')
+    localStorage.removeItem('neuramed_token')
+    localStorage.removeItem('neuramed_user')
     setToken(null)
     setUser(null)
   }
@@ -56,10 +56,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user, token, isLoading,
-      isAuthenticated: !!user,
+      isAuthenticated: !!token && !!user,
       isDoctor: user?.role === 'doctor',
       isPatient: user?.role === 'patient',
-      login, logout,
+      login: loginFn, logout
     }}>
       {children}
     </AuthContext.Provider>

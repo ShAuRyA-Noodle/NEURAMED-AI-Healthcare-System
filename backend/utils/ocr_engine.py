@@ -221,16 +221,10 @@ def _extract_image_tesseract(file_bytes: bytes) -> dict:
         import pytesseract
         from PIL import Image
 
-        # Guard against decompression bombs: cap total pixels so a tiny crafted
-        # file cannot expand into a multi-gigabyte bitmap and exhaust memory.
-        # ~50 MP covers legitimate medical scans while blocking abuse.
-        Image.MAX_IMAGE_PIXELS = 50_000_000
-
         pytesseract.pytesseract.tesseract_cmd = os.getenv(
             "TESSERACT_CMD", r"C:\Program Files\Tesseract-OCR\tesseract.exe"
         )
         img = Image.open(io.BytesIO(file_bytes))
-        img.load()  # force decode now so an oversized image raises here, inside the guard
 
         # Enhance image for better OCR
         img = img.convert("L")  # Grayscale

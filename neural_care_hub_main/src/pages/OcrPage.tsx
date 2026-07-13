@@ -237,12 +237,15 @@ const OCRReports = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '5fr 7fr', gap: 24 }}>
+      <div className="split-workspace">
         {/* LEFT */}
         <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column' }}>
           {/* Drop zone */}
           {!file ? (
             <div
+              role="button" tabIndex={0}
+              aria-label="Upload medical document"
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!isPending) inputRef.current?.click(); } }}
               onDragOver={e => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
@@ -265,7 +268,11 @@ const OCRReports = () => {
                 <img src={preview} alt="Report" style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 8, opacity: isPending ? 0.3 : 1, cursor: 'pointer' }}
                   onClick={() => !isPending && inputRef.current?.click()} />
               ) : (
-                <div onClick={() => !isPending && inputRef.current?.click()} style={{ height: 160, background: 'var(--elevated)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, opacity: isPending ? 0.3 : 1, cursor: 'pointer' }}>
+                <div onClick={() => !isPending && inputRef.current?.click()}
+                  role="button" tabIndex={0}
+                  aria-label="Replace document"
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!isPending) inputRef.current?.click(); } }}
+                  style={{ height: 160, background: 'var(--elevated)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, opacity: isPending ? 0.3 : 1, cursor: 'pointer' }}>
                   <FileText size={32} style={{ color: 'var(--muted)' }} />
                   <span className="font-body" style={{ fontSize: 12, color: 'var(--text)' }}>{file.name}</span>
                   <span className="font-body" style={{ fontSize: 10, color: 'var(--dim)' }}>{(file.size / 1024).toFixed(0)}KB</span>
@@ -811,7 +818,7 @@ const OCRReports = () => {
                               <Stethoscope size={14} style={{ color: 'var(--amber)' }} />
                               <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em' }}>SPECIALIST REFERRALS</span>
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                            <div className="form-grid-2" style={{ gap: 8 }}>
                               {result.specialist_referrals.map((ref, i) => {
                                 const urgColor = URGENCY_COLORS[ref.urgency] || URGENCY_COLORS.routine;
                                 return (

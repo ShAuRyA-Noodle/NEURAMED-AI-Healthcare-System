@@ -9,6 +9,7 @@ from agents import voice_agent
 from db.models import DiagnosisSession, User
 from db.schemas import DiagnosisResult, DiagnosisSessionResponse
 from utils.auth import require_user
+from core.exceptions import InferenceUnavailable
 
 router = APIRouter(prefix="/api/voice", tags=["Voice"])
 
@@ -43,6 +44,9 @@ async def diagnose(request: DiagnoseRequest, db: Session = Depends(get_db), curr
             "timestamp": datetime.utcnow().isoformat()
         })
         return res
+    except InferenceUnavailable:
+        # Inference failure is an error, not a result — let it become a 503.
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

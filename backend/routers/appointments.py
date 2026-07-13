@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -8,7 +9,9 @@ from db.database import get_db
 from agents import appointment_agent
 from db.models import Appointment, Patient, User
 from db.schemas import AppointmentCreate, AppointmentResponse
-from utils.auth import require_user
+from utils.auth import require_user, require_doctor
+
+logger = logging.getLogger("neuramed.appointments")
 
 router = APIRouter(prefix="/api/appointments", tags=["Appointments"])
 
@@ -39,8 +42,13 @@ def create_appointment(app_req: AppointmentCreate, db: Session = Depends(get_db)
             duration_minutes=app_req.duration_minutes or 30,
             location=app_req.location,
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except appointment_agent.SchedulingConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Appointment creation failed")
+        raise HTTPException(status_code=500, detail="Internal error processing request")
 
 
 def _format_appointment(a):
@@ -110,7 +118,7 @@ def get_appointment_stats(db: Session = Depends(get_db), current_user: User = De
 
 
 @router.get("/upcoming")
-def get_upcoming(db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def get_upcoming(db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     now = datetime.utcnow()
     week_ahead = now + timedelta(days=7)
     appointments = db.query(Appointment).filter(
@@ -122,7 +130,7 @@ def get_upcoming(db: Session = Depends(get_db), current_user: User = Depends(req
 
 
 @router.get("/today")
-def get_today_appointments(db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def get_today_appointments(db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     now = datetime.utcnow()
     today_start = datetime(now.year, now.month, now.day)
     today_end = today_start + timedelta(days=1)
@@ -141,7 +149,7 @@ def get_appointments(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_user)
+    current_user: User = Depends(require_doctor)
 ):
     query = db.query(Appointment)
     if patient_id:
@@ -159,7 +167,7 @@ def get_appointments(
 
 
 @router.patch("/{appointment_id}/status")
-def update_status(appointment_id: int, body: StatusUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def update_status(appointment_id: int, body: StatusUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     valid_statuses = ["scheduled", "completed", "cancelled"]
     if body.status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
@@ -172,7 +180,7 @@ def update_status(appointment_id: int, body: StatusUpdate, db: Session = Depends
 
 
 @router.patch("/{appointment_id}/notes")
-def add_notes(appointment_id: int, body: NotesUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def add_notes(appointment_id: int, body: NotesUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     app = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not app:
         raise HTTPException(status_code=404, detail="Appointment not found")
