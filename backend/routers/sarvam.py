@@ -1,7 +1,7 @@
 import os
 import json
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from db.database import get_db
@@ -9,6 +9,7 @@ from db.models import User, DiagnosisSession
 from utils.auth import require_user
 from utils.llm import call_llm
 from core.exceptions import InferenceUnavailable
+from agents import voice_agent
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,32 @@ async def sarvam_health():
             "available_models": [],
             "note": "Ollama not running locally. Start with: ollama serve",
         }
+
+
+@router.post("/transcribe")
+async def sarvam_transcribe(
+    file: UploadFile = File(...),
+    language: str = Form("hi"),
+    current_user: User = Depends(require_user),
+):
+    """Real server-side speech-to-text for vernacular audio, powered by Groq
+    Whisper (whisper-large-v3) with the target language hinted.
+
+    This is NOT a hosted "Sarvam" speech model — it is Groq Whisper, and the
+    provenance says so. On any transcription failure, ``transcribe_with_whisper``
+    raises ``InferenceUnavailable`` (-> 503); we never fabricate a transcript.
+    """
+    audio_bytes = await file.read()
+    transcript = voice_agent.transcribe_with_whisper(audio_bytes, language=language)
+    return {
+        "transcript": transcript,
+        "language": language,
+        "provenance": {
+            "source": "real_model",
+            "model": "whisper-large-v3",
+            "vendor": "groq",
+        },
+    }
 
 
 @router.post("/diagnose")
@@ -118,6 +145,12 @@ async def sarvam_diagnose(
                     "immediate_advice_native": groq_data.get("immediate_advice", ""),
                     "see_doctor_urgency": groq_data.get("see_doctor_urgency", "routine"),
                     "medical_terms_explained": groq_data.get("medical_terms_explained", []),
+                    "provenance": {
+                        "status": "ok",
+                        "source": "real_model",
+                        "model": "llama-3.3-70b-versatile",
+                        "vendor": "groq",
+                    },
                 }
                 logger.info("Sarvam: Groq returned valid English analysis")
 
@@ -188,15 +221,25 @@ async def sarvam_diagnose(
                                     sarvam_text = parsed.get("response_native") or parsed.get("response_english") or parsed.get("response") or str(parsed)
                             except (json.JSONDecodeError, ValueError):
                                 pass  # It's plain text, use as-is
+                            # Real Sarvam model output via local Ollama. It is a
+                            # free-text native-language response, so we do NOT
+                            # fabricate structured fields (urgency, primary_concern,
+                            # or an English translation we don't actually have).
+                            # response_english is only set when the model spoke
+                            # English; otherwise it is omitted, never a placeholder.
                             result = {
                                 "response_native": sarvam_text,
-                                "response_english": sarvam_text if language == "en" else f"[Response in {lang['name']}]",
-                                "urgency": "medium",
-                                "primary_concern": "Medical advice provided",
                                 "immediate_advice_native": "",
-                                "see_doctor_urgency": "routine",
                                 "medical_terms_explained": [],
+                                "provenance": {
+                                    "status": "ok",
+                                    "source": "real_model",
+                                    "model": model_name,
+                                    "vendor": "ollama",
+                                },
                             }
+                            if language == "en":
+                                result["response_english"] = sarvam_text
                             logger.info(f"Sarvam: Got response from {model_name}")
                             break
             except Exception as e:
