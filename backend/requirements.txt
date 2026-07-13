@@ -22,3 +22,6 @@ aiofiles
 websockets
 PyMuPDF
 httpx
+pytest
+pytest-asyncio
+alembic
