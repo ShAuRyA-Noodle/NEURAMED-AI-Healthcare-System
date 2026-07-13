@@ -4,7 +4,14 @@ import { ScanLine, Brain, AlertTriangle, CheckCircle, UploadCloud, Download, Rot
 import { useImageAnalysis } from '@/hooks/useImageAnalysis';
 import { useToast } from '@/hooks/useToast';
 import { getSecondOpinion } from '@/api/imaging';
+import { ProvenanceChip } from '@/components/shared/ProvenanceChip';
 import type { ScanAnalysisResult, AnomalyRegion, SecondOpinionResult } from '@/types';
+
+const CONSENSUS_CONFIG: Record<string, { color: string; label: string }> = {
+  unanimous: { color: 'var(--green)', label: 'Unanimous' },
+  majority: { color: 'var(--cyan)', label: 'Majority' },
+  split: { color: 'var(--amber)', label: 'Split — models disagree' },
+};
 
 const MEDICAL_TERMS = ['opacity', 'consolidation', 'pneumonia', 'effusion', 'cardiac', 'lobe', 'infiltrate', 'nodule', 'edema', 'fracture', 'lesion', 'mass', 'density', 'calcification', 'atelectasis', 'cardiomegaly', 'pleural', 'mediastinal', 'parenchymal', 'interstitial'];
 
@@ -465,29 +472,10 @@ const ImagingAI = () => {
                   const scores = result.pathology_scores || {};
                   const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
                   const prov = result.provenance;
-                  const provOk = !prov || prov.status === 'ok';
                   return (
                     <>
-                      {/* Provenance chip */}
-                      {prov && (prov.model || prov.vendor) && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <span style={{
-                            fontFamily: 'var(--font-body)', fontSize: 10, padding: '4px 10px', borderRadius: 12,
-                            display: 'inline-flex', alignItems: 'center', gap: 6,
-                            background: provOk ? 'rgba(0,229,255,0.08)' : 'rgba(255,149,0,0.1)',
-                            color: provOk ? 'var(--cyan)' : 'var(--amber)',
-                            border: `1px solid ${provOk ? 'rgba(0,229,255,0.2)' : 'rgba(255,149,0,0.3)'}`,
-                          }}>
-                            <Shield size={11} />
-                            {[prov.model, prov.vendor].filter(Boolean).join(' · ')}
-                          </span>
-                          {!provOk && (
-                            <span className="font-body" style={{ fontSize: 10, color: 'var(--amber)' }}>
-                              {prov.status}{prov.reason ? ` — ${prov.reason}` : ''}
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      {/* Provenance chip (shared component) */}
+                      {prov && <ProvenanceChip provenance={prov} />}
 
                       {/* Pathology scores panel (chest X-ray classifier) */}
                       {result.classifier_available && sorted.length > 0 ? (
@@ -1061,109 +1049,117 @@ const ImagingAI = () => {
               </div>
 
               <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
-                {/* Synthesis */}
-                {secondOpinionResult.synthesis && (
-                  <div style={{ background: 'rgba(0,229,255,0.05)', padding: 16, borderRadius: 10, border: '1px solid rgba(0,229,255,0.15)' }}>
-                    <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>SYNTHESIS</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-                      <span style={{
-                        fontFamily: 'var(--font-heading)', fontSize: 12, padding: '4px 12px', borderRadius: 20,
-                        background: 'rgba(0,229,255,0.1)', color: 'var(--cyan)', border: '1px solid rgba(0,229,255,0.25)',
-                      }}>Consensus: {secondOpinionResult.synthesis.consensus_level}</span>
-                      {secondOpinionResult.synthesis.consensus_diagnosis && (
-                        <span className="font-body" style={{ fontSize: 13, color: 'var(--text)' }}>{secondOpinionResult.synthesis.consensus_diagnosis}</span>
-                      )}
-                      {!secondOpinionResult.synthesis.consensus_diagnosis && secondOpinionResult.synthesis.majority_diagnosis && (
-                        <span className="font-body" style={{ fontSize: 13, color: 'var(--text)' }}>Majority: {secondOpinionResult.synthesis.majority_diagnosis}</span>
-                      )}
-                    </div>
-                    <p className="font-body" style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6, margin: 0 }}>{secondOpinionResult.synthesis.synthesized_recommendation}</p>
-                    {secondOpinionResult.synthesis.clinical_note && (
-                      <p className="font-body" style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5, margin: '8px 0 0 0' }}>{secondOpinionResult.synthesis.clinical_note}</p>
-                    )}
-                    {secondOpinionResult.synthesis.agreement_areas.length > 0 && (
-                      <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <span className="font-body" style={{ fontSize: 10, color: 'var(--green)', letterSpacing: '0.05em' }}>AGREE: </span>
-                        {secondOpinionResult.synthesis.agreement_areas.map((a, i) => (
-                          <span key={i} style={{
-                            fontFamily: 'var(--font-body)', fontSize: 10, padding: '2px 8px', borderRadius: 8,
-                            background: 'rgba(0,255,157,0.08)', color: 'var(--green)', border: '1px solid rgba(0,255,157,0.15)',
-                          }}>{a}</span>
-                        ))}
-                      </div>
-                    )}
-                    {secondOpinionResult.synthesis.dispute_areas.length > 0 && (
-                      <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <span className="font-body" style={{ fontSize: 10, color: 'var(--amber)', letterSpacing: '0.05em' }}>DISPUTE: </span>
-                        {secondOpinionResult.synthesis.dispute_areas.map((d, i) => (
-                          <span key={i} style={{
-                            fontFamily: 'var(--font-body)', fontSize: 10, padding: '2px 8px', borderRadius: 8,
-                            background: 'rgba(255,149,0,0.08)', color: 'var(--amber)', border: '1px solid rgba(255,149,0,0.15)',
-                          }}>{d}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Individual Opinions */}
-                {Object.entries(secondOpinionResult.opinions).map(([perspective, opinion]) => {
-                  const perspectiveColors: Record<string, string> = {
-                    conservative: 'var(--green)', balanced: 'var(--cyan)', differential: 'var(--amber)',
-                  };
-                  const color = perspectiveColors[perspective] || 'var(--cyan)';
+                {(() => {
+                  const so = secondOpinionResult;
+                  const consensus = CONSENSUS_CONFIG[so.consensus_level] || CONSENSUS_CONFIG.split;
+                  const realVotes = (so.votes || []).filter(v => v.status === 'ok' && !v.abstain);
                   return (
-                    <div key={perspective} style={{ background: 'var(--elevated)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden' }}>
-                      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <>
+                      {/* Consensus header */}
+                      <div style={{ background: `${consensus.color}12`, padding: 16, borderRadius: 10, border: `1px solid ${consensus.color}30` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                           <span style={{
-                            fontFamily: 'var(--font-heading)', fontSize: 11, padding: '3px 10px', borderRadius: 12,
-                            background: `${color}15`, color: color, border: `1px solid ${color}30`,
-                            textTransform: 'uppercase', letterSpacing: '0.05em',
-                          }}>{perspective}</span>
-                          <span className="font-heading" style={{ fontSize: 13, color: 'var(--text)' }}>{opinion.primary_diagnosis}</span>
+                            fontFamily: 'var(--font-heading)', fontSize: 12, padding: '4px 12px', borderRadius: 20,
+                            background: `${consensus.color}18`, color: consensus.color, border: `1px solid ${consensus.color}40`,
+                          }}>{consensus.label}</span>
+                          <span className="font-number" style={{ fontSize: 13, color: consensus.color }}>
+                            {Math.round((so.agreement_pct || 0) * 100)}% agreement
+                          </span>
+                          <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>
+                            {so.real_votes} of {so.panel_size ?? so.votes?.length ?? 0} models voted
+                          </span>
                         </div>
-                        <span className="font-number" style={{ fontSize: 13, color: confColor(opinion.confidence * 100) }}>{Math.round(opinion.confidence * 100)}%</span>
+                        {so.agreed_diagnosis && (
+                          <p className="font-body" style={{ fontSize: 13, color: 'var(--text)', margin: '10px 0 0' }}>
+                            Leading diagnosis: <b style={{ color: consensus.color }}>{so.agreed_diagnosis}</b>
+                          </p>
+                        )}
+                        {(so.abstained?.length > 0 || so.unavailable?.length > 0) && (
+                          <p className="font-body" style={{ fontSize: 11, color: 'var(--muted)', margin: '8px 0 0' }}>
+                            {so.abstained?.length > 0 && <>Abstained: {so.abstained.join(', ')}. </>}
+                            {so.unavailable?.length > 0 && <>Unavailable: {so.unavailable.join(', ')}.</>}
+                          </p>
+                        )}
+                        <div style={{ marginTop: 12 }}>{so.provenance && <ProvenanceChip provenance={so.provenance} />}</div>
                       </div>
-                      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <p className="font-body" style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6, margin: 0 }}>{opinion.reasoning}</p>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{
-                            fontFamily: 'var(--font-body)', fontSize: 10, padding: '2px 8px', borderRadius: 8,
-                            background: 'rgba(255,149,0,0.08)', color: 'var(--amber)', border: '1px solid rgba(255,149,0,0.15)',
-                          }}>Urgency: {opinion.urgency_assessment}</span>
-                        </div>
-                        <p className="font-body" style={{ fontSize: 11, color: 'var(--cyan)', margin: 0 }}>{opinion.key_message}</p>
-                        {opinion.agreed_findings.length > 0 && (
-                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                            {opinion.agreed_findings.map((f, i) => (
-                              <span key={i} style={{
-                                fontFamily: 'var(--font-body)', fontSize: 9, padding: '2px 6px', borderRadius: 6,
-                                background: 'rgba(0,255,157,0.08)', color: 'var(--green)', border: '1px solid rgba(0,255,157,0.15)',
-                              }}>{f}</span>
+
+                      {/* Dissent — the product: where the models disagreed */}
+                      {so.dissent?.length > 0 && (
+                        <div style={{ background: 'rgba(255,149,0,0.06)', padding: 16, borderRadius: 10, border: '1px solid rgba(255,149,0,0.25)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                            <AlertTriangle size={14} style={{ color: 'var(--amber)' }} />
+                            <span className="font-body" style={{ fontSize: 11, color: 'var(--amber)', letterSpacing: '0.1em' }}>WHERE THE MODELS DISAGREED</span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            {so.dissent.map((d, i) => (
+                              <div key={i} style={{ borderLeft: '2px solid var(--amber)', paddingLeft: 12 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                  <span className="font-heading" style={{ fontSize: 12, color: 'var(--text)' }}>{d.primary_diagnosis || 'Alternative view'}</span>
+                                  <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)' }}>{d.vendor} · {d.model}</span>
+                                </div>
+                                {d.reasoning && <p className="font-body" style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5, margin: '4px 0 0' }}>{d.reasoning}</p>}
+                              </div>
                             ))}
                           </div>
-                        )}
-                        {opinion.disputed_findings.length > 0 && (
-                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                            {opinion.disputed_findings.map((f, i) => (
-                              <span key={i} style={{
-                                fontFamily: 'var(--font-body)', fontSize: 9, padding: '2px 6px', borderRadius: 6,
-                                background: 'rgba(255,59,92,0.08)', color: 'var(--red)', border: '1px solid rgba(255,59,92,0.15)',
-                              }}>{f}</span>
-                            ))}
-                          </div>
-                        )}
-                        {opinion.recommended_tests.length > 0 && (
-                          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 4 }}>
-                            <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.05em' }}>RECOMMENDED TESTS: </span>
-                            <span className="font-body" style={{ fontSize: 11, color: 'var(--text)' }}>{opinion.recommended_tests.join(', ')}</span>
-                          </div>
+                        </div>
+                      )}
+
+                      {/* Per-vendor votes — full transparency */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em' }}>INDEPENDENT VOTES ({so.votes?.length ?? 0})</span>
+                        {(so.votes || []).map((vote, i) => {
+                          const ok = vote.status === 'ok';
+                          const abstained = ok && vote.abstain;
+                          const color = !ok ? 'var(--dim)' : abstained ? 'var(--muted)' : 'var(--cyan)';
+                          return (
+                            <div key={i} style={{ background: 'var(--elevated)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden', opacity: ok && !abstained ? 1 : 0.7 }}>
+                              <div style={{ padding: '12px 16px', borderBottom: ok && !abstained && vote.reasoning ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                                  <span style={{
+                                    fontFamily: 'var(--font-heading)', fontSize: 11, padding: '3px 10px', borderRadius: 12,
+                                    background: `${color}15`, color, border: `1px solid ${color}30`, textTransform: 'uppercase', letterSpacing: '0.05em',
+                                  }}>{vote.vendor}</span>
+                                  <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)' }}>{vote.model}</span>
+                                  {ok && !abstained && vote.primary_diagnosis && (
+                                    <span className="font-heading" style={{ fontSize: 13, color: 'var(--text)' }}>{vote.primary_diagnosis}</span>
+                                  )}
+                                  {abstained && <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>Abstained{vote.abstain_reason ? ` — ${vote.abstain_reason}` : ''}</span>}
+                                  {!ok && <span className="font-body" style={{ fontSize: 11, color: 'var(--dim)' }}>Unavailable{vote.reason ? ` — ${vote.reason}` : ''}</span>}
+                                </div>
+                                {ok && !abstained && typeof vote.confidence === 'number' && (
+                                  <span className="font-number" style={{ fontSize: 13, color: confColor(vote.confidence * 100) }}>{Math.round(vote.confidence * 100)}%</span>
+                                )}
+                              </div>
+                              {ok && !abstained && vote.reasoning && (
+                                <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                  <p className="font-body" style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6, margin: 0 }}>{vote.reasoning}</p>
+                                  {vote.differentials && vote.differentials.length > 0 && (
+                                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                      {vote.differentials.map((f, di) => (
+                                        <span key={di} style={{
+                                          fontFamily: 'var(--font-body)', fontSize: 9, padding: '2px 6px', borderRadius: 6,
+                                          background: 'rgba(0,229,255,0.08)', color: 'var(--cyan)', border: '1px solid rgba(0,229,255,0.15)',
+                                        }}>{f}</span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {realVotes.length < 2 && (
+                          <p className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>Fewer than 2 independent votes returned — consensus not computed.</p>
                         )}
                       </div>
-                    </div>
+
+                      {/* Disclaimer */}
+                      {so.disclaimer && (
+                        <p className="font-body" style={{ fontSize: 10, color: 'var(--dim)', lineHeight: 1.5, margin: 0 }}>{so.disclaimer}</p>
+                      )}
+                    </>
                   );
-                })}
+                })()}
               </div>
             </motion.div>
           </motion.div>

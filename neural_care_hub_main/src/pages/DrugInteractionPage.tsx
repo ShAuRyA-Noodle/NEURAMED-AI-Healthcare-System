@@ -1,10 +1,11 @@
 import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Pill, X, AlertTriangle, CheckCircle, Loader2, Search, ChevronRight } from 'lucide-react';
+import { Pill, X, AlertTriangle, CheckCircle, Loader2, Search, ChevronRight, ExternalLink } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { checkDrugInteractions } from '@/api/drugs';
 import { useToast } from '@/hooks/useToast';
-import type { DrugInteractionResult, DrugInteraction } from '@/types';
+import { ProvenanceChip } from '@/components/shared/ProvenanceChip';
+import type { DrugInteractionResult, DrugPair } from '@/types';
 
 const COMMON_DRUGS = [
   'Warfarin', 'Aspirin', 'Metformin', 'Lisinopril', 'Atorvastatin', 'Metoprolol',
@@ -24,14 +25,23 @@ const SEVERITY_CONFIG: Record<string, { bg: string; border: string; text: string
   major: { bg: 'rgba(255,59,92,0.08)', border: 'rgba(255,59,92,0.3)', text: '#fca5a5', icon: '!!' },
   moderate: { bg: 'rgba(255,149,0,0.08)', border: 'rgba(255,149,0,0.3)', text: '#fdba74', icon: '!' },
   minor: { bg: 'rgba(253,224,71,0.06)', border: 'rgba(253,224,71,0.2)', text: '#fde047', icon: '~' },
+  unspecified: { bg: 'rgba(0,229,255,0.06)', border: 'rgba(0,229,255,0.2)', text: 'var(--cyan)', icon: '?' },
   none: { bg: 'rgba(0,255,157,0.06)', border: 'rgba(0,255,157,0.2)', text: '#86efac', icon: '✓' },
 };
 
+const SEVERITY_RANK = ['contraindicated', 'major', 'moderate', 'minor', 'unspecified'];
+
 const RISK_BANNER: Record<string, { bg: string; border: string; text: string; label: string }> = {
-  safe: { bg: 'rgba(0,255,157,0.08)', border: 'rgba(0,255,157,0.3)', text: '#86efac', label: 'No significant interactions detected' },
-  caution: { bg: 'rgba(255,149,0,0.1)', border: 'rgba(255,149,0,0.3)', text: '#fdba74', label: 'Monitor carefully — interactions present' },
-  avoid: { bg: 'rgba(255,59,92,0.1)', border: 'rgba(255,59,92,0.3)', text: '#fca5a5', label: 'High-risk combination — physician review required' },
   contraindicated: { bg: 'rgba(255,59,92,0.15)', border: 'rgba(255,59,92,0.4)', text: '#fca5a5', label: 'CONTRAINDICATED — do not combine' },
+  major: { bg: 'rgba(255,59,92,0.1)', border: 'rgba(255,59,92,0.3)', text: '#fca5a5', label: 'Major interaction — physician review required' },
+  moderate: { bg: 'rgba(255,149,0,0.1)', border: 'rgba(255,149,0,0.3)', text: '#fdba74', label: 'Moderate interaction — monitor carefully' },
+  minor: { bg: 'rgba(253,224,71,0.08)', border: 'rgba(253,224,71,0.25)', text: '#fde047', label: 'Minor interaction present' },
+  unspecified: { bg: 'rgba(0,229,255,0.08)', border: 'rgba(0,229,255,0.3)', text: 'var(--cyan)', label: 'Interaction found — severity unspecified in labels' },
+  no_known_interaction_in_sources: { bg: 'rgba(0,255,157,0.08)', border: 'rgba(0,255,157,0.3)', text: '#86efac', label: 'No interaction found in the FDA labels we checked' },
+};
+
+const labelHost = (url: string) => {
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return 'FDA label'; }
 };
 
 const DrugInteractionPage = () => {
@@ -89,7 +99,14 @@ const DrugInteractionPage = () => {
     }
   };
 
-  const risk = result ? RISK_BANNER[result.overall_risk] || RISK_BANNER.safe : null;
+  const risk = result ? (RISK_BANNER[result.overall_risk] || RISK_BANNER.unspecified) : null;
+  const orderedPairs: DrugPair[] = result
+    ? [...result.pairs].sort((a, b) => {
+        const ra = a.status === 'evidence' ? SEVERITY_RANK.indexOf(a.severity || 'unspecified') : 99;
+        const rb = b.status === 'evidence' ? SEVERITY_RANK.indexOf(b.severity || 'unspecified') : 99;
+        return ra - rb;
+      })
+    : [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -189,128 +206,114 @@ const DrugInteractionPage = () => {
           {/* Risk Banner */}
           {risk && (
             <div style={{
-              padding: '16px 24px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12,
+              padding: '16px 24px', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
               background: risk.bg, border: `1px solid ${risk.border}`,
               animation: result.overall_risk === 'contraindicated' ? 'pulse-dot 2s ease-in-out infinite' : 'none'
             }}>
-              {result.overall_risk === 'safe' ? <CheckCircle size={20} style={{ color: risk.text }} /> : <AlertTriangle size={20} style={{ color: risk.text }} />}
-              <span className="font-heading" style={{ fontSize: 15, color: risk.text }}>{risk.label}</span>
-            </div>
-          )}
-
-          {/* Interaction Matrix */}
-          {drugs.length <= 8 && (
-            <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}>
-              <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 16 }}>INTERACTION MATRIX</span>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ padding: 8, border: '1px solid var(--border)' }}></th>
-                      {drugs.map(d => (
-                        <th key={d} className="font-body" style={{ padding: '6px 8px', fontSize: 10, color: 'var(--muted)', border: '1px solid var(--border)', textAlign: 'center', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis' }}>{d}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {drugs.map((rowDrug, ri) => (
-                      <tr key={rowDrug}>
-                        <td className="font-body" style={{ padding: '6px 8px', fontSize: 10, color: 'var(--muted)', border: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{rowDrug}</td>
-                        {drugs.map((colDrug, ci) => {
-                          if (ri === ci) return <td key={colDrug} style={{ padding: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', textAlign: 'center', color: 'var(--dim)', fontSize: 12 }}>—</td>;
-                          const interaction = result.interactions?.find(
-                            i => (i.drug_a === rowDrug && i.drug_b === colDrug) || (i.drug_a === colDrug && i.drug_b === rowDrug)
-                          );
-                          const sev = interaction ? (SEVERITY_CONFIG[interaction.severity] || SEVERITY_CONFIG.none) : SEVERITY_CONFIG.none;
-                          return (
-                            <td key={colDrug} style={{
-                              padding: 8, textAlign: 'center', border: '1px solid var(--border)',
-                              background: sev.bg, cursor: interaction ? 'pointer' : 'default'
-                            }}
-                              onClick={() => {
-                                if (interaction) {
-                                  const idx = result.interactions.indexOf(interaction);
-                                  setExpandedInteraction(expandedInteraction === idx ? null : idx);
-                                }
-                              }}
-                            >
-                              <span style={{ fontSize: 14, color: sev.text, fontWeight: 700 }}>{sev.icon}</span>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {result.overall_risk === 'no_known_interaction_in_sources'
+                  ? <CheckCircle size={20} style={{ color: risk.text }} />
+                  : <AlertTriangle size={20} style={{ color: risk.text }} />}
+                <span className="font-heading" style={{ fontSize: 15, color: risk.text }}>{risk.label}</span>
               </div>
+              {/* Provenance — real model + real sources that produced this */}
+              {result.provenance && <ProvenanceChip provenance={result.provenance} />}
             </div>
           )}
 
-          {/* Interactions List */}
-          {result.interactions?.length > 0 && (
+          {/* Pairs — cite-or-abstain, one card per drug pair */}
+          {orderedPairs.length > 0 && (
             <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}>
               <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 16 }}>
-                INTERACTIONS ({result.interactions.length})
+                PAIRWISE ANALYSIS ({orderedPairs.length})
               </span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {result.interactions.sort((a, b) => {
-                  const order = ['contraindicated', 'major', 'moderate', 'minor'];
-                  return order.indexOf(a.severity) - order.indexOf(b.severity);
-                }).map((interaction: DrugInteraction, idx: number) => {
-                  const sev = SEVERITY_CONFIG[interaction.severity] || SEVERITY_CONFIG.minor;
+                {orderedPairs.map((p, idx) => {
+                  const [a, b] = p.pair;
+                  if (p.status !== 'evidence') {
+                    // Honest "no evidence" — never fabricated as safe
+                    return (
+                      <div key={idx} style={{
+                        background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 10,
+                        padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12
+                      }}>
+                        <span style={{
+                          fontSize: 9, padding: '3px 8px', borderRadius: 4, textTransform: 'uppercase',
+                          background: 'rgba(255,255,255,0.04)', color: 'var(--muted)', border: '1px solid var(--border)',
+                          fontFamily: 'var(--font-body)', fontWeight: 600, whiteSpace: 'nowrap'
+                        }}>No evidence</span>
+                        <span className="font-heading" style={{ fontSize: 13, color: 'var(--text)' }}>
+                          {a} <span style={{ color: 'var(--dim)', fontSize: 11 }}>×</span> {b}
+                        </span>
+                        <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 'auto', textAlign: 'right' }}>
+                          {p.note || 'No interaction found in the FDA labels we checked.'}
+                        </span>
+                      </div>
+                    );
+                  }
+                  const sev = SEVERITY_CONFIG[p.severity || 'unspecified'] || SEVERITY_CONFIG.unspecified;
                   const isExpanded = expandedInteraction === idx;
+                  const citationUrls = p.citations && p.citations.length > 0
+                    ? p.citations
+                    : (p.evidence || []).map(e => e.citation_url).filter(Boolean);
                   return (
                     <div key={idx} style={{
-                      background: 'var(--elevated)', border: `1px solid ${sev.border}`, borderRadius: 10,
-                      overflow: 'hidden', cursor: 'pointer'
-                    }} onClick={() => setExpandedInteraction(isExpanded ? null : idx)}>
-                      <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                      background: 'var(--elevated)', border: `1px solid ${sev.border}`, borderRadius: 10, overflow: 'hidden'
+                    }}>
+                      <div data-cursor="hover" onClick={() => setExpandedInteraction(isExpanded ? null : idx)}
+                        style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
                         <span style={{
                           fontSize: 9, padding: '3px 8px', borderRadius: 4, textTransform: 'uppercase',
                           background: sev.bg, color: sev.text, border: `1px solid ${sev.border}`,
                           fontFamily: 'var(--font-body)', fontWeight: 600
-                        }}>{interaction.severity}</span>
+                        }}>{p.severity}</span>
                         <span className="font-heading" style={{ fontSize: 13, color: 'var(--text)' }}>
-                          {interaction.drug_a} <span style={{ color: 'var(--dim)', fontSize: 11 }}>×</span> {interaction.drug_b}
+                          {a} <span style={{ color: 'var(--dim)', fontSize: 11 }}>×</span> {b}
                         </span>
-                        <div style={{ marginLeft: 'auto' }}>
-                          <ChevronRight size={14} style={{ color: 'var(--muted)', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 200ms' }} />
-                        </div>
+                        <ChevronRight size={14} style={{ marginLeft: 'auto', color: 'var(--muted)', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 200ms' }} />
                       </div>
                       <AnimatePresence>
                         {isExpanded && (
                           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                             style={{ overflow: 'hidden' }}>
                             <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                              <div>
-                                <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.08em' }}>MECHANISM</span>
-                                <p className="font-body" style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6, margin: '4px 0 0' }}>{interaction.mechanism}</p>
-                              </div>
-                              <div>
-                                <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.08em' }}>CLINICAL EFFECT</span>
-                                <p className="font-body" style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6, margin: '4px 0 0' }}>{interaction.clinical_effect}</p>
-                              </div>
-                              <div>
-                                <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.08em' }}>MANAGEMENT</span>
-                                <p className="font-body" style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6, margin: '4px 0 0' }}>{interaction.management}</p>
-                              </div>
-                              {interaction.alternatives && interaction.alternatives.length > 0 && (
+                              {p.summary && (
                                 <div>
-                                  <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.08em' }}>ALTERNATIVES</span>
-                                  {interaction.alternatives.map((alt, ai) => (
-                                    <div key={ai} style={{ marginTop: 6, padding: '8px 12px', background: 'rgba(0,255,157,0.05)', border: '1px solid rgba(0,255,157,0.15)', borderRadius: 6 }}>
-                                      <span className="font-body" style={{ fontSize: 12, color: 'var(--text)' }}>
-                                        Replace <b style={{ color: 'var(--amber)' }}>{alt.replace}</b> with <b style={{ color: 'var(--green)' }}>{alt.with}</b>
-                                      </span>
-                                      {alt.note && <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginTop: 2 }}>{alt.note}</span>}
+                                  <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.08em' }}>WHAT THE LABEL SAYS</span>
+                                  <p className="font-body" style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6, margin: '4px 0 0' }}>{p.summary}</p>
+                                </div>
+                              )}
+                              {p.clinical_management && (
+                                <div>
+                                  <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.08em' }}>CLINICAL MANAGEMENT</span>
+                                  <p className="font-body" style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6, margin: '4px 0 0' }}>{p.clinical_management}</p>
+                                </div>
+                              )}
+                              {/* Attributed snippets straight from the FDA label */}
+                              {p.evidence && p.evidence.length > 0 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                  <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.08em' }}>FDA LABEL EXCERPTS</span>
+                                  {p.evidence.map((e, ei) => (
+                                    <div key={ei} style={{ padding: '8px 12px', background: 'rgba(0,229,255,0.04)', border: '1px solid rgba(0,229,255,0.12)', borderRadius: 6 }}>
+                                      <p className="font-body" style={{ fontSize: 11, color: 'var(--text)', lineHeight: 1.5, margin: 0, fontStyle: 'italic' }}>“{e.snippet}”</p>
+                                      <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', display: 'block', marginTop: 4 }}>— {e.source_drug} label</span>
                                     </div>
                                   ))}
                                 </div>
                               )}
-                              {interaction.onset && (
-                                <div style={{ display: 'flex', gap: 16 }}>
-                                  <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>Onset: <span style={{ color: 'var(--text)' }}>{interaction.onset}</span></span>
-                                  {interaction.documentation && <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>Documentation: <span style={{ color: 'var(--text)' }}>{interaction.documentation}</span></span>}
+                              {/* Citation links */}
+                              {citationUrls.length > 0 && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                  {citationUrls.map((url, ci) => (
+                                    <a key={ci} href={url} target="_blank" rel="noreferrer" data-cursor="hover"
+                                      style={{
+                                        display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 12,
+                                        background: 'rgba(0,255,157,0.06)', color: 'var(--green)', border: '1px solid rgba(0,255,157,0.15)',
+                                        fontFamily: 'var(--font-body)', fontSize: 10, textDecoration: 'none'
+                                      }}>
+                                      <ExternalLink size={10} /> FDA label · {labelHost(url)}
+                                    </a>
+                                  ))}
                                 </div>
                               )}
                             </div>
@@ -324,39 +327,30 @@ const DrugInteractionPage = () => {
             </div>
           )}
 
-          {/* Safe Pairs */}
-          {result.safe_pairs?.length > 0 && (
-            <details style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}>
-              <summary className="font-body" style={{ fontSize: 12, color: 'var(--green)', cursor: 'pointer' }}>
-                Safe Pairs ({result.safe_pairs.length})
-              </summary>
-              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {result.safe_pairs.map((pair, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <CheckCircle size={12} style={{ color: 'var(--green)' }} />
-                    <span className="font-body" style={{ fontSize: 12, color: 'var(--text)' }}>
-                      {pair.drug_a} and {pair.drug_b}
-                    </span>
-                    <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>— {pair.note}</span>
-                  </div>
-                ))}
-              </div>
-            </details>
-          )}
-
-          {/* Overall Recommendations */}
-          {result.overall_recommendations?.length > 0 && (
+          {/* Sources checked — every FDA label consulted */}
+          {result.sources_checked?.length > 0 && (
             <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}>
-              <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 12 }}>RECOMMENDATIONS</span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {result.overall_recommendations.map((rec, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                    <span className="font-number" style={{ fontSize: 12, color: 'var(--cyan)', width: 20, flexShrink: 0 }}>{i + 1}.</span>
-                    <span className="font-body" style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>{rec}</span>
-                  </div>
+              <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 12 }}>
+                SOURCES CHECKED ({result.sources_checked.length})
+              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {result.sources_checked.map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noreferrer" data-cursor="hover"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--cyan)', textDecoration: 'none', fontFamily: 'var(--font-body)', fontSize: 11 }}
+                    onMouseEnter={e => (e.currentTarget.style.opacity = '0.75')}
+                    onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
+                    <ExternalLink size={11} style={{ flexShrink: 0 }} /> {url}
+                  </a>
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Honest disclaimer */}
+          {result.disclaimer && (
+            <p className="font-body" style={{ fontSize: 10, color: 'var(--dim)', lineHeight: 1.5, margin: 0 }}>
+              {result.disclaimer}
+            </p>
           )}
         </motion.div>
       )}
