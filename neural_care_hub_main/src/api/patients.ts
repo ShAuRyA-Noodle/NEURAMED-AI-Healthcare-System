@@ -1,5 +1,5 @@
 import client from './client'
-import type { Patient, PatientDetail } from '../types'
+import type { Patient, PatientDetail, EnrichedPatient } from '../types'
 
 export interface PatientFilterParams {
   search?: string
@@ -15,7 +15,7 @@ export interface PatientFilterParams {
 }
 
 export const getPatients = (params?: PatientFilterParams) =>
-  client.get<Patient[]>('/api/patients', { params }).then(r => r.data)
+  client.get<EnrichedPatient[]>('/api/patients', { params }).then(r => r.data)
 
 export const getPatient = (id: number) =>
   client.get<PatientDetail>(`/api/patients/${id}`).then(r => r.data)

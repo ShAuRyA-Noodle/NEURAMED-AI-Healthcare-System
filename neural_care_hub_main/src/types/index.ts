@@ -386,6 +386,54 @@ export interface PatientDetail extends Patient {
     agent_usage: Record<string, number>
 }
 
+/**
+ * The shape GET /api/patients actually returns — the base Patient row plus the
+ * fields computed in backend/routers/patients.py (get_patients handler).
+ * `Patient` is the raw DB row; `EnrichedPatient` is this list-endpoint response.
+ *
+ * NOTE ON CASING: the backend uppercases the last-session agent/urgency
+ * (`agent_type.upper()`, `urgency_level.upper()`), so these arrive as e.g.
+ * "VOICE" / "HIGH", NOT the lowercase AgentType/UrgencyLevel unions. They are
+ * typed as `string` here to reflect reality; consumers must lower-case before
+ * comparing against those unions.
+ */
+export interface EnrichedPatient {
+    id: number
+    patient_code: string
+    first_name: string | null
+    last_name: string | null
+    /** Always a non-empty string (falls back to patient_code server-side). */
+    full_name: string
+    age: number | null
+    gender: string | null
+    phone: string | null
+    email: string | null
+    address: string | null
+    emergency_contact: string | null
+    allergies: string | null
+    chronic_conditions: string | null
+    insurance_id: string | null
+    created_at: string
+    demographics: {
+        age: number | null
+        gender: string | null
+        blood_type: string
+        date_of_birth: string | null
+    }
+    total_sessions: number
+    /** Duplicate of total_sessions kept for backward compat by the backend. */
+    session_count: number
+    /** UPPERCASE agent type ("VOICE" | "IMAGING" | "OCR") or null when the patient has no sessions. */
+    last_session_agent: string | null
+    /** UPPERCASE urgency ("LOW" | "MEDIUM" | "HIGH" | "CRITICAL"); backend defaults to "LOW". */
+    last_session_urgency: string
+    last_session_date: string | null
+    most_common_condition: string | null
+    /** Distinct condition names across all of the patient's sessions. */
+    total_conditions_detected: string[]
+    risk_score: number
+}
+
 // --- Session Types ---
 export interface DiagnosisSession {
     id: number

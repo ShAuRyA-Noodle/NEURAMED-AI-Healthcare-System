@@ -5,7 +5,7 @@ import { usePatients, useCreatePatient } from '@/hooks/usePatients';
 import { AgentBadge } from '@/components/shared/AgentBadge';
 import { UrgencyBadge } from '@/components/shared/UrgencyBadge';
 import { SkeletonCard } from '@/components/shared/SkeletonCard';
-import type { AgentType } from '@/types';
+import type { AgentType, UrgencyLevel, EnrichedPatient } from '@/types';
 
 const urgencyColor = (u: string) => {
   const l = u?.toUpperCase();
@@ -59,26 +59,27 @@ const PatientsPage = () => {
   const { data: patients, isLoading } = usePatients();
   const createPatient = useCreatePatient();
 
-  const filteredPatients = (patients || []).filter((p: any) => {
+  const filteredPatients = (patients || []).filter((p: EnrichedPatient) => {
     const s = search.toLowerCase();
     const matchSearch = !s || p.patient_code.toLowerCase().includes(s) ||
       (p.full_name || '').toLowerCase().includes(s) ||
       (p.phone || '').toLowerCase().includes(s) ||
       (p.demographics?.gender || p.gender || '').toLowerCase().startsWith(s);
-    const matchAgent = agentFilter === 'all' || p.last_session_agent === agentFilter;
+    // Backend returns last_session_agent UPPERCASE ("VOICE"), agentFilter is lowercase.
+    const matchAgent = agentFilter === 'all' || p.last_session_agent?.toLowerCase() === agentFilter;
     const matchGender = genderFilter === 'all' || (p.demographics?.gender || p.gender || '').toLowerCase() === genderFilter;
     const matchRisk = riskFilter === 'all' ||
       (riskFilter === 'high' && (p.risk_score ?? 0) >= 7) ||
       (riskFilter === 'medium' && (p.risk_score ?? 0) >= 4 && (p.risk_score ?? 0) < 7) ||
       (riskFilter === 'low' && (p.risk_score ?? 0) < 4);
     return matchSearch && matchAgent && matchGender && matchRisk;
-  }).sort((a: any, b: any) => {
+  }).sort((a: EnrichedPatient, b: EnrichedPatient) => {
     if (sortBy === 'risk') return (b.risk_score ?? 0) - (a.risk_score ?? 0);
     if (sortBy === 'sessions') return (b.total_sessions ?? b.session_count ?? 0) - (a.total_sessions ?? a.session_count ?? 0);
     return 0; // default order from API
   });
 
-  const highRiskCount = (patients || []).filter((p: any) => (p.risk_score ?? 0) >= 7).length;
+  const highRiskCount = (patients || []).filter((p: EnrichedPatient) => (p.risk_score ?? 0) >= 7).length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -104,12 +105,12 @@ const PatientsPage = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
         <StatCard label="TOTAL PATIENTS" value={patients?.length || 0} icon={Users} />
         <StatCard label="HIGH RISK" value={highRiskCount} icon={AlertTriangle} />
-        <StatCard label="NEW THIS WEEK" value={patients?.filter((p: any) => {
+        <StatCard label="NEW THIS WEEK" value={patients?.filter((p: EnrichedPatient) => {
           const d = new Date(p.created_at);
           const now = new Date();
           return (now.getTime() - d.getTime()) < 7 * 86400000;
         }).length || 0} icon={UserPlus} />
-        <StatCard label="AVG SESSIONS" value={patients?.length ? Math.round((patients as any[]).reduce((s: number, p: any) => s + (p.total_sessions ?? p.session_count ?? 0), 0) / patients.length) : 0} icon={Activity} />
+        <StatCard label="AVG SESSIONS" value={patients?.length ? Math.round(patients.reduce((s: number, p: EnrichedPatient) => s + (p.total_sessions ?? p.session_count ?? 0), 0) / patients.length) : 0} icon={Activity} />
       </div>
 
       {/* Filters */}
@@ -174,7 +175,7 @@ const PatientsPage = () => {
             <span className="font-body" style={{ color: 'var(--muted)', fontSize: 14 }}>No patients found matching criteria.</span>
           </div>
         ) : (
-          filteredPatients.map((p: any, i: number) => {
+          filteredPatients.map((p: EnrichedPatient, i: number) => {
             const uColor = urgencyColor(p.last_session_urgency || '');
             const riskScore = p.risk_score ?? 0;
             const riskColor = riskScore >= 7 ? 'var(--red)' : riskScore >= 4 ? 'var(--amber)' : 'var(--green)';
@@ -212,7 +213,7 @@ const PatientsPage = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, background: 'var(--elevated)', padding: 12, borderRadius: 8 }}>
                   <div>
                     <span className="font-body" style={{ fontSize: 10, color: 'var(--dim)', display: 'block', marginBottom: 4 }}>LAST SESSION</span>
-                    {p.last_session_agent ? <AgentBadge agent={p.last_session_agent} /> : <span className="font-body" style={{ fontSize: 12, color: 'var(--muted)' }}>—</span>}
+                    {p.last_session_agent ? <AgentBadge agent={p.last_session_agent.toLowerCase() as AgentType} /> : <span className="font-body" style={{ fontSize: 12, color: 'var(--muted)' }}>—</span>}
                   </div>
                   <div>
                     <span className="font-body" style={{ fontSize: 10, color: 'var(--dim)', display: 'block', marginBottom: 4 }}>TOTAL SESSIONS</span>
@@ -235,7 +236,7 @@ const PatientsPage = () => {
                       )}
                     </div>
                   </div>
-                  {p.last_session_urgency && <UrgencyBadge urgency={p.last_session_urgency.toLowerCase()} />}
+                  {p.last_session_urgency && <UrgencyBadge urgency={p.last_session_urgency.toLowerCase() as UrgencyLevel} />}
                 </div>
 
                 {/* Expanded details */}
