@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, UserPlus, Calendar, Activity, Search, AlertTriangle, ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
 import { usePatients, useCreatePatient } from '@/hooks/usePatients';
@@ -197,7 +198,9 @@ const PatientsPage = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <Identicon id={p.patient_code} />
                   <div style={{ flex: 1 }}>
-                    <span className="font-number" style={{ fontSize: 16, color: 'var(--text)' }}>{p.full_name || p.patient_code}</span>
+                    <Link to={`/patients/${p.id}`} onClick={e => e.stopPropagation()} style={{ textDecoration: 'none' }}>
+                      <span className="font-number" style={{ fontSize: 16, color: 'var(--text)' }}>{p.full_name || p.patient_code}</span>
+                    </Link>
                     <span className="font-body" style={{ fontSize: 11, color: 'var(--cyan)', display: 'block', marginTop: 1 }}>{p.full_name ? p.patient_code : ''}</span>
                     <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginTop: 2 }}>
                       {p.demographics?.age || p.age}yo · {p.demographics?.gender || p.gender} {p.demographics?.blood_type ? `· ${p.demographics.blood_type}` : ''}
