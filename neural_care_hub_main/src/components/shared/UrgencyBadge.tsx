@@ -7,13 +7,13 @@ export const UrgencyBadge: React.FC<{ urgency: UrgencyLevel }> = ({ urgency }) =
 
     switch (urgency) {
         case 'critical':
-            styleClasses = "bg-red-500/15 border-red-500/30 text-red-500"
+            styleClasses = "bg-destructive/15 border-destructive/30 text-destructive"
             break
         case 'high':
             styleClasses = "bg-amber-500/15 border-amber-500/30 text-amber-500"
             break
         case 'medium':
-            styleClasses = "bg-cyan-500/15 border-cyan-500/30 text-cyan-500"
+            styleClasses = "bg-primary/15 border-primary/30 text-primary"
             break
         case 'low':
             styleClasses = "bg-white/5 border-white/10 text-muted-foreground"
