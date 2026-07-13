@@ -14,13 +14,53 @@
     --amber: #FF9500;
     --red: #FF3B5C;
     --text: #EEF2F7;
-    --muted: #445566;
-    --dim: #2A3540;
+    --muted: #8AA0AD;   /* secondary text — lightened for WCAG AA (~7.5:1 on --bg) */
+    --dim: #6E828F;     /* tertiary text — lightened for WCAG AA (~5.1:1 on --bg)  */
 
-    --background: var(--bg);
-    --foreground: var(--text);
+    /* ── shadcn HSL token bridge ──────────────────────────────────────────
+       Tailwind maps `background`, `primary`, `muted`, `card`, … to
+       hsl(var(--…)), which requires an "H S% L%" triplet (NO hsl() wrapper,
+       NO commas). Each value below is derived from the brand hex palette
+       above so the shadcn utilities resolve to the SAME cyan/green clinical
+       theme — one source of truth (shadcn primary === brand --cyan).
+       NOTE: `--border`/`--muted` above stay real colors because ~450 inline
+       `var(--border)` / `var(--muted)` usages depend on them; the shadcn
+       border/muted-surface utilities use the dedicated triplets below. */
+    --background: 200 60% 2%;          /* #020608  brand --bg           */
+    --foreground: 200 43% 93%;         /* #E6F0F5  light readable text  */
 
-    --radius: 0.5rem;
+    --card: 210 31% 6%;                /* #0B1015  brand --surface      */
+    --card-foreground: 200 43% 93%;
+    --popover: 210 31% 6%;
+    --popover-foreground: 200 43% 93%;
+
+    --primary: 187 100% 50%;           /* #00E5FF  brand --cyan         */
+    --primary-foreground: 200 60% 4%;
+    --secondary: 157 100% 50%;         /* #00FF9D  brand --green        */
+    --secondary-foreground: 200 60% 4%;
+    --accent: 157 100% 50%;            /* brand green                   */
+    --accent-foreground: 200 60% 4%;
+    --destructive: 350 100% 62%;       /* #FF3B5C  brand --red          */
+    --destructive-foreground: 0 0% 100%;
+
+    --muted-surface: 204 28% 10%;      /* #131C22  subtle muted surface */
+    --muted-foreground: 202 18% 61%;   /* #8AA0AD  ~7.5:1 on --bg (AA)  */
+
+    --border-hsl: 205 20% 15%;         /* subtle border for utilities   */
+    --input: 205 20% 18%;
+    --ring: 187 100% 50%;              /* focus ring = brand cyan       */
+
+    /* Sidebar (shadcn ui/sidebar component) */
+    --sidebar-background: 210 31% 6%;
+    --sidebar-foreground: 200 43% 93%;
+    --sidebar-primary: 187 100% 50%;
+    --sidebar-primary-foreground: 200 60% 4%;
+    --sidebar-accent: 204 28% 10%;
+    --sidebar-accent-foreground: 200 43% 93%;
+    --sidebar-border: 205 20% 15%;
+    --sidebar-ring: 187 100% 50%;
+
+    --radius: 0.75rem;
 
     /* Glow shadows */
     --glow-cyan: 0 0 12px rgba(0, 229, 255, 0.25), 0 0 40px rgba(0, 229, 255, 0.08);

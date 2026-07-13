@@ -5,7 +5,7 @@ export const ConfidenceMeter: React.FC<{ value: number; size?: number }> = ({ va
     const radius = 40
     const circumference = 2 * Math.PI * radius
 
-    const color = value > 0.8 ? 'stroke-cyan-500' : value > 0.6 ? 'stroke-amber-500' : 'stroke-red-500'
+    const color = value > 0.8 ? 'stroke-primary' : value > 0.6 ? 'stroke-amber-500' : 'stroke-destructive'
 
     useEffect(() => {
         const targetOffset = circumference - (value * circumference)

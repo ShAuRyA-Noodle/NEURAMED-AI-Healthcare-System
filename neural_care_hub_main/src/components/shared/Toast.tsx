@@ -12,10 +12,10 @@ export const Toast: React.FC = () => {
 
     const getBorderColor = (type: ToastMessage['type']) => {
         switch (type) {
-            case 'success': return 'border-l-green-500'
-            case 'error': return 'border-l-red-500'
+            case 'success': return 'border-l-secondary'
+            case 'error': return 'border-l-destructive'
             case 'warning': return 'border-l-amber-500'
-            case 'info': return 'border-l-cyan-500'
+            case 'info': return 'border-l-primary'
         }
     }
 
