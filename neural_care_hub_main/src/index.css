@@ -77,8 +77,28 @@
   }
 }
 
-* {
-  cursor: none !important;
+/* Hide the native cursor ONLY on fine-pointer devices and ONLY while a custom
+   cursor component is mounted (it toggles body.custom-cursor-active). Touch
+   devices keep normal behaviour, disabled buttons keep not-allowed, inputs keep
+   the I-beam, and if the cursor JS throws the native cursor returns. */
+@media (pointer: fine) {
+  body.custom-cursor-active {
+    cursor: none;
+  }
+}
+
+/* Respect users who ask the OS to reduce motion — collapse animations and
+   transitions to near-instant everywhere. Heavy Three.js/rAF scenes are
+   additionally skipped in JS via usePrefersReducedMotion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 ::selection {

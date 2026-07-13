@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react';
+import { useFinePointer } from '../../hooks/useFinePointer';
 
 const TRAIL_COUNT = 8;
 const LERP_RING = 0.12;
 
 const LoginCursor = () => {
+  const fine = useFinePointer();
   const dotRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
   const trailRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -20,10 +22,13 @@ const LoginCursor = () => {
   const isClicking = useRef(false);
 
   useEffect(() => {
-    // Inject cursor:none style
-    const style = document.createElement('style');
-    style.textContent = '* { cursor: none !important; }';
-    document.head.appendChild(style);
+    // Never hide the native cursor / run rAF on touch devices.
+    if (!fine) return;
+
+    // Scoped cursor hide via body class (see index.css) instead of a global
+    // `* { cursor: none !important }` — keeps not-allowed / I-beam affordances
+    // and restores the native cursor if this JS ever throws.
+    document.body.classList.add('custom-cursor-active');
 
     const onMouseMove = (e: MouseEvent) => {
       mouse.current = { x: e.clientX, y: e.clientY };
@@ -99,12 +104,15 @@ const LoginCursor = () => {
     const animId = requestAnimationFrame(animate);
 
     return () => {
-      document.head.removeChild(style);
+      document.body.classList.remove('custom-cursor-active');
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mousedown', onMouseDown);
       cancelAnimationFrame(animId);
     };
-  }, []);
+  }, [fine]);
+
+  // Touch devices: render nothing so no static cyan artifacts remain.
+  if (!fine) return null;
 
   return (
     <>

@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { login as apiLogin, register as apiRegister } from '../api/auth';
 import LoginCursor from '../components/cursor/LoginCursor';
 import { useToast } from '@/hooks/useToast';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 
 // ─── PASSWORD STRENGTH ───
 const STRENGTH_LABELS = [
@@ -35,7 +36,15 @@ const SPECIALIZATIONS = [
 
 // ─── MINI THREE.JS SCENES FOR ROLE CARDS ───
 const useMiniScene = (canvasRef: React.RefObject<HTMLCanvasElement | null>, type: 'doctor' | 'patient', isActive: boolean) => {
+  const reducedMotion = usePrefersReducedMotion();
+  // Track selection without re-creating the WebGL context on every toggle.
+  const activeRef = useRef(isActive);
+  useEffect(() => { activeRef.current = isActive; }, [isActive]);
+
   useEffect(() => {
+    // Don't spin up a WebGL context on phones or when reduced motion is requested.
+    if (typeof window !== 'undefined' && (window.innerWidth < 768 || reducedMotion)) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -49,16 +58,13 @@ const useMiniScene = (canvasRef: React.RefObject<HTMLCanvasElement | null>, type
     renderer.setClearColor(0x000000, 0);
 
     let mesh: THREE.Object3D;
+    let material: THREE.Material;
 
     if (type === 'doctor') {
       // Wireframe Icosahedron
       const geo = new THREE.IcosahedronGeometry(0.9, 1);
-      const mat = new THREE.MeshBasicMaterial({
-        color: isActive ? 0x00FF9D : 0x00E5FF,
-        wireframe: true,
-        transparent: true,
-        opacity: isActive ? 0.6 : 0.25,
-      });
+      const mat = new THREE.MeshBasicMaterial({ wireframe: true, transparent: true });
+      material = mat;
       mesh = new THREE.Mesh(geo, mat);
     } else {
       // Heartbeat sine wave ring
@@ -69,11 +75,8 @@ const useMiniScene = (canvasRef: React.RefObject<HTMLCanvasElement | null>, type
         pts.push(new THREE.Vector3(Math.cos(angle) * r, Math.sin(angle) * r, 0));
       }
       const geo = new THREE.BufferGeometry().setFromPoints(pts);
-      const mat = new THREE.LineBasicMaterial({
-        color: isActive ? 0x00E5FF : 0x00E5FF,
-        transparent: true,
-        opacity: isActive ? 0.7 : 0.25,
-      });
+      const mat = new THREE.LineBasicMaterial({ transparent: true });
+      material = mat;
       mesh = new THREE.Line(geo, mat);
     }
 
@@ -82,6 +85,16 @@ const useMiniScene = (canvasRef: React.RefObject<HTMLCanvasElement | null>, type
     let animId: number;
     const animate = () => {
       animId = requestAnimationFrame(animate);
+      // Read the latest selection each frame so color/opacity update without
+      // re-initialising the scene (isActive is intentionally out of the deps).
+      const active = activeRef.current;
+      if (type === 'doctor') {
+        (material as THREE.MeshBasicMaterial).color.setHex(active ? 0x00FF9D : 0x00E5FF);
+        material.opacity = active ? 0.6 : 0.25;
+      } else {
+        (material as THREE.LineBasicMaterial).color.setHex(0x00E5FF);
+        material.opacity = active ? 0.7 : 0.25;
+      }
       mesh.rotation.y += type === 'doctor' ? 0.008 : 0.004;
       mesh.rotation.x += type === 'doctor' ? 0.004 : 0.002;
       renderer.render(scene, camera);
@@ -90,9 +103,20 @@ const useMiniScene = (canvasRef: React.RefObject<HTMLCanvasElement | null>, type
 
     return () => {
       cancelAnimationFrame(animId);
+      // Dispose every geometry + material in the scene, then the renderer, so
+      // toggling / unmounting doesn't leak GPU buffers or WebGL contexts.
+      scene.traverse((obj) => {
+        const withGeo = obj as THREE.Mesh;
+        if (withGeo.geometry) withGeo.geometry.dispose();
+        const mat = (obj as THREE.Mesh).material;
+        if (mat) {
+          if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+          else mat.dispose();
+        }
+      });
       renderer.dispose();
     };
-  }, [canvasRef, type, isActive]);
+  }, [canvasRef, type, reducedMotion]);
 };
 
 // ─── ROLE CARD ───
@@ -273,6 +297,7 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const { login: authLogin } = useAuth();
   const { addToast } = useToast();
+  const reducedMotion = usePrefersReducedMotion();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mouseRef = useRef({ x: 0, y: 0 });
 
@@ -297,6 +322,10 @@ const LoginPage = () => {
 
   // THREE.JS BACKGROUND
   useEffect(() => {
+    // Don't initialise the full-screen DNA/particle scene on phones or when the
+    // user requested reduced motion — the static CSS gradient fallback stands in.
+    if (window.innerWidth < 768 || reducedMotion) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -442,7 +471,7 @@ const LoginPage = () => {
       document.removeEventListener('mousemove', handleMouse);
       renderer.dispose();
     };
-  }, []);
+  }, [reducedMotion]);
 
   // Form handlers
   const triggerShake = useCallback(() => {
@@ -531,7 +560,16 @@ const LoginPage = () => {
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh', overflow: 'hidden' }}>
       <LoginCursor />
-      <canvas ref={canvasRef} style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 }} />
+      <canvas ref={canvasRef} style={{
+        position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0,
+        // Static themed fallback shown when the WebGL scene is skipped
+        // (mobile / reduced motion). When the scene runs, its opaque clear
+        // color paints over this.
+        background:
+          'radial-gradient(ellipse 800px 600px at 20% 30%, rgba(0,229,255,0.06), transparent 60%),' +
+          'radial-gradient(ellipse 700px 500px at 80% 80%, rgba(0,255,157,0.05), transparent 60%),' +
+          '#020608',
+      }} />
 
       <div style={{
         position: 'fixed', inset: 0, zIndex: 10,
