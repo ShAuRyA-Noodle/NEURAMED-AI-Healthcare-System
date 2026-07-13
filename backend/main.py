@@ -2,8 +2,10 @@ from dotenv import load_dotenv
 import os
 import sys
 
-# Fix Windows console encoding for Indian language support
-if sys.platform == "win32":
+# Fix Windows console encoding for Indian language support.
+# Guarded so it does NOT run under pytest — replacing sys.stdout/stderr grabs
+# pytest's capture buffer and crashes at teardown ("I/O operation on closed file").
+if sys.platform == "win32" and "pytest" not in sys.modules:
     import io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
@@ -12,13 +14,13 @@ if sys.platform == "win32":
 env_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path=env_path)
 
-print("=== NEURAMED STARTUP ===")
-_gk = os.getenv('GROQ_API_KEY', '')
-print(f"GROQ KEY: {'LOADED' if _gk else 'MISSING'} (starts with: {_gk[:8]}...)" if _gk else "GROQ KEY: MISSING")
-print(f"ELEVENLABS KEY: {'LOADED' if os.getenv('ELEVENLABS_API_KEY') else 'MISSING'}")
-print(f"TESSERACT: {os.getenv('TESSERACT_CMD', 'NOT SET')}")
-print(f"ENVIRONMENT: {os.getenv('ENVIRONMENT', 'not set')}")
-print(f".env file exists at {env_path}: {os.path.exists(env_path)}")
+import logging
+logging.basicConfig(level=logging.INFO)
+_log = logging.getLogger("neuramed")
+_log.info("NEURAMED starting | env=%s | groq=%s | elevenlabs=%s",
+          os.getenv("ENVIRONMENT", "development"),
+          "configured" if os.getenv("GROQ_API_KEY") else "MISSING",
+          "configured" if os.getenv("ELEVENLABS_API_KEY") else "MISSING")
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,6 +35,9 @@ from routers import drug_interactions, second_opinion, timeline, sarvam
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="NEURAMED API")
+
+from core.exceptions import InferenceUnavailable, inference_unavailable_handler
+app.add_exception_handler(InferenceUnavailable, inference_unavailable_handler)
 
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
 origins = ["*"] if ALLOWED_ORIGINS == "*" else [o.strip() for o in ALLOWED_ORIGINS.split(",")]
@@ -80,7 +85,3 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.get("/health")
 def health_check():
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
-
-@app.on_event("startup")
-def startup_event():
-    pass
