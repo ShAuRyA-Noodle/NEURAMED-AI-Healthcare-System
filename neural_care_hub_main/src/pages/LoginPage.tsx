@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { useAuth } from '../context/AuthContext';
 import { login as apiLogin, register as apiRegister } from '../api/auth';
 import LoginCursor from '../components/cursor/LoginCursor';
+import { useToast } from '@/hooks/useToast';
 
 // ─── PASSWORD STRENGTH ───
 const STRENGTH_LABELS = [
@@ -271,6 +272,7 @@ const DoctorCredentialsStep = ({ credentials, setCredentials, onBack, onSubmit }
 const LoginPage = () => {
   const navigate = useNavigate();
   const { login: authLogin } = useAuth();
+  const { addToast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mouseRef = useRef({ x: 0, y: 0 });
 
@@ -501,7 +503,10 @@ const LoginPage = () => {
             hospital_name: credentials.hospital,
             years_of_practice: credentials.yearsOfPractice,
           });
-        } catch { /* profile update is best-effort */ }
+        } catch (err) {
+          addToast('error', 'Account created, but your professional details could not be saved. Please complete your profile from Settings.');
+          console.error('Profile PATCH failed after registration:', err);
+        }
       }
 
       setTimeout(() => navigate('/dashboard', { replace: true }), 1200);
