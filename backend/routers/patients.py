@@ -54,7 +54,7 @@ def get_patients(
     limit: int = 50,
     offset: int = 0,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_user)
+    current_user: User = Depends(require_doctor)
 ):
     limit, offset = clamp_pagination(limit, offset)
     query = db.query(Patient)
@@ -166,7 +166,7 @@ def get_patients(
 
 
 @router.get("/{patient_id}")
-def get_patient(patient_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def get_patient(patient_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")

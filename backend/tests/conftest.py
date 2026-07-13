@@ -49,18 +49,49 @@ def client(db_session):
 
 @pytest.fixture
 def auth_client(client):
-    """A TestClient already carrying a valid Bearer token for a fresh patient user."""
+    """A TestClient already carrying a valid Bearer token for a fresh DOCTOR user.
+
+    Doctors have clinical access, so existing tests that browse PHI
+    (patients, sessions, dashboard, appointments) keep passing.
+    """
     reg = client.post("/api/auth/register", json={
-        "email": "test.user@example.com",
+        "email": "test.doctor@example.com",
         "password": "TestPass123!",
-        "full_name": "Test User",
+        "full_name": "Test Doctor",
+        "role": "doctor",
+        "invite_code": "TEST-INVITE",
+    })
+    assert reg.status_code in (200, 201), reg.text
+    token = reg.json().get("access_token")
+    if not token:
+        login = client.post("/api/auth/login", json={
+            "email": "test.doctor@example.com",
+            "password": "TestPass123!",
+        })
+        assert login.status_code == 200, login.text
+        token = login.json()["access_token"]
+    client.headers.update({"Authorization": f"Bearer {token}"})
+    return client
+
+
+@pytest.fixture
+def patient_client(client):
+    """A TestClient carrying a valid Bearer token for a self-registered PATIENT.
+
+    Used to prove PHI browse/enumerate endpoints are forbidden (403) to
+    non-doctor accounts while diagnostic/analyze endpoints stay open.
+    """
+    reg = client.post("/api/auth/register", json={
+        "email": "test.patient@example.com",
+        "password": "TestPass123!",
+        "full_name": "Test Patient",
         "role": "patient",
     })
     assert reg.status_code in (200, 201), reg.text
     token = reg.json().get("access_token")
     if not token:
         login = client.post("/api/auth/login", json={
-            "email": "test.user@example.com",
+            "email": "test.patient@example.com",
             "password": "TestPass123!",
         })
         assert login.status_code == 200, login.text
