@@ -45,6 +45,7 @@ const Sidebar = ({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }
     const Icon = item.icon;
     return (
       <Link key={item.path} to={item.path} onClick={onClose} data-cursor="hover"
+        aria-current={isActive ? 'page' : undefined}
         style={{
           height: 42, padding: '0 12px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 12,
           fontFamily: '"DM Mono", monospace', fontSize: 13, transition: 'all 250ms cubic-bezier(0.16, 1, 0.3, 1)',
@@ -226,8 +227,8 @@ const Sidebar = ({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }
                 {user.role === 'doctor' ? '👨‍⚕️ Doctor' : '🧑‍🦽 Patient'}
               </span>
             </div>
-            <button onClick={logout} title="Sign out" data-cursor="hover" style={{
-              width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none',
+            <button onClick={logout} title="Sign out" aria-label="Log out" data-cursor="hover" style={{
+              width: 44, height: 44, borderRadius: 6, background: 'transparent', border: 'none',
               color: 'rgba(255,255,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 200ms cubic-bezier(0.16, 1, 0.3, 1)', flexShrink: 0,
             }}

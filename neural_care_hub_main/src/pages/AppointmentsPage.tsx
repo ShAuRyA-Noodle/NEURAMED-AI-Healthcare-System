@@ -273,14 +273,15 @@ const Appointments = () => {
                       {!formData.patient_id && matchedPatients.length > 0 && (
                         <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', zIndex: 10, background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, marginTop: 4, maxHeight: 200, overflow: 'auto' }}>
                           {matchedPatients.map((p: any) => (
-                            <div key={p.id} data-cursor="hover" onClick={() => { setFormData({ ...formData, patient_id: String(p.id) }); setPatientSearch(''); }}
-                              style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border)', transition: 'background 150ms' }}
+                            <button key={p.id} type="button" data-cursor="hover" onClick={() => { setFormData({ ...formData, patient_id: String(p.id) }); setPatientSearch(''); }}
+                              aria-label={`Select patient ${p.full_name || p.patient_code}`}
+                              style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', color: 'inherit', font: 'inherit', padding: '10px 14px', cursor: 'pointer', border: 'none', borderBottom: '1px solid var(--border)', transition: 'background 150ms' }}
                               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
                               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                               <span className="font-body" style={{ fontSize: 13, color: 'var(--text)' }}>{p.full_name || p.patient_code}</span>
                               <span className="font-number" style={{ fontSize: 10, color: 'var(--cyan)', marginLeft: 8 }}>{p.patient_code}</span>
                               <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 8 }}>{p.phone || ''}</span>
-                            </div>
+                            </button>
                           ))}
                         </div>
                       )}

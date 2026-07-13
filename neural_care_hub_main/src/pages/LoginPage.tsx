@@ -222,8 +222,8 @@ const DoctorCredentialsStep = ({ credentials, setCredentials, onBack, onSubmit }
       </div>
 
       <div style={{ marginBottom: 14 }}>
-        <label style={labelStyle}>Medical License Number</label>
-        <input value={credentials.license} onChange={e => setCredentials({ ...credentials, license: e.target.value })}
+        <label htmlFor="cred-license" style={labelStyle}>Medical License Number</label>
+        <input id="cred-license" value={credentials.license} onChange={e => setCredentials({ ...credentials, license: e.target.value })}
           placeholder="e.g. MCI-12345"
           style={{ ...inputStyle, textTransform: 'uppercase', letterSpacing: '0.08em' }}
           onFocus={e => { e.target.style.borderColor = '#00FF9D'; e.target.style.boxShadow = '0 0 0 3px rgba(0,255,157,0.1)'; }}
@@ -231,8 +231,8 @@ const DoctorCredentialsStep = ({ credentials, setCredentials, onBack, onSubmit }
       </div>
 
       <div style={{ marginBottom: 14 }}>
-        <label style={labelStyle}>Specialization</label>
-        <select value={credentials.specialization}
+        <label htmlFor="cred-specialization" style={labelStyle}>Specialization</label>
+        <select id="cred-specialization" value={credentials.specialization}
           onChange={e => setCredentials({ ...credentials, specialization: e.target.value })}
           style={{
             ...inputStyle, cursor: 'pointer', appearance: 'none',
@@ -250,16 +250,16 @@ const DoctorCredentialsStep = ({ credentials, setCredentials, onBack, onSubmit }
       </div>
 
       <div style={{ marginBottom: 14 }}>
-        <label style={labelStyle}>Hospital / Clinic Name</label>
-        <input value={credentials.hospital} onChange={e => setCredentials({ ...credentials, hospital: e.target.value })}
+        <label htmlFor="cred-hospital" style={labelStyle}>Hospital / Clinic Name</label>
+        <input id="cred-hospital" value={credentials.hospital} onChange={e => setCredentials({ ...credentials, hospital: e.target.value })}
           style={inputStyle}
           onFocus={e => { e.target.style.borderColor = '#00FF9D'; e.target.style.boxShadow = '0 0 0 3px rgba(0,255,157,0.1)'; }}
           onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }} />
       </div>
 
       <div style={{ marginBottom: 20 }}>
-        <label style={labelStyle}>Years of Practice: <span style={{ color: '#00FF9D', fontWeight: 600 }}>{credentials.yearsOfPractice}</span></label>
-        <input type="range" min={0} max={50} value={credentials.yearsOfPractice}
+        <label htmlFor="cred-years" style={labelStyle}>Years of Practice: <span style={{ color: '#00FF9D', fontWeight: 600 }}>{credentials.yearsOfPractice}</span></label>
+        <input id="cred-years" type="range" min={0} max={50} value={credentials.yearsOfPractice}
           onChange={e => setCredentials({ ...credentials, yearsOfPractice: parseInt(e.target.value) })}
           style={{ width: '100%', accentColor: '#00FF9D', height: 4, cursor: 'pointer' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: '"DM Mono", monospace', fontSize: 9, color: '#445566', marginTop: 4 }}>
@@ -670,21 +670,21 @@ const LoginPage = () => {
                 {tab === 'login' && (
                   <motion.div key="login" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ duration: 0.2 }}>
                     <div style={{ marginBottom: 14 }}>
-                      <label style={labelStyle}>Email Address</label>
-                      <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                      <label htmlFor="login-email" style={labelStyle}>Email Address</label>
+                      <input id="login-email" type="email" value={email} onChange={e => setEmail(e.target.value)}
                         style={inputStyle}
                         onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                         onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
                         onKeyDown={e => e.key === 'Enter' && handleLogin()} />
                     </div>
                     <div style={{ marginBottom: 20, position: 'relative' }}>
-                      <label style={labelStyle}>Password</label>
-                      <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
+                      <label htmlFor="login-password" style={labelStyle}>Password</label>
+                      <input id="login-password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
                         style={inputStyle}
                         onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                         onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
                         onKeyDown={e => e.key === 'Enter' && handleLogin()} />
-                      <button onClick={() => setShowPassword(!showPassword)} style={{
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} style={{
                         position: 'absolute', right: 12, top: 32, background: 'transparent', border: 'none', color: '#445566', cursor: 'pointer', fontSize: 16,
                       }}>{showPassword ? '🙈' : '👁️'}</button>
                     </div>
@@ -704,14 +704,14 @@ const LoginPage = () => {
                 {tab === 'register' && regStep === 'basic' && (
                   <motion.div key="register-basic" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.2 }}>
                     <div style={{ marginBottom: 14 }}>
-                      <label style={labelStyle}>Full Name</label>
-                      <input value={fullName} onChange={e => setFullName(e.target.value)} style={inputStyle}
+                      <label htmlFor="reg-fullname" style={labelStyle}>Full Name</label>
+                      <input id="reg-fullname" value={fullName} onChange={e => setFullName(e.target.value)} style={inputStyle}
                         onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                         onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }} />
                     </div>
                     <div style={{ marginBottom: 14 }}>
-                      <label style={labelStyle}>Email Address</label>
-                      <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle}
+                      <label htmlFor="reg-email" style={labelStyle}>Email Address</label>
+                      <input id="reg-email" type="email" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle}
                         onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                         onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }} />
                     </div>
@@ -729,8 +729,8 @@ const LoginPage = () => {
                     <AnimatePresence>
                       {role === 'doctor' && (
                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ marginBottom: 14, overflow: 'hidden' }}>
-                          <label style={labelStyle}>Doctor Invite Code</label>
-                          <input value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())}
+                          <label htmlFor="reg-invite" style={labelStyle}>Doctor Invite Code</label>
+                          <input id="reg-invite" value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())}
                             style={{ ...inputStyle, textTransform: 'uppercase', letterSpacing: '0.1em' }}
                             onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                             onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }} />
@@ -740,8 +740,8 @@ const LoginPage = () => {
                     </AnimatePresence>
 
                     <div style={{ marginBottom: 14 }}>
-                      <label style={labelStyle}>Password</label>
-                      <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle}
+                      <label htmlFor="reg-password" style={labelStyle}>Password</label>
+                      <input id="reg-password" type="password" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle}
                         onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                         onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }} />
                       {password && (
@@ -769,8 +769,8 @@ const LoginPage = () => {
                     </div>
 
                     <div style={{ marginBottom: 18 }}>
-                      <label style={labelStyle}>Confirm Password</label>
-                      <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={inputStyle}
+                      <label htmlFor="reg-confirm-password" style={labelStyle}>Confirm Password</label>
+                      <input id="reg-confirm-password" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={inputStyle}
                         onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                         onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
                         onKeyDown={e => e.key === 'Enter' && handleRegisterBasic()} />
@@ -812,10 +812,10 @@ const LoginPage = () => {
               {regStep === 'basic' && (
                 <p style={{ fontFamily: '"DM Mono", monospace', fontSize: 12, color: '#445566', textAlign: 'center', marginTop: 14 }}>
                   {tab === 'login' ? "Don't have an account? " : "Already have an account? "}
-                  <span onClick={() => { setTab(tab === 'login' ? 'register' : 'login'); setError(''); setRegStep('basic'); }}
-                    style={{ color: '#00E5FF', cursor: 'pointer' }}>
+                  <button type="button" onClick={() => { setTab(tab === 'login' ? 'register' : 'login'); setError(''); setRegStep('basic'); }}
+                    style={{ color: '#00E5FF', cursor: 'pointer', background: 'transparent', border: 'none', padding: 0, font: 'inherit' }}>
                     {tab === 'login' ? 'Register →' : 'Sign in →'}
-                  </span>
+                  </button>
                 </p>
               )}
             </>
