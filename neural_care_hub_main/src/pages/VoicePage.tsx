@@ -424,7 +424,12 @@ const VoicePage = () => {
               {/* VoiceOrb + Mic Button */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '10px 0' }}>
                 {/* Three.js VoiceOrb */}
-                <div data-cursor="hover" onClick={toggleRecording} style={{ cursor: 'pointer', position: 'relative' }}>
+                <div data-cursor="hover" onClick={toggleRecording}
+                  role="button" tabIndex={0}
+                  aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+                  aria-pressed={isRecording}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleRecording(); } }}
+                  style={{ cursor: 'pointer', position: 'relative' }}>
                   <VoiceOrb isRecording={isRecording} audioLevel={waveData.length > 0 ? Math.max(...waveData) / 56 : 0} />
                   {/* Overlay mic icon */}
                   <div style={{

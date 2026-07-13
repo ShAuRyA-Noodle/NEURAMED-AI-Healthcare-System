@@ -187,7 +187,11 @@ const PatientsPage = () => {
                 key={p.id || p.patient_code}
                 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }}
                 data-cursor="hover"
+                role="button" tabIndex={0}
+                aria-expanded={isExpanded}
+                aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${p.full_name || p.patient_code}`}
                 onClick={() => setExpandedPatient(isExpanded ? null : p.id)}
+                onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); setExpandedPatient(isExpanded ? null : p.id); } }}
                 style={{
                   background: 'var(--surface)', border: '1px solid var(--border)', borderLeft: `3px solid ${uColor}`, borderRadius: 12,
                   padding: 20, display: 'flex', flexDirection: 'column', gap: 14, transition: 'all 300ms ease', cursor: 'pointer'

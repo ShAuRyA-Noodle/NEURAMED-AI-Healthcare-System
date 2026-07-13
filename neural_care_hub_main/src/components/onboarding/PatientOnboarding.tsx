@@ -72,8 +72,8 @@ const PatientOnboarding = ({ onComplete }: { onComplete: () => void }) => {
         </div>
 
         <div>
-          <label style={labelStyle}>Date of Birth</label>
-          <input type="date" value={form.date_of_birth} onChange={e => update('date_of_birth', e.target.value)}
+          <label htmlFor="ob-dob" style={labelStyle}>Date of Birth</label>
+          <input id="ob-dob" type="date" value={form.date_of_birth} onChange={e => update('date_of_birth', e.target.value)}
             style={{ ...inputStyle, colorScheme: 'dark' }} />
         </div>
 
@@ -95,24 +95,24 @@ const PatientOnboarding = ({ onComplete }: { onComplete: () => void }) => {
 
         <div style={{ display: 'flex', gap: 12 }}>
           <div style={{ flex: 1 }}>
-            <label style={labelStyle}>Height (cm)</label>
-            <input type="number" value={form.height_cm} onChange={e => update('height_cm', e.target.value)}
+            <label htmlFor="ob-height" style={labelStyle}>Height (cm)</label>
+            <input id="ob-height" type="number" value={form.height_cm} onChange={e => update('height_cm', e.target.value)}
               placeholder="170" style={inputStyle} />
           </div>
           <div style={{ flex: 1 }}>
-            <label style={labelStyle}>Weight (kg)</label>
-            <input type="number" value={form.weight_kg} onChange={e => update('weight_kg', e.target.value)}
+            <label htmlFor="ob-weight" style={labelStyle}>Weight (kg)</label>
+            <input id="ob-weight" type="number" value={form.weight_kg} onChange={e => update('weight_kg', e.target.value)}
               placeholder="70" style={inputStyle} />
           </div>
         </div>
 
         <div>
-          <label style={labelStyle}>Emergency Contact Name</label>
-          <input value={form.emergency_contact_name} onChange={e => update('emergency_contact_name', e.target.value)} style={inputStyle} />
+          <label htmlFor="ob-ec-name" style={labelStyle}>Emergency Contact Name</label>
+          <input id="ob-ec-name" value={form.emergency_contact_name} onChange={e => update('emergency_contact_name', e.target.value)} style={inputStyle} />
         </div>
         <div>
-          <label style={labelStyle}>Emergency Contact Phone</label>
-          <input type="tel" value={form.emergency_contact_phone} onChange={e => update('emergency_contact_phone', e.target.value)} style={inputStyle} />
+          <label htmlFor="ob-ec-phone" style={labelStyle}>Emergency Contact Phone</label>
+          <input id="ob-ec-phone" type="tel" value={form.emergency_contact_phone} onChange={e => update('emergency_contact_phone', e.target.value)} style={inputStyle} />
         </div>
       </div>
     ),
@@ -127,28 +127,28 @@ const PatientOnboarding = ({ onComplete }: { onComplete: () => void }) => {
         </div>
 
         <div>
-          <label style={labelStyle}>Existing Conditions</label>
-          <textarea value={form.existing_conditions} onChange={e => update('existing_conditions', e.target.value)}
+          <label htmlFor="ob-conditions" style={labelStyle}>Existing Conditions</label>
+          <textarea id="ob-conditions" value={form.existing_conditions} onChange={e => update('existing_conditions', e.target.value)}
             placeholder="e.g. Diabetes Type 2, Hypertension"
             style={{ ...inputStyle, height: 72, padding: '10px 14px', resize: 'vertical' }} />
         </div>
 
         <div>
-          <label style={labelStyle}>Current Medications</label>
-          <textarea value={form.current_medications} onChange={e => update('current_medications', e.target.value)}
+          <label htmlFor="ob-medications" style={labelStyle}>Current Medications</label>
+          <textarea id="ob-medications" value={form.current_medications} onChange={e => update('current_medications', e.target.value)}
             placeholder="e.g. Metformin 500mg, Amlodipine 5mg"
             style={{ ...inputStyle, height: 72, padding: '10px 14px', resize: 'vertical' }} />
         </div>
 
         <div>
-          <label style={labelStyle}>Known Allergies</label>
-          <input value={form.known_allergies} onChange={e => update('known_allergies', e.target.value)}
+          <label htmlFor="ob-allergies" style={labelStyle}>Known Allergies</label>
+          <input id="ob-allergies" value={form.known_allergies} onChange={e => update('known_allergies', e.target.value)}
             placeholder="e.g. Penicillin, Peanuts" style={inputStyle} />
         </div>
 
         <div>
-          <label style={labelStyle}>Previous Surgeries</label>
-          <input value={form.previous_surgeries} onChange={e => update('previous_surgeries', e.target.value)}
+          <label htmlFor="ob-surgeries" style={labelStyle}>Previous Surgeries</label>
+          <input id="ob-surgeries" value={form.previous_surgeries} onChange={e => update('previous_surgeries', e.target.value)}
             placeholder="e.g. Appendectomy (2019)" style={inputStyle} />
         </div>
       </div>
