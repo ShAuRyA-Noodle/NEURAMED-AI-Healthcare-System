@@ -3,6 +3,7 @@ import os
 import logging
 from utils.llm import call_llm
 from core.provenance import Provenance, InferenceStatus, wrap_result
+from ml import grounding
 from db.schemas import DiagnosisResult, ConditionDetail, RecommendedTest
 from db.models import DiagnosisSession, Patient
 from sqlalchemy.orm import Session
@@ -239,6 +240,40 @@ def transcribe_audio(audio_bytes: bytes, language: str = None) -> str:
     return transcribe_with_whisper(audio_bytes, language=language)
 
 
+def ground_diagnosis(result: dict) -> dict:
+    """Attach real ICD-10 codes + verified citations to each differential.
+    Best-effort: never raises. Adds provenance.grounded_in with citation URLs."""
+    try:
+        conditions = result.get("conditions") or []
+        grounded_urls = []
+        for cond in conditions:
+            if not isinstance(cond, dict):
+                continue
+            name = (cond.get("name") or "").strip()
+            if not name or name.lower().startswith("undetermined"):
+                continue
+            # Real ICD-10 code (only set if the model didn't already provide a valid one)
+            icd = grounding.icd10_lookup(name, 3)
+            if icd:
+                cond["icd10_candidates"] = icd
+                if not cond.get("icd_code"):
+                    cond["icd_code"] = icd[0]["code"]
+            # Up to 2 real citations
+            cites = grounding.evidence(name, 2)
+            if cites:
+                cond["citations"] = cites
+                grounded_urls.extend(c["url"] for c in cites if c.get("url"))
+        if grounded_urls:
+            prov = result.get("provenance")
+            if isinstance(prov, dict):
+                existing = prov.get("grounded_in") or []
+                prov["grounded_in"] = existing + grounded_urls
+        return result
+    except Exception as e:
+        logger.warning("ground_diagnosis failed (non-fatal): %s", e)
+        return result
+
+
 def diagnose(transcript: str = None,
              audio_bytes: bytes = None,
              audio_base64: str = None,
@@ -273,6 +308,13 @@ def diagnose(transcript: str = None,
     payload = wrap_result(result_json, Provenance(
         status=InferenceStatus.OK, source="real_model",
         model=model_used, vendor="groq"))
+
+    # Ground each differential with real ICD-10 codes + verified citations.
+    # payload is a shallow copy of result_json, so payload["conditions"] shares
+    # the same condition dicts — enriching here fills icd_code before both the
+    # persisted envelope and the condition_details extraction below. Best-effort:
+    # ground_diagnosis never raises, so a grounding hiccup cannot break diagnosis.
+    payload = ground_diagnosis(payload)
 
     processing_time_ms = int((time.time() - start_time) * 1000)
 
