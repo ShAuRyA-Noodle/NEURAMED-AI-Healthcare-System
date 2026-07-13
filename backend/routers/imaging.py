@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from ws_manager import broadcast_to_clients
@@ -8,7 +9,10 @@ from agents import imaging_agent
 from db.models import ScanResult, User
 from db.schemas import ScanAnalysisResult, ScanResultResponse
 from utils.auth import require_user
+from utils.file_handling import check_upload_size, validate_imaging_file, clamp_pagination
 from core.exceptions import InferenceUnavailable
+
+logger = logging.getLogger("neuramed.imaging")
 
 router = APIRouter(prefix="/api/imaging", tags=["Imaging"])
 
@@ -26,9 +30,11 @@ async def analyze_image(
     current_user: User = Depends(require_user)
 ):
     try:
+        validate_imaging_file(file)
         contents = await file.read()
         if not contents:
             raise HTTPException(status_code=400, detail="Empty file uploaded")
+        check_upload_size(contents)
         res = imaging_agent.analyze(
             image_bytes=contents, scan_type=scan_type,
             patient_id=patient_id, session_id=session_id, db=db,
@@ -56,12 +62,14 @@ async def analyze_image(
         raise
     except InferenceUnavailable:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Imaging analysis failed: {str(e)}")
+    except Exception:
+        logger.exception("Imaging analysis failed")
+        raise HTTPException(status_code=500, detail="Internal error processing request")
 
 @router.get("/scans", response_model=List[ScanResultResponse])
-def get_scans(limit: int = 20, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
-    return db.query(ScanResult).limit(limit).all()
+def get_scans(limit: int = 20, offset: int = 0, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    limit, offset = clamp_pagination(limit, offset)
+    return db.query(ScanResult).offset(offset).limit(limit).all()
 
 @router.get("/scans/{scan_id}", response_model=ScanResultResponse)
 def get_scan(scan_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_user)):

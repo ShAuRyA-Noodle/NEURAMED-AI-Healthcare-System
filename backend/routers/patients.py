@@ -6,6 +6,7 @@ from db.database import get_db
 from db.models import Patient, DiagnosisSession, User
 from db.schemas import PatientCreate, PatientResponse
 from utils.auth import require_user, require_doctor
+from utils.file_handling import clamp_pagination
 
 router = APIRouter(prefix="/api/patients", tags=["Patients"])
 
@@ -55,6 +56,7 @@ def get_patients(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_user)
 ):
+    limit, offset = clamp_pagination(limit, offset)
     query = db.query(Patient)
     if search:
         query = query.filter(

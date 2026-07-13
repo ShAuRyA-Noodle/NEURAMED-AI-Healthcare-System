@@ -33,13 +33,40 @@ from routers import drug_interactions, second_opinion, timeline, sarvam
 # Schema is owned by Alembic migrations (see backend/migrations/).
 # Run `alembic upgrade head` to create/update tables.
 
-app = FastAPI(title="NEURAMED API")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+IS_PRODUCTION = ENVIRONMENT == "production"
+
+# M4 — disable interactive docs in production; keep them on in dev/test.
+_docs_kwargs = (
+    {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    if IS_PRODUCTION else {}
+)
+app = FastAPI(title="NEURAMED API", **_docs_kwargs)
 
 from core.exceptions import InferenceUnavailable, inference_unavailable_handler
 app.add_exception_handler(InferenceUnavailable, inference_unavailable_handler)
 
+# C4/C5 — fail closed on default/unset secrets in production.
+from utils.auth import assert_production_secrets
+
+
+@app.on_event("startup")
+def _startup_security_checks():
+    assert_production_secrets()
+
+
+# H3 — CORS allowlist. In production a concrete allowlist is required; a
+# wildcard alongside credentials is forbidden. Dev/test stay permissive.
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
-origins = ["*"] if ALLOWED_ORIGINS == "*" else [o.strip() for o in ALLOWED_ORIGINS.split(",")]
+if IS_PRODUCTION:
+    if not ALLOWED_ORIGINS or ALLOWED_ORIGINS.strip() == "*":
+        raise RuntimeError(
+            "ALLOWED_ORIGINS must be an explicit allowlist in production "
+            "(wildcard is not allowed with credentials)."
+        )
+    origins = [o.strip() for o in ALLOWED_ORIGINS.split(",") if o.strip()]
+else:
+    origins = ["*"] if ALLOWED_ORIGINS == "*" else [o.strip() for o in ALLOWED_ORIGINS.split(",")]
 
 app.add_middleware(
     CORSMiddleware,

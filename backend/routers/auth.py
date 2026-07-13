@@ -6,6 +6,7 @@ from db.schemas import UserCreate, UserLogin, UserOut, Token, UserProfileUpdate
 from utils.auth import (verify_password, get_password_hash,
                          create_access_token, DOCTOR_INVITE_CODE,
                          require_user)
+from utils.rate_limit import auth_rate_limit
 import random
 import string
 
@@ -13,7 +14,8 @@ router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
 
 @router.post("/register", response_model=Token)
-def register(user_data: UserCreate, db: Session = Depends(get_db)):
+def register(user_data: UserCreate, db: Session = Depends(get_db),
+             _rl: None = Depends(auth_rate_limit)):
     # Check email exists
     if db.query(User).filter(User.email == user_data.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -66,7 +68,8 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(credentials: UserLogin, db: Session = Depends(get_db)):
+def login(credentials: UserLogin, db: Session = Depends(get_db),
+          _rl: None = Depends(auth_rate_limit)):
     user = db.query(User).filter(User.email == credentials.email).first()
     if not user or not verify_password(credentials.password, user.hashed_password):
         raise HTTPException(

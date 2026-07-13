@@ -12,6 +12,7 @@ from db.schemas import DashboardStats, ActivityFeedItem
 from utils.llm import call_llm
 from core.exceptions import InferenceUnavailable
 from utils.auth import require_user
+from utils.file_handling import clamp_pagination
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 
@@ -124,6 +125,7 @@ def get_stats(db: Session = Depends(get_db), current_user: User = Depends(requir
 
 @router.get("/activity-feed", response_model=List[ActivityFeedItem])
 def get_activity_feed(limit: int = 20, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    limit, _ = clamp_pagination(limit)
     sessions = db.query(DiagnosisSession).order_by(
         DiagnosisSession.created_at.desc()
     ).limit(limit).all()
@@ -146,6 +148,7 @@ def get_activity_feed(limit: int = 20, db: Session = Depends(get_db), current_us
 
 @router.get("/recent-sessions")
 def get_recent_sessions(limit: int = 10, db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+    limit, _ = clamp_pagination(limit)
     sessions = db.query(DiagnosisSession).order_by(
         DiagnosisSession.created_at.desc()
     ).limit(limit).all()
