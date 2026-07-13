@@ -24,7 +24,6 @@ _log.info("NEURAMED starting | env=%s | groq=%s | elevenlabs=%s",
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from datetime import datetime
 
 from routers import voice, imaging, ocr, dashboard, patients, appointments, search, system, auth
@@ -77,7 +76,8 @@ app.add_middleware(
 )
 
 os.makedirs("uploads", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# H1 — no public static mount for uploads/. Raw medical images are served only
+# via the authorized endpoint GET /api/imaging/file/{scan_id}/{kind}.
 
 # Include routers
 app.include_router(voice.router)
@@ -99,8 +99,17 @@ app.include_router(sarvam.router)
 
 from ws_manager import manager, broadcast_to_clients
 
+from utils.auth import decode_token
+
+
 @app.websocket("/ws/live-feed")
 async def websocket_endpoint(websocket: WebSocket):
+    # H2 — authenticate the WebSocket. Browsers can't set Authorization headers
+    # on a WS handshake, so the JWT is passed as a query param: ?token=<jwt>.
+    token = websocket.query_params.get("token")
+    if decode_token(token) is None:
+        await websocket.close(code=1008)
+        return
     await manager.connect(websocket)
     try:
         while True:
