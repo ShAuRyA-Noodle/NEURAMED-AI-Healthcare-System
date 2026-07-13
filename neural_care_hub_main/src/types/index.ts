@@ -93,6 +93,19 @@ export interface ScanAnalysisResult {
     icd10_codes?: { code: string; description: string }[]
     report_text?: string
     body_region?: string
+    // Real classifier / provenance / honesty fields
+    pathology_scores?: Record<string, number>
+    classifier_available?: boolean
+    measurements_enabled?: boolean
+    provenance?: {
+        status: string
+        source: string
+        model: string | null
+        vendor: string | null
+        reason: string | null
+        grounded_in: string[]
+    }
+    disclaimer?: string
 }
 
 export interface RichRecommendation {

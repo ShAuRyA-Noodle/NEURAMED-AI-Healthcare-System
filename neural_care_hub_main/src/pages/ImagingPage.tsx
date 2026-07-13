@@ -172,6 +172,9 @@ const ImagingAI = () => {
   const bodyRegions = ['Brain', 'Chest', 'Abdomen', 'Spine', 'Pelvis', 'Extremity', 'Neck'];
   const genderOptions = ['Male', 'Female', 'Other'];
   const confColor = (v: number) => v > 80 ? 'var(--green)' : v > 60 ? 'var(--cyan)' : 'var(--amber)';
+  // Pathology probability -> color (higher = more concerning)
+  const pathColor = (p: number) => p > 0.7 ? 'var(--red)' : p > 0.5 ? 'var(--amber)' : p > 0.25 ? 'var(--cyan)' : 'var(--green)';
+  const MEASUREMENTS_UNAVAILABLE = 'Measurements unavailable — no DICOM calibration (upload DICOM for physical measurements)';
   const acr = result?.acr_category?.replace(/[^1-5]/g, '') || '';
   const acrInfo = ACR_COLORS[acr];
 
@@ -454,6 +457,76 @@ const ImagingAI = () => {
                   </div>
                 </div>
 
+                {/* Provenance chip + Pathology scores + Disclaimer */}
+                {(() => {
+                  const scores = result.pathology_scores || {};
+                  const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+                  const prov = result.provenance;
+                  const provOk = !prov || prov.status === 'ok';
+                  return (
+                    <>
+                      {/* Provenance chip */}
+                      {prov && (prov.model || prov.vendor) && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{
+                            fontFamily: 'var(--font-body)', fontSize: 10, padding: '4px 10px', borderRadius: 12,
+                            display: 'inline-flex', alignItems: 'center', gap: 6,
+                            background: provOk ? 'rgba(0,229,255,0.08)' : 'rgba(255,149,0,0.1)',
+                            color: provOk ? 'var(--cyan)' : 'var(--amber)',
+                            border: `1px solid ${provOk ? 'rgba(0,229,255,0.2)' : 'rgba(255,149,0,0.3)'}`,
+                          }}>
+                            <Shield size={11} />
+                            {[prov.model, prov.vendor].filter(Boolean).join(' · ')}
+                          </span>
+                          {!provOk && (
+                            <span className="font-body" style={{ fontSize: 10, color: 'var(--amber)' }}>
+                              {prov.status}{prov.reason ? ` — ${prov.reason}` : ''}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Pathology scores panel (chest X-ray classifier) */}
+                      {result.classifier_available && sorted.length > 0 ? (
+                        <div style={{ background: 'var(--elevated)', borderRadius: 8, border: '1px solid var(--border)', padding: 16 }}>
+                          <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 12 }}>
+                            CLASSIFIER FINDINGS — TORCHXRAYVISION (RESEARCH SIGNAL)
+                          </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {sorted.map(([name, prob], i) => {
+                              const pct = Math.round(prob * 100);
+                              const c = pathColor(prob);
+                              return (
+                                <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                  <span className="font-body" style={{ fontSize: 12, color: 'var(--text)', width: 132, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={name}>{name}</span>
+                                  <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
+                                    <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.6, delay: i * 0.04 }}
+                                      style={{ height: '100%', borderRadius: 3, background: c }} />
+                                  </div>
+                                  <span className="font-number" style={{ fontSize: 12, color: c, minWidth: 38, textAlign: 'right' }}>{pct}%</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : result.classifier_available === false ? (
+                        <div style={{ background: 'var(--elevated)', borderRadius: 8, border: '1px solid var(--border)', padding: '10px 14px' }}>
+                          <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
+                            Pathology classifier available for chest X-ray only; this analysis is from the vision model.
+                          </span>
+                        </div>
+                      ) : null}
+
+                      {/* Honest disclaimer */}
+                      {result.disclaimer && (
+                        <p className="font-body" style={{ fontSize: 10, color: 'var(--dim)', lineHeight: 1.5, margin: '-4px 0 0 0' }}>
+                          {result.disclaimer}
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
+
                 {/* Anomaly Regions Table */}
                 {result.anomaly_regions?.length > 0 && (
                   <div>
@@ -462,7 +535,7 @@ const ImagingAI = () => {
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                           <tr>
-                            {['Region', 'Area', 'Intensity', 'Confidence', 'Size'].map(h => (
+                            {['Region', 'Area', 'Intensity'].map(h => (
                               <th key={h} className="font-body" style={{ fontSize: 10, color: 'var(--muted)', padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>{h}</th>
                             ))}
                           </tr>
@@ -473,8 +546,6 @@ const ImagingAI = () => {
                               <td className="font-body" style={{ fontSize: 12, color: 'var(--text)', padding: '8px 12px' }}>{r.location || `Region ${r.id}`}</td>
                               <td className="font-number" style={{ fontSize: 11, color: 'var(--muted)', padding: '8px 12px' }}>{r.area}px²</td>
                               <td className="font-number" style={{ fontSize: 11, color: 'var(--muted)', padding: '8px 12px' }}>{Math.round(r.mean_intensity)}</td>
-                              <td className="font-number" style={{ fontSize: 11, color: confColor(r.confidence * 100), padding: '8px 12px' }}>{Math.round(r.confidence * 100)}%</td>
-                              <td className="font-number" style={{ fontSize: 11, color: 'var(--muted)', padding: '8px 12px' }}>{r.size_mm || '—'}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -552,7 +623,7 @@ const ImagingAI = () => {
                                       background: 'rgba(0,229,255,0.1)', color: 'var(--cyan)', border: '1px solid rgba(0,229,255,0.2)',
                                     }}>Location: {result.primary_finding_detail.location}</span>
                                   )}
-                                  {result.primary_finding_detail.size_mm && result.primary_finding_detail.size_mm.length > 0 && (
+                                  {result.measurements_enabled !== false && result.primary_finding_detail.size_mm && result.primary_finding_detail.size_mm.length > 0 && (
                                     <span style={{
                                       fontFamily: 'var(--font-body)', fontSize: 11, padding: '4px 10px', borderRadius: 12,
                                       background: 'rgba(0,229,255,0.1)', color: 'var(--cyan)', border: '1px solid rgba(0,229,255,0.2)',
@@ -589,12 +660,17 @@ const ImagingAI = () => {
                         )}
 
                         {/* Measurements */}
-                        {result.measurements && (
+                        {result.measurements_enabled === false ? (
+                          <div style={{ background: 'var(--elevated)', padding: 14, borderRadius: 8, border: '1px solid var(--border)' }}>
+                            <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 6 }}>MEASUREMENTS</span>
+                            <p className="font-body" style={{ fontSize: 12, color: 'var(--amber)', lineHeight: 1.6, margin: 0 }}>{MEASUREMENTS_UNAVAILABLE}</p>
+                          </div>
+                        ) : result.measurements ? (
                           <div style={{ background: 'var(--elevated)', padding: 14, borderRadius: 8, border: '1px solid var(--border)' }}>
                             <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 6 }}>MEASUREMENTS</span>
                             <p className="font-body" style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6, margin: 0 }}>{result.measurements}</p>
                           </div>
-                        )}
+                        ) : null}
                       </div>
                     )}
 
@@ -638,7 +714,7 @@ const ImagingAI = () => {
                                             <span className="font-body" style={{ fontSize: 12, color: isAbnormal ? 'var(--amber)' : 'var(--text)' }}>{finding.significance}</span>
                                           </div>
                                         )}
-                                        {finding.measurement && (
+                                        {finding.measurement && result.measurements_enabled !== false && (
                                           <div>
                                             <span className="font-body" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.1em' }}>MEASUREMENT: </span>
                                             <span className="font-number" style={{ fontSize: 12, color: 'var(--cyan)' }}>{finding.measurement}</span>
