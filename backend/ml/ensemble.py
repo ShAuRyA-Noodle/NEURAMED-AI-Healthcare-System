@@ -12,10 +12,22 @@ logger = logging.getLogger(__name__)
 _TIMEOUT = 40.0
 
 PANEL = [
-    {"vendor": "gemini",   "base": "https://generativelanguage.googleapis.com/v1beta/openai", "key_env": "GEMINI_API_KEY",   "model": "gemini-2.5-flash"},
+    # key_env may be a single name or a list of aliases tried in order.
+    # Google AI Studio (Gemini) keys are commonly stored as GOOGLE_API_KEY.
+    {"vendor": "gemini",   "base": "https://generativelanguage.googleapis.com/v1beta/openai", "key_env": ["GEMINI_API_KEY", "GOOGLE_API_KEY"], "model": "gemini-2.5-flash"},
     {"vendor": "groq",     "base": "https://api.groq.com/openai/v1",                            "key_env": "GROQ_API_KEY",     "model": "llama-3.3-70b-versatile"},
-    {"vendor": "cerebras", "base": "https://api.cerebras.ai/v1",                                "key_env": "CEREBRAS_API_KEY", "model": "gpt-oss-120b"},
+    {"vendor": "cerebras", "base": "https://api.cerebras.ai/v1",                                "key_env": ["CEREBRAS_API_KEY", "CEREBRAS_KEY"], "model": "gpt-oss-120b"},
 ]
+
+
+def _resolve_key(key_env) -> tuple[str, str]:
+    """Return (value, name) for the first set env var among key_env (str or list)."""
+    names = [key_env] if isinstance(key_env, str) else list(key_env)
+    for name in names:
+        val = os.getenv(name, "").strip()
+        if val:
+            return val, name
+    return "", names[0]
 
 VOTE_SCHEMA_INSTRUCTION = (
     "You are an independent consulting physician giving a second opinion on the "
@@ -26,9 +38,9 @@ VOTE_SCHEMA_INSTRUCTION = (
 )
 
 def _call_one(member, case_text):
-    key = os.getenv(member["key_env"], "").strip()
+    key, key_name = _resolve_key(member["key_env"])
     if not key:
-        return {"vendor": member["vendor"], "model": member["model"], "status": "unavailable", "reason": f"{member['key_env']} not set"}
+        return {"vendor": member["vendor"], "model": member["model"], "status": "unavailable", "reason": f"{key_name} not set"}
     try:
         r = httpx.post(
             f"{member['base']}/chat/completions",
