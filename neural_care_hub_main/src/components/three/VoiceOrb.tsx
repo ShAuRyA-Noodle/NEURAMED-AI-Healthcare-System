@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
+import { ENABLE_3D } from '../../lib/enable3d';
 
 interface VoiceOrbProps {
   isRecording: boolean;
@@ -19,7 +20,7 @@ const VoiceOrb = ({ isRecording, audioLevel = 0 }: VoiceOrbProps) => {
   useEffect(() => { audioRef.current = audioLevel; }, [audioLevel]);
 
   useEffect(() => {
-    if (window.innerWidth < 768 || reducedMotion) return;
+    if (!ENABLE_3D || window.innerWidth < 768 || reducedMotion) return;
 
     const container = containerRef.current;
     if (!container) return;
@@ -194,8 +195,8 @@ const VoiceOrb = ({ isRecording, audioLevel = 0 }: VoiceOrbProps) => {
     }
   }, [reducedMotion]);
 
-  // CSS fallback for mobile or reduced-motion — the static glowing orb
-  if (reducedMotion || (typeof window !== 'undefined' && window.innerWidth < 768)) {
+  // CSS fallback (static glowing orb) — used when 3D is disabled, on mobile, or reduced-motion
+  if (!ENABLE_3D || reducedMotion || (typeof window !== 'undefined' && window.innerWidth < 768)) {
     return (
       <div style={{
         width: 120, height: 120, borderRadius: '50%', margin: '0 auto',

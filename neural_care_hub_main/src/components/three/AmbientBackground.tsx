@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
+import { ENABLE_3D } from '../../lib/enable3d';
 
 const PARTICLE_COUNT = 300;
 const NODE_COUNT = 25;
@@ -12,8 +13,8 @@ const AmbientBackground = () => {
   const reducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
-    // Skip on mobile or when the user requested reduced motion — CSS fallback handles it
-    if (window.innerWidth < 768 || reducedMotion) return;
+    // Decorative only — off by default, and skipped on mobile / reduced motion.
+    if (!ENABLE_3D || window.innerWidth < 768 || reducedMotion) return;
 
     const container = containerRef.current;
     if (!container) return;
