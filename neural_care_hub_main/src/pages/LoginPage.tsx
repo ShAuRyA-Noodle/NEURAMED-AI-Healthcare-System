@@ -309,6 +309,11 @@ const LoginPage = () => {
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<'doctor' | 'patient' | ''>('');
   const [inviteCode, setInviteCode] = useState('');
+  // Public demo doctor code — lets anyone try the clinician experience on the
+  // demo (synthetic data only). Configurable via VITE_DEMO_DOCTOR_CODE; must
+  // match the backend DOCTOR_INVITE_CODE. For a real deployment, remove this
+  // hint and use a private code.
+  const DEMO_DOCTOR_CODE = ((import.meta.env.VITE_DEMO_DOCTOR_CODE as string) || 'NEURAMED-DEMO-2026').toUpperCase();
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -734,7 +739,14 @@ const LoginPage = () => {
                             style={{ ...inputStyle, textTransform: 'uppercase', letterSpacing: '0.1em' }}
                             onFocus={e => { e.target.style.borderColor = '#00E5FF'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
                             onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }} />
-                          <p style={{ fontFamily: '"DM Mono", monospace', fontSize: 10, color: '#445566', marginTop: 4 }}>Contact admin for invite code</p>
+                          <p style={{ fontFamily: '"DM Mono", monospace', fontSize: 10, color: '#8AA0AD', marginTop: 4 }}>
+                            Demo doctor code:{' '}
+                            <button type="button" onClick={() => setInviteCode(DEMO_DOCTOR_CODE)}
+                              aria-label="Use the demo doctor invite code"
+                              style={{ background: 'transparent', border: 0, padding: 0, color: '#00E5FF', cursor: 'pointer', fontFamily: 'inherit', fontSize: 10, letterSpacing: '0.08em' }}>
+                              {DEMO_DOCTOR_CODE}
+                            </button>{' '}— click to use
+                          </p>
                         </motion.div>
                       )}
                     </AnimatePresence>
