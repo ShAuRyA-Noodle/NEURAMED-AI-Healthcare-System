@@ -181,15 +181,16 @@ const SarvamVoicePage = () => {
             </p>
           </div>
         </div>
-        {/* Ollama Status */}
+        {/* Availability — Groq is the primary engine; a local Ollama Sarvam
+            model is an optional enhancement, NOT a requirement. */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 20,
-          background: health?.ollama_running ? 'rgba(0,255,157,0.08)' : 'rgba(255,59,92,0.08)',
-          border: `1px solid ${health?.ollama_running ? 'rgba(0,255,157,0.25)' : 'rgba(255,59,92,0.25)'}`,
+          background: health?.available ? 'rgba(0,255,157,0.08)' : 'rgba(255,59,92,0.08)',
+          border: `1px solid ${health?.available ? 'rgba(0,255,157,0.25)' : 'rgba(255,59,92,0.25)'}`,
         }}>
-          {health?.ollama_running
-            ? <><Wifi size={12} style={{ color: 'var(--green)' }} /><span className="font-body" style={{ fontSize: 11, color: 'var(--green)' }}>Sarvam {health.sarvam_available ? 'Ready' : '(Groq Fallback)'}</span></>
-            : <><WifiOff size={12} style={{ color: 'var(--red)' }} /><span className="font-body" style={{ fontSize: 11, color: 'var(--red)' }}>Ollama Offline (Groq Fallback)</span></>
+          {health?.available
+            ? <><Wifi size={12} style={{ color: 'var(--green)' }} /><span className="font-body" style={{ fontSize: 11, color: 'var(--green)' }}>Ready · {health.sarvam_available ? 'Sarvam (native)' : 'Groq'}</span></>
+            : <><WifiOff size={12} style={{ color: 'var(--red)' }} /><span className="font-body" style={{ fontSize: 11, color: 'var(--red)' }}>Unavailable — set GROQ_API_KEY</span></>
           }
         </div>
       </div>

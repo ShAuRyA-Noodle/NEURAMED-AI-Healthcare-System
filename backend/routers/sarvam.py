@@ -32,27 +32,38 @@ LANGUAGE_CONFIG = {
 
 @router.get("/health")
 async def sarvam_health():
-    """Check if Ollama is running and Sarvam model is available."""
+    """Report vernacular-diagnosis availability.
+
+    The PRIMARY engine is Groq (works with no local setup). A local Ollama
+    Sarvam model is an OPTIONAL enhancement for native-language nuance. So
+    `available` reflects Groq — the feature is usable whenever Groq is
+    configured, regardless of Ollama.
+    """
     import httpx
+    groq_configured = bool(os.getenv("GROQ_API_KEY", "").strip())
+    ollama_running = False
+    sarvam_available = False
+    model_names = []
     try:
         async with httpx.AsyncClient() as client:
             r = await client.get(f"{OLLAMA_URL}/api/tags", timeout=3.0)
             models = r.json().get("models", [])
+            ollama_running = True
             sarvam_available = any("sarvam" in m.get("name", "") for m in models)
             model_names = [m.get("name", "") for m in models]
-        return {
-            "ollama_running": True,
-            "sarvam_available": sarvam_available,
-            "available_models": model_names,
-            "model": "mashriram/sarvam-m-tools:latest",
-        }
     except Exception:
-        return {
-            "ollama_running": False,
-            "sarvam_available": False,
-            "available_models": [],
-            "note": "Ollama not running locally. Start with: ollama serve",
-        }
+        pass
+
+    engine = "sarvam-ollama" if sarvam_available else ("groq" if groq_configured else "none")
+    return {
+        "available": groq_configured or sarvam_available,   # can the feature run?
+        "engine": engine,                                    # what will actually answer
+        "groq_configured": groq_configured,
+        "ollama_running": ollama_running,                    # optional enhancement
+        "sarvam_available": sarvam_available,
+        "available_models": model_names,
+        "note": None if groq_configured else "Set GROQ_API_KEY to enable vernacular diagnosis.",
+    }
 
 
 @router.post("/transcribe")

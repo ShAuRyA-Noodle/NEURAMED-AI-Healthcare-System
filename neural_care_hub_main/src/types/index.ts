@@ -700,11 +700,14 @@ export interface SecondOpinionResult {
 
 // --- Sarvam Types ---
 export interface SarvamHealthStatus {
-    ollama_running: boolean
+    available: boolean            // can the feature run at all (Groq or Sarvam)
+    engine?: 'sarvam-ollama' | 'groq' | 'none'
+    groq_configured?: boolean
+    ollama_running: boolean       // optional native-model enhancement
     sarvam_available: boolean
     available_models: string[]
     model?: string
-    note?: string
+    note?: string | null
 }
 
 export interface SarvamDiagnoseResult {
