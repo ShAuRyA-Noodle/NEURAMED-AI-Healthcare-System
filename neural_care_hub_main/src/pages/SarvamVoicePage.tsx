@@ -194,13 +194,13 @@ const SarvamVoicePage = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div className="form-grid-2" style={{ gap: 24 }}>
         {/* LEFT — Input */}
         <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Language Selector */}
           <div>
             <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 10 }}>SELECT LANGUAGE</span>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            <div className="form-grid-3" style={{ gap: 8 }}>
               {LANGUAGES.map(lang => (
                 <button key={lang.code} onClick={() => setLanguage(lang.code)} style={{
                   padding: '10px 8px', borderRadius: 8, cursor: 'pointer',

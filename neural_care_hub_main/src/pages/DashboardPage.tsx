@@ -334,7 +334,7 @@ const Dashboard = () => {
       {/* ═══════ 1E. SPLIT ROW: Recent Sessions + AI Insights ═══════ */}
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}
-        style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 16 }}
+        className="split-main-aside"
       >
         {/* Recent Sessions */}
         <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, overflowX: 'auto' }}>

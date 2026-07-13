@@ -218,6 +218,68 @@ h6 {
   --sidebar-width: 220px;
 }
 
+/* ===== RESPONSIVE LAYOUT UTILITIES =====
+   Real CSS grids with media queries so they collapse on mobile —
+   unlike inline `style={{ gridTemplateColumns }}` which no breakpoint
+   can override. Single mobile breakpoint family is 768px; large splits
+   collapse at/above it so you never get mobile chrome + a desktop grid.
+   Inline `gap` on a page element still overrides the class default. */
+
+/* Auto-reflowing stat/KPI grid — wraps naturally via auto-fill */
+.grid-auto {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
+/* Dashboard loading-skeleton grid (class was referenced but never defined,
+   so skeletons rendered as full-width stacked blocks) */
+.responsive-grid-4 {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+/* Two-panel workspace (5fr 7fr): side-by-side on desktop, stacked on mobile */
+.split-workspace {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 5fr 7fr;
+}
+.split-workspace > * { min-width: 0; }
+@media (max-width: 900px) {
+  .split-workspace { grid-template-columns: 1fr; }
+}
+
+/* Content + aside split (dashboard 3fr 2fr) */
+.split-main-aside {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 3fr 2fr;
+}
+.split-main-aside > * { min-width: 0; }
+@media (max-width: 1024px) {
+  .split-main-aside { grid-template-columns: 1fr; }
+}
+
+/* Form rows: pairs/triples on desktop, single column on small screens */
+.form-grid-2 {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr 1fr;
+}
+.form-grid-3 {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, 1fr);
+}
+.form-grid-2 > *,
+.form-grid-3 > * { min-width: 0; }
+@media (max-width: 640px) {
+  .form-grid-2,
+  .form-grid-3 { grid-template-columns: 1fr; }
+}
+
 /* Sidebar mobile */
 @media (max-width: 768px) {
   .sidebar-container {

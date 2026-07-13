@@ -103,7 +103,7 @@ const PatientsPage = () => {
       </div>
 
       {/* Stats Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+      <div className="grid-auto">
         <StatCard label="TOTAL PATIENTS" value={patients?.length || 0} icon={Users} />
         <StatCard label="HIGH RISK" value={highRiskCount} icon={AlertTriangle} />
         <StatCard label="NEW THIS WEEK" value={patients?.filter((p: EnrichedPatient) => {
@@ -168,7 +168,7 @@ const PatientsPage = () => {
       </div>
 
       {/* Patient Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))', gap: 16 }}>
         {isLoading ? (
           Array.from({ length: 9 }).map((_, i) => <SkeletonCard key={i} height={200} />)
         ) : filteredPatients.length === 0 ? (
@@ -213,7 +213,7 @@ const PatientsPage = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, background: 'var(--elevated)', padding: 12, borderRadius: 8 }}>
+                <div className="form-grid-2" style={{ gap: 10, background: 'var(--elevated)', padding: 12, borderRadius: 8 }}>
                   <div>
                     <span className="font-body" style={{ fontSize: 10, color: 'var(--dim)', display: 'block', marginBottom: 4 }}>LAST SESSION</span>
                     {p.last_session_agent ? <AgentBadge agent={p.last_session_agent.toLowerCase() as AgentType} /> : <span className="font-body" style={{ fontSize: 12, color: 'var(--muted)' }}>—</span>}
@@ -245,7 +245,7 @@ const PatientsPage = () => {
                 {/* Expanded details */}
                 {isExpanded && (
                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} style={{ borderTop: '1px solid var(--border)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div className="form-grid-2" style={{ gap: 10 }}>
                       {[
                         { label: 'Phone', value: p.phone },
                         { label: 'Email', value: p.email },
@@ -270,7 +270,7 @@ const PatientsPage = () => {
                         <span className="font-body" style={{ fontSize: 12, color: 'var(--text)' }}>{p.emergency_contact}</span>
                       </div>
                     )}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div className="form-grid-2" style={{ gap: 10 }}>
                       {p.allergies && (
                         <div>
                           <span className="font-body" style={{ fontSize: 9, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 2 }}>Allergies</span>
@@ -290,7 +290,7 @@ const PatientsPage = () => {
                         <span className="font-number" style={{ fontSize: 12, color: 'var(--text)' }}>{p.insurance_id}</span>
                       </div>
                     )}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                    <div className="form-grid-2" style={{ gap: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                       {p.last_session_date && (
                         <div>
                           <span className="font-body" style={{ fontSize: 9, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: 2 }}>Last Session</span>
@@ -350,7 +350,7 @@ const PatientsPage = () => {
                 }
               });
             }} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-grid-2" style={{ gap: 12 }}>
                 {/* First Name */}
                 <div>
                   <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>First Name *</label>
@@ -367,7 +367,7 @@ const PatientsPage = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-grid-2" style={{ gap: 12 }}>
                 {/* Age */}
                 <div>
                   <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Age *</label>
@@ -388,7 +388,7 @@ const PatientsPage = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-grid-2" style={{ gap: 12 }}>
                 {/* Phone */}
                 <div>
                   <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Phone</label>
@@ -426,7 +426,7 @@ const PatientsPage = () => {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-grid-2" style={{ gap: 12 }}>
                 {/* Allergies */}
                 <div>
                   <label className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Allergies</label>
