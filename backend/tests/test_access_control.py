@@ -36,9 +36,13 @@ def test_patient_cannot_view_patient_timeline(patient_client):
     assert r.status_code == 403
 
 
-def test_patient_cannot_view_dashboard_stats(patient_client):
+def test_patient_can_view_dashboard_stats(patient_client):
+    # The Overview/dashboard is the default landing surface for every logged-in
+    # user (aggregate stats + charts), so it is require_user, not doctor-only.
+    # Individual patient RECORDS (list/detail/sessions/search/timeline) remain
+    # doctor-gated — those are the PHI-enumeration surfaces.
     r = patient_client.get("/api/dashboard/stats")
-    assert r.status_code == 403
+    assert r.status_code == 200
 
 
 def test_patient_cannot_browse_scans(patient_client):
