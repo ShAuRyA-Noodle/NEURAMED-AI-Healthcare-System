@@ -118,7 +118,7 @@ def get_appointment_stats(db: Session = Depends(get_db), current_user: User = De
 
 
 @router.get("/upcoming")
-def get_upcoming(db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def get_upcoming(db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     now = datetime.utcnow()
     week_ahead = now + timedelta(days=7)
     appointments = db.query(Appointment).filter(
@@ -130,7 +130,7 @@ def get_upcoming(db: Session = Depends(get_db), current_user: User = Depends(req
 
 
 @router.get("/today")
-def get_today_appointments(db: Session = Depends(get_db), current_user: User = Depends(require_user)):
+def get_today_appointments(db: Session = Depends(get_db), current_user: User = Depends(require_doctor)):
     now = datetime.utcnow()
     today_start = datetime(now.year, now.month, now.day)
     today_end = today_start + timedelta(days=1)

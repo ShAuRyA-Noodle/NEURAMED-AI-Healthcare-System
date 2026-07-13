@@ -72,6 +72,23 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def decode_token(token: Optional[str]) -> Optional[dict]:
+    """Validate a JWT and return its payload, or None if missing/invalid.
+
+    Shared decode logic used by both the HTTP dependency (require_user) and
+    the WebSocket handshake (which passes the token as a query param).
+    """
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        return None
+    if payload.get("sub") is None:
+        return None
+    return payload
+
+
 async def require_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
@@ -81,15 +98,10 @@ async def require_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    if token is None:
+    payload = decode_token(token)
+    if payload is None:
         raise credentials_exception
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-        if user_id is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
+    user_id = payload.get("sub")
     user = db.query(User).filter(User.id == int(user_id)).first()
     if user is None:
         raise credentials_exception

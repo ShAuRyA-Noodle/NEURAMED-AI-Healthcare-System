@@ -10,10 +10,19 @@ export const useLiveWebSocket = () => {
         let timeoutId: number
 
         const connect = () => {
-            const wsUrl = import.meta.env.VITE_WS_URL
+            // H2 — the live feed carries PHI, so the WS handshake requires a JWT.
+            // Browsers can't set Authorization headers on a WS, so pass it as a
+            // query param. Skip connecting entirely when unauthenticated.
+            const token = localStorage.getItem('neuramed_token')
+            if (!token) {
+                setIsConnected(false)
+                return
+            }
+            const baseUrl = import.meta.env.VITE_WS_URL
                 || (import.meta.env.VITE_API_BASE_URL
                     ? import.meta.env.VITE_API_BASE_URL.replace(/^http/, 'ws') + '/ws/live-feed'
                     : 'ws://localhost:8000/ws/live-feed')
+            const wsUrl = `${baseUrl}?token=${encodeURIComponent(token)}`
             const ws = new WebSocket(wsUrl)
             wsRef.current = ws
 
