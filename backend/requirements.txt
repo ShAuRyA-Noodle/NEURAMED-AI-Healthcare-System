@@ -25,3 +25,10 @@ httpx
 pytest
 pytest-asyncio
 alembic
+torch
+torchxrayvision
+scikit-image
+pydicom>=3
+pylibjpeg
+pylibjpeg-libjpeg
+pylibjpeg-openjpeg
