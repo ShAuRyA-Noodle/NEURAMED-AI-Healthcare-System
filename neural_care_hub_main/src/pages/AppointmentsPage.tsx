@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, UserPlus, FileText, CheckCircle, Clock, XCircle, Plus, X, TrendingUp, Loader2, StickyNote } from 'lucide-react';
+import { Calendar, UserPlus, FileText, CheckCircle, Clock, XCircle, Plus, X, TrendingUp, Loader2, StickyNote, type LucideIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAppointments, useCreateAppointment, useUpdateAppointmentStatus, useAppointmentStats, useAddAppointmentNotes } from '@/hooks/useAppointments';
 import { usePatients } from '@/hooks/usePatients';
@@ -13,7 +13,7 @@ const statusBg = (s: AppointmentStatus) => s === 'completed' ? 'rgba(0,255,157,0
 
 const SPECIALTIES = ['General', 'Cardiology', 'Pulmonology', 'Neurology', 'Orthopedics', 'Radiology', 'Dermatology', 'Oncology', 'Pediatrics', 'Psychiatry'];
 
-const StatCard = ({ label, value, icon: Icon, color }: { label: string; value: number | string; icon: any; color?: string }) => (
+const StatCard = ({ label, value, icon: Icon, color }: { label: string; value: number | string; icon: LucideIcon; color?: string }) => (
   <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
     <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <Icon size={20} style={{ color: color || 'var(--muted)' }} />
@@ -43,7 +43,7 @@ const Appointments = () => {
   const { mutateAsync: saveNotes, isPending: isSavingNotes } = useAddAppointmentNotes();
 
   // Filter patients for the create modal search
-  const matchedPatients = (allPatients || []).filter((p: any) => {
+  const matchedPatients = (allPatients || []).filter((p) => {
     if (!patientSearch) return false;
     const s = patientSearch.toLowerCase();
     return (p.full_name || '').toLowerCase().includes(s) ||
@@ -77,7 +77,7 @@ const Appointments = () => {
         appointment_type: formData.appointment_type,
         duration_minutes: parseInt(formData.duration_minutes, 10) || 30,
         location: formData.location || undefined,
-      } as any);
+      });
       setIsModalOpen(false);
       setModalStep(1);
       setFormData({ patient_id: '', doctor_name: '', specialty: 'General', appointment_date: '', reason: '', appointment_type: 'initial', duration_minutes: '30', location: '' });
@@ -122,12 +122,12 @@ const Appointments = () => {
       {/* Filters */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface)', padding: '12px 16px', borderRadius: 12, border: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', gap: 8 }}>
-          {['all', 'scheduled', 'completed', 'cancelled'].map((f) => (
-            <button key={f} data-cursor="hover" onClick={() => setFilter(f as any)} style={{
+          {(['all', 'scheduled', 'completed', 'cancelled'] as const).map((f) => (
+            <button key={f} data-cursor="hover" onClick={() => setFilter(f)} style={{
               height: 32, padding: '0 16px', borderRadius: 16, fontFamily: 'var(--font-body)', fontSize: 12, textTransform: 'capitalize', cursor: 'pointer',
-              border: `1px solid ${filter === f ? (f === 'all' ? 'var(--text)' : statusColor(f as any)) : 'var(--border)'}`,
-              background: filter === f ? (f === 'all' ? 'rgba(255,255,255,0.05)' : statusBg(f as any)) : 'transparent',
-              color: filter === f ? (f === 'all' ? 'var(--text)' : statusColor(f as any)) : 'var(--muted)', transition: 'all 200ms'
+              border: `1px solid ${filter === f ? (f === 'all' ? 'var(--text)' : statusColor(f)) : 'var(--border)'}`,
+              background: filter === f ? (f === 'all' ? 'rgba(255,255,255,0.05)' : statusBg(f)) : 'transparent',
+              color: filter === f ? (f === 'all' ? 'var(--text)' : statusColor(f)) : 'var(--muted)', transition: 'all 200ms'
             }}>
               {f}
             </button>
@@ -142,7 +142,7 @@ const Appointments = () => {
           <span className="font-heading" style={{ fontSize: 14, color: 'var(--cyan)', display: 'block', marginBottom: 12 }}>Today ({todayAppts.length})</span>
           <div style={{ background: 'rgba(0,229,255,0.03)', border: '1px solid rgba(0,229,255,0.1)', borderRadius: 12, padding: 16 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {todayAppts.map((a: any) => (
+              {todayAppts.map((a) => (
                 <div key={a.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                     <div>
@@ -193,7 +193,7 @@ const Appointments = () => {
               </tr>
             </thead>
             <tbody>
-              {otherAppts.map((a: any) => (
+              {otherAppts.map((a) => (
                 <tr key={a.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background 150ms' }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
@@ -264,15 +264,15 @@ const Appointments = () => {
                       {formData.patient_id && (
                         <div style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.2)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <span className="font-body" style={{ fontSize: 12, color: 'var(--cyan)' }}>
-                            {(allPatients || []).find((p: any) => String(p.id) === formData.patient_id)?.full_name || ''}{' '}
-                            <span style={{ color: 'var(--muted)', fontSize: 10 }}>{(allPatients || []).find((p: any) => String(p.id) === formData.patient_id)?.patient_code}</span>
+                            {(allPatients || []).find((p) => String(p.id) === formData.patient_id)?.full_name || ''}{' '}
+                            <span style={{ color: 'var(--muted)', fontSize: 10 }}>{(allPatients || []).find((p) => String(p.id) === formData.patient_id)?.patient_code}</span>
                           </span>
                           <button type="button" onClick={() => { setFormData({ ...formData, patient_id: '' }); setPatientSearch(''); }} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 0 }}><X size={14} /></button>
                         </div>
                       )}
                       {!formData.patient_id && matchedPatients.length > 0 && (
                         <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', zIndex: 10, background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, marginTop: 4, maxHeight: 200, overflow: 'auto' }}>
-                          {matchedPatients.map((p: any) => (
+                          {matchedPatients.map((p) => (
                             <button key={p.id} type="button" data-cursor="hover" onClick={() => { setFormData({ ...formData, patient_id: String(p.id) }); setPatientSearch(''); }}
                               aria-label={`Select patient ${p.full_name || p.patient_code}`}
                               style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', color: 'inherit', font: 'inherit', padding: '10px 14px', cursor: 'pointer', border: 'none', borderBottom: '1px solid var(--border)', transition: 'background 150ms' }}
@@ -351,9 +351,9 @@ const Appointments = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span className="font-body" style={{ color: 'var(--muted)', fontSize: 12 }}>Patient</span>
                         <span className="font-body" style={{ color: 'var(--text)', fontSize: 13 }}>
-                          {(allPatients || []).find((p: any) => String(p.id) === formData.patient_id)?.full_name || `Patient #${formData.patient_id}`}
+                          {(allPatients || []).find((p) => String(p.id) === formData.patient_id)?.full_name || `Patient #${formData.patient_id}`}
                           <span className="font-number" style={{ color: 'var(--cyan)', fontSize: 10, marginLeft: 8 }}>
-                            {(allPatients || []).find((p: any) => String(p.id) === formData.patient_id)?.patient_code || ''}
+                            {(allPatients || []).find((p) => String(p.id) === formData.patient_id)?.patient_code || ''}
                           </span>
                         </span>
                       </div>

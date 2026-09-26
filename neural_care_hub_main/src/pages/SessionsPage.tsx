@@ -2,17 +2,18 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Filter, ChevronLeft, ChevronRight, Search, Trash2, Download, BarChart3, Clock, AlertTriangle } from 'lucide-react';
+import { Activity, Filter, ChevronLeft, ChevronRight, Search, Trash2, Download, BarChart3, Clock, AlertTriangle, type LucideIcon } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { AgentBadge } from '@/components/shared/AgentBadge';
 import { UrgencyBadge } from '@/components/shared/UrgencyBadge';
 import { SkeletonCard } from '@/components/shared/SkeletonCard';
 import { useToast } from '@/hooks/useToast';
 import api from '@/api/client';
+import type { SessionListItem } from '@/types';
 
 const PAGE_SIZE = 20;
 
-const StatCard = ({ label, value, icon: Icon, color }: { label: string; value: number | string; icon: any; color?: string }) => (
+const StatCard = ({ label, value, icon: Icon, color }: { label: string; value: number | string; icon: LucideIcon; color?: string }) => (
   <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
     <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <Icon size={18} style={{ color: color || 'var(--muted)' }} />
@@ -47,7 +48,7 @@ const Sessions = () => {
       if (urgencyFilter) params.set('urgency', urgencyFilter);
       params.set('limit', String(PAGE_SIZE));
       params.set('offset', String(page * PAGE_SIZE));
-      return api.get(`/api/sessions?${params.toString()}`).then(r => r.data as { total: number; sessions: any[] });
+      return api.get<{ total: number; sessions: SessionListItem[] }>(`/api/sessions?${params.toString()}`).then(r => r.data);
     },
   });
 
@@ -66,7 +67,7 @@ const Sessions = () => {
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const filteredSessions = searchQuery
-    ? sessions.filter((s: any) => {
+    ? sessions.filter((s) => {
       const q = searchQuery.toLowerCase();
       return s.patient_code?.toLowerCase().includes(q) || (s.conditions_detected || []).some((c: string) => c.toLowerCase().includes(q));
     })
@@ -82,7 +83,7 @@ const Sessions = () => {
 
   const toggleSelectAll = () => {
     if (selected.size === filteredSessions.length) setSelected(new Set());
-    else setSelected(new Set(filteredSessions.map((s: any) => s.id)));
+    else setSelected(new Set(filteredSessions.map((s) => s.id)));
   };
 
   const handleBulkDelete = () => {
@@ -182,7 +183,7 @@ const Sessions = () => {
             </thead>
             <tbody>
               <AnimatePresence>
-                {filteredSessions.map((s: any) => {
+                {filteredSessions.map((s) => {
                   const conf = Math.round((s.confidence_score || 0) * 100);
                   const confCol = conf > 80 ? 'var(--green)' : conf > 60 ? 'var(--cyan)' : 'var(--amber)';
                   return (

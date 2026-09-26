@@ -23,7 +23,7 @@ import DashboardHero from '@/components/three/DashboardHero';
 
 const PIE_COLORS = ['#00E5FF', '#00FF9D', '#FF9500', '#FF3B5C', '#8B5CF6', '#EC4899'];
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: { dataKey?: string; color?: string; name?: string; value?: number | string }[]; label?: string }) => {
   if (!active || !payload) return null;
   return (
     <div style={{
@@ -31,9 +31,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       borderRadius: 8, padding: '12px 16px', fontFamily: 'var(--font-body)', fontSize: 12
     }}>
       <div style={{ color: 'var(--muted)', marginBottom: 8 }}>
-        {format(new Date(label), 'MMM d, yyyy')}
+        {label ? format(new Date(label), 'MMM d, yyyy') : ''}
       </div>
-      {payload.map((p: any) => (
+      {payload.map((p) => (
         <div key={p.dataKey} style={{ color: p.color, marginBottom: 2 }}>
           {p.name}: {p.value}
         </div>
@@ -45,7 +45,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 /* ── Uptime Counter ── */
 const UptimeCounter = ({ seconds }: { seconds: number }) => {
   const [elapsed, setElapsed] = useState(seconds);
-  useEffect(() => { setElapsed(seconds); }, [seconds]);
   useEffect(() => {
     const t = setInterval(() => setElapsed(e => e + 1), 1000);
     return () => clearInterval(t);
@@ -251,7 +250,7 @@ const Dashboard = () => {
               {sysInfo && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Clock size={11} style={{ color: 'var(--dim)' }} />
-                  <UptimeCounter seconds={sysInfo.uptime_seconds} />
+                  <UptimeCounter key={sysInfo.server_start_time} seconds={sysInfo.uptime_seconds} />
                 </div>
               )}
             </div>
@@ -353,7 +352,7 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {recentSessions?.slice(0, 8).map((s: any) => (
+                {recentSessions?.slice(0, 8).map((s) => (
                   <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/sessions/${s.id}`)}
                     role="button" tabIndex={0}
                     aria-label={`Open session ${s.id} for ${s.patient_code}`}
@@ -424,7 +423,7 @@ const Dashboard = () => {
             <PieChart width={200} height={200}>
               <Pie data={stats.condition_distribution.slice(0, 6)} dataKey="count" nameKey="condition" cx={100} cy={100}
                 innerRadius={60} outerRadius={85} onMouseEnter={(_, i) => setActivePie(i)} onMouseLeave={() => setActivePie(null)}>
-                {stats.condition_distribution.slice(0, 6).map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                {stats.condition_distribution.slice(0, 6).map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
               </Pie>
             </PieChart>
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', pointerEvents: 'none' }}>
@@ -432,12 +431,12 @@ const Dashboard = () => {
                 {activePie !== null ? stats.condition_distribution[activePie]?.condition : 'Total'}
               </div>
               <div className="font-number" style={{ fontSize: 22, color: 'var(--text)' }}>
-                {activePie !== null ? stats.condition_distribution[activePie]?.count : stats.condition_distribution.reduce((s: number, c: any) => s + c.count, 0)}
+                {activePie !== null ? stats.condition_distribution[activePie]?.count : stats.condition_distribution.reduce((s, c) => s + c.count, 0)}
               </div>
             </div>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
-            {stats.condition_distribution.slice(0, 6).map((c: any, i: number) => (
+            {stats.condition_distribution.slice(0, 6).map((c, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <div style={{ width: 6, height: 6, borderRadius: '50%', background: PIE_COLORS[i] }} />
                 <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)' }}>{c.condition}</span>

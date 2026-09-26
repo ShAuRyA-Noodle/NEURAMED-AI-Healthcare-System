@@ -37,11 +37,6 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
-  useEffect(() => {
-    setShowResults(false);
-    setSearchQuery('');
-  }, [location.pathname]);
-
   const pathParts = location.pathname.split('/').filter(Boolean);
   const pageName = pathParts.length > 0
     ? pathParts[0].charAt(0).toUpperCase() + pathParts[0].slice(1).replace('-', ' ')
@@ -98,7 +93,7 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
         <input
           value={searchQuery}
           onChange={e => { setSearchQuery(e.target.value); setShowResults(true); }}
-          onFocus={() => { searchQuery.length >= 2 && setShowResults(true); setSearchFocused(true); }}
+          onFocus={() => { if (searchQuery.length >= 2) setShowResults(true); setSearchFocused(true); }}
           onBlur={() => setSearchFocused(false)}
           placeholder="Search patients, sessions, appointments..."
           data-cursor="hover"
@@ -151,7 +146,7 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
                     <div style={{ padding: '8px 14px', background: 'rgba(19,28,34,0.5)' }}>
                       <span className="font-body" style={{ fontSize: 9, color: 'var(--dim)', letterSpacing: '0.15em' }}>PATIENTS</span>
                     </div>
-                    {searchResults.patients.map((p: any) => (
+                    {searchResults.patients.map((p) => (
                       <button key={p.id} type="button" data-cursor="hover"
                         aria-label={`Open patient ${p.patient_code}`}
                         onClick={() => { navigate('/patients'); setShowResults(false); setSearchQuery(''); }}
@@ -169,7 +164,7 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
                     <div style={{ padding: '8px 14px', background: 'rgba(19,28,34,0.5)' }}>
                       <span className="font-body" style={{ fontSize: 9, color: 'var(--dim)', letterSpacing: '0.15em' }}>SESSIONS</span>
                     </div>
-                    {searchResults.sessions.map((s: any) => (
+                    {searchResults.sessions.map((s) => (
                       <button key={s.id} type="button" data-cursor="hover"
                         aria-label={`Open session ${s.id} for ${s.patient_code}`}
                         onClick={() => { navigate(`/sessions/${s.id}`); setShowResults(false); setSearchQuery(''); }}
@@ -190,7 +185,7 @@ const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
                     <div style={{ padding: '8px 14px', background: 'rgba(19,28,34,0.5)' }}>
                       <span className="font-body" style={{ fontSize: 9, color: 'var(--dim)', letterSpacing: '0.15em' }}>APPOINTMENTS</span>
                     </div>
-                    {searchResults.appointments.map((a: any) => (
+                    {searchResults.appointments.map((a) => (
                       <button key={a.id} type="button" data-cursor="hover"
                         aria-label={`Open appointment for ${a.patient_code} with Dr. ${a.doctor_name}`}
                         onClick={() => { navigate('/appointments'); setShowResults(false); setSearchQuery(''); }}

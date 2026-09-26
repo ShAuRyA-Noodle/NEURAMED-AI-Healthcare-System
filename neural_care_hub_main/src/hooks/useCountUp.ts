@@ -10,7 +10,6 @@ export const useCountUp = (target: number, duration: number = 1400, startOnMount
     useEffect(() => {
         // Reduced motion: jump straight to the final value, no rAF tween.
         if (reducedMotion) {
-            setCount(target)
             return
         }
 
@@ -39,5 +38,5 @@ export const useCountUp = (target: number, duration: number = 1400, startOnMount
         return () => cancelAnimationFrame(animationFrame)
     }, [target, duration, startOnMount, reducedMotion])
 
-    return count
+    return reducedMotion ? target : count
 }
