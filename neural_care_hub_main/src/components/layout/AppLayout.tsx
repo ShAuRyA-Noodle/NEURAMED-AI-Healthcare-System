@@ -1,4 +1,4 @@
-import { ReactNode, useState, useEffect } from 'react';
+import { ReactNode, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
@@ -10,29 +10,22 @@ import { useAuth } from '../../context/AuthContext';
 const AppLayout = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
   const { user } = useAuth();
-  const [isSidebarOpen, setSidebarOpen] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-
-  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
-
-  // Show onboarding for patients who haven't completed it
-  useEffect(() => {
-    if (user && user.role === 'patient' && !user.onboarding_completed) {
-      setShowOnboarding(true);
-    }
-  }, [user]);
+  const [openOnPath, setOpenOnPath] = useState<string | null>(null);
+  const [dismissedOnboardingFor, setDismissedOnboardingFor] = useState<number | null>(null);
+  const isSidebarOpen = openOnPath === location.pathname;
+  const showOnboarding = user?.role === 'patient' && !user.onboarding_completed && dismissedOnboardingFor !== user.id;
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', width: '100%', overflow: 'hidden' }}>
       <AmbientBackground />
-      <Sidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setOpenOnPath(null)} />
       {/* Mobile overlay */}
       {isSidebarOpen && (
-        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}
+        <div className="sidebar-overlay" onClick={() => setOpenOnPath(null)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 90 }} />
       )}
       <div className="main-content" style={{ marginLeft: 220, flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <TopBar onMenuClick={() => setSidebarOpen(prev => !prev)} />
+        <TopBar key={location.pathname} onMenuClick={() => setOpenOnPath(isSidebarOpen ? null : location.pathname)} />
         <main style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
           <AnimatePresence mode="wait">
             <motion.div
@@ -48,7 +41,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
         </main>
       </div>
       {showOnboarding && (
-        <PatientOnboarding onComplete={() => setShowOnboarding(false)} />
+        <PatientOnboarding onComplete={() => setDismissedOnboardingFor(user.id)} />
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
@@ -187,7 +187,7 @@ const TrendSection = ({ trend }: { trend: TrendAnalysis }) => {
               {isOpen && (
                 <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} style={{ overflow: 'hidden' }}>
                   <div style={{ padding: '0 16px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {group.items.map((item: any, i: number) => (
+                    {group.items.map((item, i) => (
                       <div key={i} style={{
                         padding: '10px 14px', borderRadius: 8,
                         background: `${group.color}06`, borderLeft: `3px solid ${group.color}`,
@@ -195,19 +195,19 @@ const TrendSection = ({ trend }: { trend: TrendAnalysis }) => {
                         <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, color: '#EEF2F7' }}>
                           {item.condition}
                         </div>
-                        {item.evidence && (
+                        {'evidence' in item && item.evidence && (
                           <p style={{ fontFamily: '"DM Mono", monospace', fontSize: 11, color: '#778899', marginTop: 4 }}>{item.evidence}</p>
                         )}
-                        {item.timeline && (
+                        {'timeline' in item && item.timeline && (
                           <span style={{ fontFamily: '"DM Mono", monospace', fontSize: 10, color: group.color, marginTop: 4, display: 'inline-block' }}>{item.timeline}</span>
                         )}
-                        {item.pattern && (
+                        {'pattern' in item && item.pattern && (
                           <p style={{ fontFamily: '"DM Mono", monospace', fontSize: 11, color: '#778899', marginTop: 4 }}>Pattern: {item.pattern}</p>
                         )}
-                        {item.occurrences && (
+                        {'occurrences' in item && item.occurrences && (
                           <span style={{ fontFamily: '"DM Mono", monospace', fontSize: 10, color: '#445566', marginTop: 2, display: 'inline-block' }}>{item.occurrences} occurrences</span>
                         )}
-                        {item.current_status && (
+                        {'current_status' in item && item.current_status && (
                           <span style={{ fontFamily: '"DM Mono", monospace', fontSize: 10, color: group.color, marginTop: 2, display: 'inline-block', marginLeft: 8 }}>Status: {item.current_status}</span>
                         )}
                       </div>
@@ -230,7 +230,7 @@ const TrendSection = ({ trend }: { trend: TrendAnalysis }) => {
             <Stethoscope size={16} color="#FF9500" />
             <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: 13, color: '#FF9500' }}>Specialist Referrals Recommended</span>
           </div>
-          {trend.specialist_referral_recommended.map((ref: any, i: number) => (
+          {trend.specialist_referral_recommended.map((ref, i) => (
             <div key={i} style={{
               padding: '8px 12px', borderRadius: 8, background: 'rgba(255,149,0,0.04)',
               marginBottom: 6, fontFamily: '"DM Mono", monospace', fontSize: 12, color: '#EEF2F7',
@@ -262,16 +262,10 @@ const TimelinePage = () => {
     enabled: pid > 0,
   });
 
-  const filteredTimeline = useMemo(() => {
-    if (!data?.timeline) return [];
-    if (filterAgent === 'all') return data.timeline;
-    return data.timeline.filter(e => e.agent_type === filterAgent);
-  }, [data?.timeline, filterAgent]);
-
-  const agentTypes = useMemo(() => {
-    if (!data?.timeline) return [];
-    return [...new Set(data.timeline.map(e => e.agent_type))];
-  }, [data?.timeline]);
+  const filteredTimeline = filterAgent === 'all'
+    ? data?.timeline ?? []
+    : data?.timeline.filter(e => e.agent_type === filterAgent) ?? [];
+  const agentTypes = [...new Set(data?.timeline.map(e => e.agent_type) ?? [])];
 
   if (!pid) {
     return (

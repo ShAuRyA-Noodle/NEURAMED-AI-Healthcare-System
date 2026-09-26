@@ -5,6 +5,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { getSarvamHealth, sarvamDiagnose, sarvamTTS } from '@/api/sarvam';
 import { useToast } from '@/hooks/useToast';
 import type { SarvamDiagnoseResult, SarvamHealthStatus } from '@/types';
+import { getSpeechRecognition, type BrowserSpeechRecognition } from '@/lib/browserSpeech';
 
 const LANGUAGES = [
   { code: 'hi', name: 'Hindi', native: '\u0939\u093f\u0928\u094d\u0926\u0940', flag: '\ud83c\uddee\ud83c\uddf3' },
@@ -33,7 +34,7 @@ const SarvamVoicePage = () => {
   const [conversationHistory, setConversationHistory] = useState<{ role: string; content: string; lang?: string }[]>([]);
   const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
   const [listenLang, setListenLang] = useState(language);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const { addToast } = useToast();
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -68,9 +69,9 @@ const SarvamVoicePage = () => {
         addToast('error', 'Audio playback failed');
       };
       await audio.play();
-    } catch (err: any) {
+    } catch (err) {
       setSpeakingIndex(null);
-      addToast('error', `TTS failed: ${err.message || 'Unknown error'}`);
+      addToast('error', `TTS failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setTtsLoading(false);
     }
@@ -89,7 +90,7 @@ const SarvamVoicePage = () => {
 
   const { mutateAsync: diagnose, isPending } = useMutation({
     mutationFn: ({ text, lang }: { text: string; lang: string }) => sarvamDiagnose(text, lang),
-    onError: (err: any) => addToast('error', `Diagnosis failed: ${err.message}`),
+    onError: (err) => addToast('error', `Diagnosis failed: ${err instanceof Error ? err.message : 'Request failed'}`),
   });
 
   const handleSubmit = async () => {
@@ -115,7 +116,7 @@ const SarvamVoicePage = () => {
       return;
     }
 
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognition = getSpeechRecognition();
     if (!SpeechRecognition) {
       addToast('error', 'Speech recognition not supported in this browser');
       return;
@@ -130,7 +131,7 @@ const SarvamVoicePage = () => {
     recognition.continuous = true;
     recognition.interimResults = true;
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event) => {
       let finalTranscript = '';
       let interimTranscript = '';
       for (let i = 0; i < event.results.length; i++) {
@@ -144,7 +145,7 @@ const SarvamVoicePage = () => {
       setTranscript((finalTranscript + interimTranscript).trim());
     };
 
-    recognition.onerror = (event: any) => {
+    recognition.onerror = (event) => {
       setIsRecording(false);
       const msg = event.error === 'not-allowed' ? 'Microphone access denied — allow mic in browser settings'
         : event.error === 'no-speech' ? 'No speech detected — try again'

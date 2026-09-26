@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-sqlalchemy>=2.0.36
+sqlalchemy>=2.0.52
 psycopg2-binary
 pydantic[email]
 python-multipart
@@ -16,7 +16,7 @@ Pillow
 opencv-python
 scikit-image
 numpy
-reportlab==4.1.0
+reportlab==5.0.1
 aiofiles
 websockets
 PyMuPDF
@@ -27,7 +27,7 @@ alembic
 torch
 torchxrayvision
 scikit-image
-pydicom>=3
+pydicom>=3.0.2
 pylibjpeg
 pylibjpeg-libjpeg
 pylibjpeg-openjpeg

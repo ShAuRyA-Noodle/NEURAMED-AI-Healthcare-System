@@ -33,6 +33,29 @@ const ACR_COLORS: Record<string, { bg: string; border: string; text: string; lab
   '5': { bg: 'linear-gradient(135deg, rgba(255,59,92,0.15) 0%, rgba(239,68,68,0.05) 100%)', border: '#FF3B5C', text: '#fca5a5', label: 'ACR 5 — Highly Suggestive', glow: '0 0 24px rgba(255,59,92,0.15)' },
 };
 
+const confColor = (value: number) => value > 80 ? 'var(--green)' : value > 60 ? 'var(--cyan)' : 'var(--amber)';
+
+const ConfidenceGauge = ({ value, reasoning }: { value: number; reasoning?: string }) => {
+  const pct = Math.round(value * 100);
+  const radius = 40;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (pct / 100) * circumference;
+  const color = confColor(pct);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+      <svg width={100} height={100} viewBox="0 0 100 100">
+        <circle cx={50} cy={50} r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={6} />
+        <circle cx={50} cy={50} r={radius} fill="none" stroke={color} strokeWidth={6}
+          strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round" transform="rotate(-90 50 50)" style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
+        <text x={50} y={46} textAnchor="middle" fill={color} fontSize={20} fontFamily="var(--font-number)" fontWeight={700}>{pct}%</text>
+        <text x={50} y={62} textAnchor="middle" fill="var(--muted)" fontSize={8} fontFamily="var(--font-body)">CONFIDENCE</text>
+      </svg>
+      {reasoning && <p className="font-body" style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6, margin: 0, flex: 1 }}>{reasoning}</p>}
+    </div>
+  );
+};
+
 const ImagingAI = () => {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -178,7 +201,6 @@ const ImagingAI = () => {
   const scanTypes = ['CT Scan', 'MRI', 'X-Ray', 'Ultrasound'];
   const bodyRegions = ['Brain', 'Chest', 'Abdomen', 'Spine', 'Pelvis', 'Extremity', 'Neck'];
   const genderOptions = ['Male', 'Female', 'Other'];
-  const confColor = (v: number) => v > 80 ? 'var(--green)' : v > 60 ? 'var(--cyan)' : 'var(--amber)';
   // Pathology probability -> color (higher = more concerning)
   const pathColor = (p: number) => p > 0.7 ? 'var(--red)' : p > 0.5 ? 'var(--amber)' : p > 0.25 ? 'var(--cyan)' : 'var(--green)';
   const MEASUREMENTS_UNAVAILABLE = 'Measurements unavailable — no DICOM calibration (upload DICOM for physical measurements)';
@@ -187,30 +209,6 @@ const ImagingAI = () => {
 
   const tabs = ['impression', 'systematic', 'differentials', 'recommendations', 'data'] as const;
   const tabLabels = { impression: 'Impression', systematic: 'Findings', differentials: 'Differentials', recommendations: 'Recommendations', data: 'Raw Data' };
-
-  // Confidence gauge SVG
-  const ConfidenceGauge = ({ value, reasoning }: { value: number; reasoning?: string }) => {
-    const pct = Math.round(value * 100);
-    const radius = 40;
-    const circumference = 2 * Math.PI * radius;
-    const strokeDashoffset = circumference - (pct / 100) * circumference;
-    const color = confColor(pct);
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-        <svg width={100} height={100} viewBox="0 0 100 100">
-          <circle cx={50} cy={50} r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={6} />
-          <circle cx={50} cy={50} r={radius} fill="none" stroke={color} strokeWidth={6}
-            strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
-            strokeLinecap="round" transform="rotate(-90 50 50)" style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
-          <text x={50} y={46} textAnchor="middle" fill={color} fontSize={20} fontFamily="var(--font-number)" fontWeight={700}>{pct}%</text>
-          <text x={50} y={62} textAnchor="middle" fill="var(--muted)" fontSize={8} fontFamily="var(--font-body)">CONFIDENCE</text>
-        </svg>
-        {reasoning && (
-          <p className="font-body" style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6, margin: 0, flex: 1 }}>{reasoning}</p>
-        )}
-      </div>
-    );
-  };
 
   // Assessment color mapping
   const assessmentColor = (assessment: string) => {

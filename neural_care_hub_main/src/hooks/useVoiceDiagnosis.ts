@@ -8,14 +8,14 @@ export const useVoiceDiagnosis = () => {
 
     return useMutation({
         mutationFn: diagnoseSpeech,
-        onSuccess: (data: any) => {
+        onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
             queryClient.invalidateQueries({ queryKey: ['activity-feed'] })
             queryClient.invalidateQueries({ queryKey: ['recent-sessions'] })
             addToast('success', `Diagnosis complete — ${data.urgency?.toUpperCase() || 'UNKNOWN'} urgency detected`)
         },
-        onError: (err: any) => {
-            addToast('error', `Diagnosis failed: ${err.message || 'Request failed'}`)
+        onError: (err) => {
+            addToast('error', `Diagnosis failed: ${err instanceof Error ? err.message : 'Request failed'}`)
         }
     })
 }

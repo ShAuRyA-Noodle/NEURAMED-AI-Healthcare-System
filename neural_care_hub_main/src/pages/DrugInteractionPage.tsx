@@ -55,7 +55,7 @@ const DrugInteractionPage = () => {
 
   const { mutateAsync: analyze, isPending } = useMutation({
     mutationFn: checkDrugInteractions,
-    onError: (err: any) => addToast('error', `Analysis failed: ${err.message}`),
+    onError: (err) => addToast('error', `Analysis failed: ${err instanceof Error ? err.message : 'Request failed'}`),
   });
 
   const handleInputChange = useCallback((val: string) => {
