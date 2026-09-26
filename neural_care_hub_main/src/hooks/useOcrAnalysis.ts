@@ -15,8 +15,8 @@ export const useOcrAnalysis = () => {
             queryClient.invalidateQueries({ queryKey: ['recent-sessions'] })
             addToast('success', 'Report extracted successfully')
         },
-        onError: (err: any) => {
-            addToast('error', `OCR failed: ${err.message || 'Request failed'}`)
+        onError: (err) => {
+            addToast('error', `OCR failed: ${err instanceof Error ? err.message : 'Request failed'}`)
         }
     })
 }

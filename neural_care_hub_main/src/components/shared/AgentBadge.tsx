@@ -3,7 +3,7 @@ import type { AgentType } from '../../types'
 
 export const AgentBadge: React.FC<{ agent: AgentType }> = ({ agent }) => {
     let styleClasses = ""
-    let text = agent.toUpperCase()
+    const text = agent.toUpperCase()
 
     switch (agent) {
         case 'voice':

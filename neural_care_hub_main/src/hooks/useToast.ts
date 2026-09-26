@@ -11,7 +11,7 @@ export interface ToastMessage {
 
 // Global store for toasts so all useToast() calls share the same state
 let globalToasts: ToastMessage[] = []
-let listeners: Set<() => void> = new Set()
+const listeners: Set<() => void> = new Set()
 
 function emitChange() {
     listeners.forEach(l => l())

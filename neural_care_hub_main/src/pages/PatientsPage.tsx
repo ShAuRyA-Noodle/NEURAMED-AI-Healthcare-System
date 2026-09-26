@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Users, UserPlus, Calendar, Activity, Search, AlertTriangle, ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
+import { Users, UserPlus, Calendar, Activity, Search, AlertTriangle, ChevronDown, ChevronUp, Plus, X, type LucideIcon } from 'lucide-react';
 import { usePatients, useCreatePatient } from '@/hooks/usePatients';
 import { AgentBadge } from '@/components/shared/AgentBadge';
 import { UrgencyBadge } from '@/components/shared/UrgencyBadge';
@@ -32,7 +32,7 @@ const Identicon = ({ id }: { id: string }) => {
   );
 };
 
-const StatCard = ({ label, value, icon: Icon, trend }: { label: string; value: number | string; icon: any; trend?: number }) => (
+const StatCard = ({ label, value, icon: Icon, trend }: { label: string; value: number | string; icon: LucideIcon; trend?: number }) => (
   <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
     <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <Icon size={20} style={{ color: 'var(--muted)' }} />
@@ -147,8 +147,8 @@ const PatientsPage = () => {
             }}>{r === 'all' ? 'All Risk' : `${r} risk`}</button>
           ))}
           {/* Agent filter */}
-          {['all', 'voice', 'imaging', 'ocr'].map(a => (
-            <button key={a} data-cursor="hover" onClick={() => setAgentFilter(a as any)} style={{
+          {(['all', 'voice', 'imaging', 'ocr'] as const).map(a => (
+            <button key={a} data-cursor="hover" onClick={() => setAgentFilter(a)} style={{
               height: 30, padding: '0 12px', borderRadius: 16, fontFamily: 'var(--font-body)', fontSize: 11, textTransform: 'capitalize', cursor: 'pointer',
               border: `1px solid ${agentFilter === a ? 'var(--text)' : 'var(--border)'}`,
               background: agentFilter === a ? 'rgba(255,255,255,0.05)' : 'transparent',

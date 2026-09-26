@@ -18,7 +18,7 @@ const AuthContext = createContext<AuthContextType | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(() => Boolean(localStorage.getItem('neuramed_token')))
 
   useEffect(() => {
     const savedToken = localStorage.getItem('neuramed_token')
@@ -34,8 +34,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(null)
         setUser(null)
       }).finally(() => setIsLoading(false))
-    } else {
-      setIsLoading(false)
     }
   }, [])
 

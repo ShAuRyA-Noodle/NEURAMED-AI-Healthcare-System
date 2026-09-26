@@ -7,6 +7,27 @@ import { UrgencyBadge } from '@/components/shared/UrgencyBadge';
 import { AgentBadge } from '@/components/shared/AgentBadge';
 import { ConfidenceMeter } from '@/components/shared/ConfidenceMeter';
 import { useToast } from '@/hooks/useToast';
+import type { AnomalyRegion, ConditionDetail, MedicationDetail, RecommendedTest, RichAbnormalValue, SessionDetail as SessionDetailData, UrgencyLevel } from '@/types';
+
+interface SessionResult {
+  conditions?: (ConditionDetail | string)[];
+  recommendations?: (string | { action: string })[];
+  immediate_actions?: string[];
+  recommended_tests?: (RecommendedTest | string)[];
+  when_to_go_to_er?: string;
+  transcript?: string;
+  primary_finding?: string;
+  findings?: string;
+  summary?: string;
+  anomaly_regions?: AnomalyRegion[];
+  abnormal_values?: RichAbnormalValue[];
+  medications?: (string | MedicationDetail)[];
+}
+
+type SessionResponse = Omit<SessionDetailData, 'result_json' | 'urgency_level'> & {
+  result_json: SessionResult;
+  urgency_level: UrgencyLevel;
+};
 
 const URGENCY_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   critical: { bg: 'rgba(239,68,68,0.1)', border: '#ef4444', text: '#fca5a5' },
@@ -19,7 +40,7 @@ const SessionDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToast } = useToast();
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<SessionResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -33,7 +54,7 @@ const SessionDetail = () => {
           headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         });
         if (!res.ok) throw new Error('Not found');
-        setSession(await res.json());
+        setSession((await res.json()) as SessionResponse);
       } catch {
         addToast('error', 'Failed to load session');
       } finally {
@@ -185,7 +206,7 @@ const SessionDetail = () => {
               {recommendations.length > 0 && (
                 <div>
                   <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>RECOMMENDATIONS</span>
-                  {recommendations.map((r: any, i: number) => (
+                  {recommendations.map((r, i) => (
                     <div key={i} style={{ background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px', marginBottom: 8 }}>
                       <span className="font-body" style={{ fontSize: 13, color: 'var(--text)' }}>{typeof r === 'string' ? r : r.action || JSON.stringify(r)}</span>
                     </div>
@@ -197,7 +218,7 @@ const SessionDetail = () => {
 
           {activeTab === 'conditions' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {conditions.map((c: any, i: number) => {
+              {conditions.map((c, i) => {
                 const isObj = typeof c === 'object';
                 return (
                   <div key={i} style={{ background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 10, padding: 16 }}>
@@ -244,10 +265,10 @@ const SessionDetail = () => {
               {resultJson.recommended_tests?.length > 0 && (
                 <div>
                   <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>RECOMMENDED TESTS</span>
-                  {resultJson.recommended_tests.map((t: any, i: number) => (
+                  {resultJson.recommended_tests.map((t, i) => (
                     <div key={i} style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.1)', borderRadius: 8, padding: '10px 14px', marginBottom: 6 }}>
-                      <span className="font-heading" style={{ fontSize: 13, color: 'var(--text)' }}>{t.test || t}</span>
-                      {t.reason && <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginTop: 2 }}>{t.reason}</span>}
+                      <span className="font-heading" style={{ fontSize: 13, color: 'var(--text)' }}>{typeof t === 'string' ? t : t.test}</span>
+                      {typeof t !== 'string' && t.reason && <span className="font-body" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginTop: 2 }}>{t.reason}</span>}
                     </div>
                   ))}
                 </div>
@@ -290,7 +311,7 @@ const SessionDetail = () => {
 
           {activeTab === 'regions' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {resultJson.anomaly_regions?.map((r: any, i: number) => (
+              {resultJson.anomaly_regions?.map((r, i) => (
                 <div key={i} style={{ background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px', display: 'flex', justifyContent: 'space-between' }}>
                   <span className="font-body" style={{ fontSize: 13, color: 'var(--text)' }}>{r.location || `Region ${r.id}`}</span>
                   <div style={{ display: 'flex', gap: 12 }}>
@@ -312,7 +333,7 @@ const SessionDetail = () => {
 
           {activeTab === 'labs' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {abnormalValues.length > 0 ? abnormalValues.map((v: any, i: number) => (
+              {abnormalValues.length > 0 ? abnormalValues.map((v, i) => (
                 <div key={i} style={{ background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span className="font-body" style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>{v.test}</span>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -326,7 +347,7 @@ const SessionDetail = () => {
 
           {activeTab === 'medications' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {medications.length > 0 ? medications.map((m: any, i: number) => {
+              {medications.length > 0 ? medications.map((m, i) => {
                 const med = typeof m === 'string' ? { name: m } : m;
                 return (
                   <div key={i} style={{ background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px' }}>
@@ -344,7 +365,7 @@ const SessionDetail = () => {
         {session.related_sessions?.length > 0 && (
           <div style={{ background: 'var(--surface-gradient)', border: '1px solid var(--border)', borderRadius: 14, padding: 20, height: 'fit-content' }}>
             <span className="font-heading" style={{ fontSize: 14, color: 'var(--text)', display: 'block', marginBottom: 16 }}>Related Sessions</span>
-            {session.related_sessions.map((rs: any) => (
+            {session.related_sessions.map((rs) => (
               <button key={rs.id} type="button" data-cursor="hover" onClick={() => navigate(`/sessions/${rs.id}`)}
                 aria-label={`Open related session ${rs.id}`} style={{
                 width: '100%', textAlign: 'left', font: 'inherit', color: 'inherit', display: 'block',
