@@ -3,7 +3,7 @@ import type { UrgencyLevel } from '../../types'
 
 export const UrgencyBadge: React.FC<{ urgency: UrgencyLevel }> = ({ urgency }) => {
     let styleClasses = ""
-    let text = urgency.toUpperCase()
+    const text = urgency.toUpperCase()
 
     switch (urgency) {
         case 'critical':

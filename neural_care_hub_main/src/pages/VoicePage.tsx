@@ -13,6 +13,7 @@ import { ProvenanceChip } from '@/components/shared/ProvenanceChip';
 import { CitationList } from '@/components/shared/CitationList';
 import VoiceOrb from '@/components/three/VoiceOrb';
 import type { DiagnosisResult, ConditionDetail } from '@/types';
+import { getSpeechRecognition, type BrowserSpeechRecognition } from '@/lib/browserSpeech';
 
 // 12 clinical templates
 const TEMPLATES = [
@@ -76,7 +77,7 @@ const VoicePage = () => {
   const [liveTranscript, setLiveTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [duration, setDuration] = useState(0);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const liveTranscriptRef = useRef('');
 
   // Waveform state
@@ -112,9 +113,9 @@ const VoicePage = () => {
       audio.onended = () => { setIsSpeaking(false); URL.revokeObjectURL(url); };
       audio.onerror = () => { setIsSpeaking(false); URL.revokeObjectURL(url); addToast('error', 'Audio playback failed'); };
       await audio.play();
-    } catch (err: any) {
+    } catch (err) {
       setIsSpeaking(false);
-      addToast('error', `TTS failed: ${err.message || 'Unknown error'}`);
+      addToast('error', `TTS failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setTtsLoading(false);
     }
@@ -134,8 +135,6 @@ const VoicePage = () => {
     let interval: ReturnType<typeof setInterval>;
     if (isRecording) {
       interval = setInterval(() => setDuration(d => d + 1), 1000);
-    } else {
-      setDuration(0);
     }
     return () => clearInterval(interval);
   }, [isRecording]);
@@ -144,7 +143,7 @@ const VoicePage = () => {
     localStorage.setItem('neuramed-lifestyle-checks', JSON.stringify(lifestyleChecked));
   }, [lifestyleChecked]);
 
-  const updateWaveform = useCallback(() => {
+  const updateWaveform = useCallback(function drawWaveform() {
     if (analyserRef.current && dataArrayRef.current) {
       analyserRef.current.getByteFrequencyData(dataArrayRef.current);
       const newWave: number[] = [];
@@ -153,11 +152,11 @@ const VoicePage = () => {
       }
       setWaveData(newWave);
     }
-    animationFrameRef.current = requestAnimationFrame(updateWaveform);
+    animationFrameRef.current = requestAnimationFrame(drawWaveform);
   }, []);
 
   const startRecording = async () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognition = getSpeechRecognition();
     if (!SpeechRecognition) {
       addToast('error', 'Speech recognition not supported. Use Chrome or Edge, or switch to Type tab.');
       setTab('type');
@@ -168,7 +167,10 @@ const VoicePage = () => {
       // Start audio stream for waveform visualization
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const browser = window as Window & { webkitAudioContext?: typeof AudioContext };
+      const AudioContextConstructor = browser.AudioContext ?? browser.webkitAudioContext;
+      if (!AudioContextConstructor) throw new Error('Audio context is unavailable');
+      const audioCtx = new AudioContextConstructor();
       const analyser = audioCtx.createAnalyser();
       const source = audioCtx.createMediaStreamSource(stream);
       source.connect(analyser);
@@ -185,7 +187,7 @@ const VoicePage = () => {
       recognition.interimResults = true;
       recognition.lang = language;
 
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event) => {
         let final = '';
         let interim = '';
         for (let i = 0; i < event.results.length; i++) {
@@ -201,7 +203,7 @@ const VoicePage = () => {
         setInterimTranscript(interim);
       };
 
-      recognition.onerror = (event: any) => {
+      recognition.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
         if (event.error === 'not-allowed') {
           addToast('error', 'Microphone access denied. Please allow microphone access.');
@@ -218,6 +220,7 @@ const VoicePage = () => {
       recognition.start();
       recognitionRef.current = recognition;
       setIsRecording(true);
+      setDuration(0);
       setLiveTranscript('');
       setInterimTranscript('');
     } catch (e) {

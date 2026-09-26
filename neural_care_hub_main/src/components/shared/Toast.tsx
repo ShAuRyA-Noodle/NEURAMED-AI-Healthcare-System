@@ -3,12 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useToast, ToastMessage } from '../../hooks/useToast'
 import { X } from 'lucide-react'
 
-// Simple global context since we create Toast in App.tsx
-export let addGlobalToast: ReturnType<typeof useToast>['addToast']
-
 export const Toast: React.FC = () => {
-    const { toasts, addToast, removeToast } = useToast()
-    addGlobalToast = addToast
+    const { toasts, removeToast } = useToast()
 
     const getBorderColor = (type: ToastMessage['type']) => {
         switch (type) {

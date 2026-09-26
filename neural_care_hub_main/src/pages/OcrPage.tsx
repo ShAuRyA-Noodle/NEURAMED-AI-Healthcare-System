@@ -522,7 +522,7 @@ const OCRReports = () => {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                               {result.key_findings.map((f, i) => (
                                 <div key={i} style={{ background: 'var(--elevated)', borderRadius: 6, padding: '10px 14px', border: '1px solid var(--border)' }}>
-                                  <span className="font-body" style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.5 }}>{typeof f === 'string' ? f : (f as any).finding || JSON.stringify(f)}</span>
+                                  <span className="font-body" style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.5 }}>{typeof f === 'string' ? f : JSON.stringify(f)}</span>
                                 </div>
                               ))}
                             </div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/client';
+import { useToast } from '../../hooks/useToast';
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const LANGUAGES = ['English', 'Hindi', 'Tamil', 'Telugu', 'Bengali', 'Marathi', 'Kannada', 'Malayalam', 'Punjabi'];
@@ -19,6 +20,7 @@ const labelStyle: React.CSSProperties = {
 
 const PatientOnboarding = ({ onComplete }: { onComplete: () => void }) => {
   const { user } = useAuth();
+  const { addToast } = useToast();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
 
@@ -41,7 +43,7 @@ const PatientOnboarding = ({ onComplete }: { onComplete: () => void }) => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const payload: any = { onboarding_completed: true };
+      const payload: { onboarding_completed: boolean; date_of_birth?: string; blood_type?: string; height_cm?: number; weight_kg?: number; emergency_contact_name?: string; emergency_contact_phone?: string; existing_conditions?: string; current_medications?: string; known_allergies?: string; previous_surgeries?: string; language_preference?: string } = { onboarding_completed: true };
       if (form.date_of_birth) payload.date_of_birth = form.date_of_birth;
       if (form.blood_type) payload.blood_type = form.blood_type;
       if (form.height_cm) payload.height_cm = parseFloat(form.height_cm);
@@ -57,7 +59,9 @@ const PatientOnboarding = ({ onComplete }: { onComplete: () => void }) => {
       await api.patch('/api/auth/profile', payload);
       onComplete();
     } catch {
-      onComplete(); // don't block user if update fails
+      addToast('error', 'Could not save your profile. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 

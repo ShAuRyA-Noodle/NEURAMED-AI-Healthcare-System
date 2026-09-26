@@ -196,7 +196,7 @@ const BiometricLoader = () => (
 // ─── DOCTOR CREDENTIALS STEP ───
 const DoctorCredentialsStep = ({ credentials, setCredentials, onBack, onSubmit }: {
   credentials: { license: string; specialization: string; hospital: string; yearsOfPractice: number };
-  setCredentials: (c: any) => void;
+  setCredentials: (c: { license: string; specialization: string; hospital: string; yearsOfPractice: number }) => void;
   onBack: () => void;
   onSubmit: () => void;
 }) => {
@@ -494,8 +494,8 @@ const LoginPage = () => {
       authLogin(res.access_token, res.user);
       // Small delay for biometric animation
       setTimeout(() => navigate('/dashboard', { replace: true }), 1200);
-    } catch (e: any) {
-      setError(e.message || 'Login failed');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Login failed');
       triggerShake();
       setLoading(false);
     }
@@ -545,8 +545,8 @@ const LoginPage = () => {
       }
 
       setTimeout(() => navigate('/dashboard', { replace: true }), 1200);
-    } catch (e: any) {
-      setError(e.message || 'Registration failed');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Registration failed');
       triggerShake();
       setLoading(false);
     }
