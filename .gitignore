@@ -56,3 +56,6 @@ uploads/
 /test_api.py
 /test_output.pdf
 /utputFormat
+
+# Local Claude Code settings (machine-specific)
+.claude/settings.local.json
