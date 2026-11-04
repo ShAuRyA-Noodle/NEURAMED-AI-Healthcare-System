@@ -49,3 +49,10 @@ uploads/
 
 # Logs
 *.log
+
+# Local scratch files (keep out of the repo)
+/test_keys.py
+/test_groq.py
+/test_api.py
+/test_output.pdf
+/utputFormat
