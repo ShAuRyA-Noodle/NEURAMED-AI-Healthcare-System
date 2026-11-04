@@ -617,7 +617,7 @@ const LoginPage = () => {
             ))}
           </div>
           <p style={{ fontFamily: '"DM Mono", monospace', fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 48 }}>
-            Trusted by clinicians. Powered by AI.
+            Research demo. Not a medical device.
           </p>
         </div>
 
