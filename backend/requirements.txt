@@ -8,7 +8,7 @@ groq
 python-dotenv
 elevenlabs
 gTTS>=2.5.4
-PyJWT>=2.10.1
+PyJWT>=2.15.1
 
 pytesseract
 pdf2image
